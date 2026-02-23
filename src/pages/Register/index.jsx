@@ -1,12 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
-export default function Login() {
+export default function Register() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    name: "",
     email: "",
-    password: ""
+    password: "",
+    confirmPassword: ""
   });
 
   const [error, setError] = useState("");
@@ -21,27 +23,40 @@ export default function Login() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!form.email || !form.password) {
+    if (!form.name || !form.email || !form.password || !form.confirmPassword) {
       setError("Please fill in all fields.");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
       return;
     }
 
     setError("");
 
-    // 模拟登录成功
-    console.log("Login data:", form);
+    console.log("Register data:", form);
 
-    navigate("/");
+    navigate("/login");
   };
 
   return (
     <>
-      <h2 className="auth-title">Welcome Back</h2>
+      <h2 className="auth-title">Create Account</h2>
       <p className="auth-subtitle">
-        Enter your details to access your account
+        Join Hearth Studio and bring light home
       </p>
 
       <form onSubmit={handleSubmit} className="auth-form">
+
+        <input
+          type="text"
+          name="name"
+          placeholder="Full Name"
+          className="auth-input"
+          value={form.name}
+          onChange={handleChange}
+        />
 
         <input
           type="email"
@@ -61,20 +76,25 @@ export default function Login() {
           onChange={handleChange}
         />
 
-        <div className="auth-forgot">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </div>
+        <input
+          type="password"
+          name="confirmPassword"
+          placeholder="Confirm Password"
+          className="auth-input"
+          value={form.confirmPassword}
+          onChange={handleChange}
+        />
 
         {error && <p className="auth-error">{error}</p>}
 
         <button type="submit" className="auth-button">
-          Sign In
+          Create Account
         </button>
 
       </form>
 
       <p className="auth-switch">
-        Don't have an account? <Link to="/register">Register</Link>
+        Already have an account? <Link to="/login">Sign In</Link>
       </p>
     </>
   );

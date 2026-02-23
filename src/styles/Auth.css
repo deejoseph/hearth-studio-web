@@ -1,0 +1,122 @@
+.auth-wrapper {
+  min-height: 100vh;
+  background: radial-gradient(circle at center, #111 0%, #000 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.auth-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.auth-back {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.auth-back:hover {
+  color: #fff;
+}
+
+.auth-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.auth-title {
+  font-size: 28px;
+  margin-bottom: 10px;
+  color: #ffffff;
+  text-align: center;
+}
+
+.auth-subtitle {
+  color: #cfcfcf;   /* 提亮 */
+  font-size: 14px;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 18px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: #fff;
+  outline: none;
+  transition: 0.3s;
+}
+
+.auth-input::placeholder {
+  color: #aaa;  /* 提亮 */
+}
+
+.auth-input:focus {
+  border-color: #d4af37;  /* 金色焦点 */
+  background: rgba(255,255,255,0.08);
+}
+
+.auth-button {
+  width: 100%;
+  padding: 12px;
+  background: #d4af37;
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.auth-button:hover {
+  background: #e6c45c;
+}
+
+.auth-error {
+  color: #ff6b6b;
+  font-size: 13px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.auth-forgot {
+  text-align: right;
+  margin-bottom: 20px;
+}
+
+.auth-forgot a {
+  font-size: 13px;
+  color: #aaa;
+  text-decoration: none;
+  transition: 0.3s;
+}
+
+.auth-forgot a:hover {
+  color: #d4af37;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
