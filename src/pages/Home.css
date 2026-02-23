@@ -1,0 +1,246 @@
+/* ================= GLOBAL ================= */
+
+body {
+  margin: 0;
+  padding-top: 80px; /* 为固定 Header 预留空间 */
+  font-family: "Inter", sans-serif;
+  font-weight: 400;
+  color: #222;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2 {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 400;
+  letter-spacing: 1px;
+}
+
+.home {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* ================= HERO ================= */
+
+.hero {
+  position: relative;
+  height: 100vh;
+  background-size: cover;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.hero-content {
+  position: relative;
+  max-width: 800px;
+  padding: 0 24px;
+}
+
+.hero h1 {
+  font-size: 72px;
+  line-height: 1.1;
+  letter-spacing: 2px;
+}
+
+.hero p {
+  font-size: 20px;
+  margin-top: 18px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.hero-btn {
+  margin-top: 32px;
+  padding: 14px 32px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.6);
+  backdrop-filter: blur(4px);
+  color: white;
+  cursor: pointer;
+  transition: 0.3s ease;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+}
+
+.hero-btn:hover {
+  background: white;
+  color: black;
+}
+
+.hero-btn.dark {
+  border: 1px solid black;
+  color: black;
+}
+
+.hero-btn.dark:hover {
+  background: black;
+  color: white;
+}
+
+/* ================= SPLIT SECTION (Mobile First) ================= */
+
+.split-section {
+  display: block;
+}
+
+.split-image img {
+  width: 100%;
+  height: 75vh;
+  object-fit: cover;
+  display: block;
+}
+
+.split-text {
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.split-text h2 {
+  font-size: 2.4rem;
+  margin-bottom: 24px;
+}
+
+.split-text p {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #555;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ================= GALLERY ================= */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.gallery-grid img {
+  width: 100%;
+  height: 380px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ================= FINAL CTA ================= */
+
+.final-cta {
+  padding: 120px 24px;
+  background: #f4f1ec;
+  text-align: center;
+}
+
+.final-cta h2 {
+  font-size: 2.4rem;
+  margin-bottom: 30px;
+}
+
+/* ================= DESKTOP ================= */
+
+@media (min-width: 1024px) {
+
+  /* Hero 保持沉浸，但增加呼吸感 */
+  .hero-content {
+    max-width: 900px;
+  }
+
+  .hero h1 {
+    font-size: 80px;
+  }
+
+  /* Split 改为左右布局 */
+  .split-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 100px;
+    max-width: 1200px;
+    margin: 140px auto;
+    padding: 0 40px;
+  }
+
+  .split-section.reverse {
+    direction: rtl;
+  }
+
+  .split-section.reverse .split-text {
+    direction: ltr;
+  }
+
+  .split-image img {
+    height: 600px;
+    border-radius: 6px;
+  }
+
+  .split-text {
+    text-align: left;
+    padding: 0;
+  }
+
+  .split-text p {
+    margin: 0;
+  }
+
+  /* Gallery 桌面三列 */
+  .gallery-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .gallery-grid img {
+    height: 450px;
+  }
+
+  /* CTA 呼吸感增强 */
+  .final-cta {
+    padding: 160px 0;
+  }
+
+  .final-cta h2 {
+    font-size: 2.8rem;
+  }
+}
+
+/* ================= MOBILE HERO 优化 ================= */
+
+@media (max-width: 768px) {
+
+  body {
+    padding-top: 70px;
+  }
+
+  .hero {
+    height: 90vh;
+    background-position: 35% center;
+    text-align: left;
+  }
+
+  .hero-overlay {
+    background: rgba(0,0,0,0.55);
+  }
+
+  .hero h1 {
+    font-size: 44px;
+  }
+
+  .hero p {
+    font-size: 18px;
+  }
+
+  .hero-btn {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+  }
+
+}
