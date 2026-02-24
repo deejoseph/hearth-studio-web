@@ -32,25 +32,25 @@ export default function CollectionsPage() {
             title="Tableware"
             description="Hand-carved celadon for gatherings and shared meals."
             image={celebrationImg}
-            href="/collections/tableware"
+            href="/collection/tableware"
           />
           <CategoryCard
             title="Coffee Ware"
             description="Refined forms for slow mornings."
             image={coffeeImg}
-            href="/collections/coffee"
+            href="/collection/coffee"
           />
           <CategoryCard
             title="Tea Ware"
             description="Porcelain shaped for stillness."
             image={teaImg}
-            href="/collections/tea"
+            href="/collection/tea"
           />
           <CategoryCard
             title="Home Décor"
             description="Objects that anchor a space."
             image={decorImg}
-            href="/collections/decor"
+            href="/collection/decor"
           />
         </div>
       </Section>
@@ -98,7 +98,7 @@ export default function CollectionsPage() {
   </div>
 
   <div className="text-center mt-32">
-    <Button href="/collections/tableware">
+    <Button href="/collection/tableware">
       Explore Tableware Collection →
     </Button>
   </div>

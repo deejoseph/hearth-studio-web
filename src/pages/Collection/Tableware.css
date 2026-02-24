@@ -1,0 +1,46 @@
+.tableware-page {
+  padding: 60px 80px;
+  font-family: "Helvetica Neue", sans-serif;
+}
+
+.tableware-hero {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.tableware-hero h1 {
+  font-size: 40px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.tableware-hero p {
+  color: #666;
+  font-size: 18px;
+}
+
+.tableware-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+
+.product-card img {
+  width: 100%;
+  border-radius: 8px;
+  transition: 0.4s;
+}
+
+.product-card img:hover {
+  transform: scale(1.03);
+}
+
+.product-card h3 {
+  margin-top: 20px;
+  font-weight: 500;
+}
+
+.product-card p {
+  color: #777;
+  font-size: 15px;
+}

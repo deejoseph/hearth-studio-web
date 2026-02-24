@@ -1,32 +1,48 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
+import AuthLayout from "../layout/AuthLayout";
 
 import Home from "../pages/Home";
 import Login from "../pages/Login";
-import Collection from "@/pages/Collection/index";
-import Customize from "../pages/Customize";
 import Register from "../pages/Register";
-import AuthLayout from "../layout/AuthLayout";
+import Customize from "../pages/Customize";
+
+import Collection from "../pages/Collection";
+import Tableware from "../pages/Collection/Tableware";
+
+// 如果还没创建这三个文件，先删除下面三行和对应路由
+// import CoffeeWare from "../pages/Collection/CoffeeWare";
+// import TeaWare from "../pages/Collection/TeaWare";
+// import HomeDecor from "../pages/Collection/HomeDecor";
 
 export default function AppRouter() {
   return (
     <BrowserRouter>
-  <Routes>
+      <Routes>
 
-    {/* 主布局 */}
-    <Route element={<MainLayout />}>
-      <Route path="/" element={<Home />} />
-      <Route path="/Collection" element={<Collection />} />
-      <Route path="/customize" element={<Customize />} />
-    </Route>
+        {/* 主布局 */}
+        <Route element={<MainLayout />}>
 
-    {/* Auth 布局 */}
-    <Route element={<AuthLayout />}>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-    </Route>
+          <Route path="/" element={<Home />} />
+          <Route path="/collection" element={<Collection />} />          
+          <Route path="/collection/:productId" element={<Tableware />} />
+          
+          {/* 还没做就先别写 */}
+          {/* <Route path="/collection/coffeeware" element={<CoffeeWare />} />
+          <Route path="/collection/teaware" element={<TeaWare />} />
+          <Route path="/collection/home-decor" element={<HomeDecor />} /> */}
 
-  </Routes>
-</BrowserRouter>
+          <Route path="/customize" element={<Customize />} />
+
+        </Route>
+
+        {/* Auth 布局 */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Route>
+
+      </Routes>
+    </BrowserRouter>
   );
 }

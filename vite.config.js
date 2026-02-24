@@ -9,4 +9,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+
+  // 👇 新增这一段
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://ichessgeek.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });
