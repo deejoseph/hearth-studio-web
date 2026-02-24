@@ -9,8 +9,8 @@ export default function Header() {
           Home
         </NavLink>
 
-        <NavLink to="/product" className="nav-link">
-          Product
+        <NavLink to="/Collection" className="nav-link">
+          Collection
         </NavLink>
 
         <NavLink to="/customize" className="nav-link">

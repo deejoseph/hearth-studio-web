@@ -1,0 +1,74 @@
+import Section from "../../components/Section";
+import CategoryCard from "../../components/CategoryCard";
+import FeaturedSplit from "../../components/FeaturedSplit";
+import Button from "../../components/Button";
+
+export default function Collection() {
+  return (
+    <main className="text-[#1a1a1a]">
+
+      {/* HERO */}
+      <Section background="soft">
+        <div className="text-center max-w-3xl mx-auto">
+          <h1 className="text-5xl font-light tracking-wide">
+            Collections
+          </h1>
+          <p className="mt-6 text-lg text-gray-700">
+            Celadon crafted for the rituals of everyday life.
+          </p>
+        </div>
+      </Section>
+
+      {/* CATEGORY GRID */}
+      <Section>
+        <div className="grid md:grid-cols-2 gap-8">
+          <CategoryCard
+            title="Tableware"
+            description="Hand-carved celadon for gatherings and shared meals."
+            image="/assets/tableware.jpg"
+            href="/collection/tableware"
+          />
+          <CategoryCard
+            title="Coffee Ware"
+            description="Refined forms for slow mornings."
+            image="/assets/coffee.jpg"
+            href="/collection/coffee"
+          />
+          <CategoryCard
+            title="Tea Ware"
+            description="Porcelain shaped for stillness."
+            image="/assets/tea.jpg"
+            href="/collection/tea"
+          />
+          <CategoryCard
+            title="Home Décor"
+            description="Objects that anchor a space."
+            image="/assets/decor.jpg"
+            href="/collection/decor"
+          />
+        </div>
+      </Section>
+
+      {/* FEATURED */}
+      <Section background="warm">
+        <div className="mb-20 text-center">
+          <h2 className="text-4xl font-light">Featured Collection</h2>
+          <p className="mt-4 text-gray-600">Tableware</p>
+        </div>
+
+        <FeaturedSplit
+          title="A Gift Meant to Be Kept for Generations"
+          text="Hand-carved celadon tableware, crafted as a timeless wedding heirloom."
+          image="/assets/wedding.jpg"
+        />
+
+        <div className="text-center mt-24">
+          <Button href="/collection/tableware">
+            Explore Tableware Collection →
+          </Button>
+        </div>
+      </Section>
+
+    </main>
+  );
+}

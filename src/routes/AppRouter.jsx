@@ -3,7 +3,7 @@ import MainLayout from "../layout/MainLayout";
 
 import Home from "../pages/Home";
 import Login from "../pages/Login";
-import Product from "../pages/Product";
+import Collection from "@/pages/Collection/index";
 import Customize from "../pages/Customize";
 import Register from "../pages/Register";
 import AuthLayout from "../layout/AuthLayout";
@@ -16,7 +16,7 @@ export default function AppRouter() {
     {/* 主布局 */}
     <Route element={<MainLayout />}>
       <Route path="/" element={<Home />} />
-      <Route path="/product" element={<Product />} />
+      <Route path="/Collection" element={<Collection />} />
       <Route path="/customize" element={<Customize />} />
     </Route>
 
