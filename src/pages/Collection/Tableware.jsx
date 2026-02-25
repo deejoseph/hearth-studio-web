@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getProductCraftOptions } from "../../api/productService";
+import { useNavigate } from "react-router-dom";
+import "./Tableware.css";
 
 const IMAGE_BASE = "https://www.ichessgeek.com/";
 
@@ -7,29 +9,29 @@ export default function Tableware() {
   const [craftData, setCraftData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-  async function fetchData() {
-    try {
-      const res = await getProductCraftOptions({
-        category: "tableware"
-      });
+    async function fetchData() {
+      try {
+        const res = await getProductCraftOptions({
+          category: "tableware",
+        });
 
-      if (res && res.success) {
-        setCraftData(res.data);
+        if (res && res.success) {
+          setCraftData(res.data);
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
       }
-
-    } catch (err) {
-      console.error("Fetch error:", err);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  fetchData();
-}, []);
+    fetchData();
+  }, []);
 
-  if (loading) return <div style={{ padding: "40px" }}>Loading...</div>;
+  if (loading) return <div className="loading">Loading...</div>;
 
   const groupedByProduct = craftData.reduce((acc, item) => {
     if (!acc[item.product_id]) {
@@ -43,66 +45,49 @@ export default function Tableware() {
   }, {});
 
   return (
-    <div style={{ padding: "40px" }}>
+    <div className="tableware-page">
       {Object.keys(groupedByProduct).map((productId) => {
         const group = groupedByProduct[productId];
 
-        return (
-          <section key={productId} style={{ marginBottom: "60px" }}>
-            <h2 style={{ marginBottom: "20px" }}>
-              {group.name}
-            </h2>
+        const startingPrice = Math.min(
+          ...group.items.map((item) => Number(item.price))
+        );
 
-            <div
-              style={{
-                display: "flex",
-                gap: "30px",
-                flexWrap: "wrap",
-              }}
-            >
+        return (
+          <section key={productId} className="product-section">
+            <h2 className="product-title">{group.name}</h2>
+
+            <div className="tableware-grid">
               {group.items.map((item) => (
-                <div
-                  key={item.id}
-                  style={{
-                    width: "260px",
-                    border: "1px solid #eee",
-                    borderRadius: "8px",
-                    padding: "15px",
-                    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
-                  }}
-                >
+                <div key={item.id} className="product-card">
                   <img
                     src={IMAGE_BASE + item.image_url}
                     alt={item.craft_name}
                     onClick={() =>
                       setSelectedImage(IMAGE_BASE + item.image_url)
                     }
-                    style={{
-                      width: "100%",
-                      height: "200px",
-                      objectFit: "cover",
-                      marginBottom: "10px",
-                      cursor: "pointer",
-                      borderRadius: "6px",
-                    }}
                   />
 
                   <h3>{item.craft_name}</h3>
 
-                  <p style={{ fontSize: "14px", color: "#666" }}>
-                    {item.description}
-                  </p>
+                  <p className="description">{item.description}</p>
 
-                  <p
-                    style={{
-                      fontWeight: "bold",
-                      marginTop: "10px",
-                    }}
-                  >
-                    ${item.price}
-                  </p>
+                  <p className="price">${item.price}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="product-footer">
+              <p className="starting-price">
+                Starting from ${startingPrice}
+              </p>
+
+              <button
+                className="customize-btn"
+                onClick={() => navigate(`/product/${productId}`)}
+              >
+                Customize
+              </button>
             </div>
           </section>
         );
@@ -110,31 +95,10 @@ export default function Tableware() {
 
       {selectedImage && (
         <div
+          className="image-modal"
           onClick={() => setSelectedImage(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.8)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            cursor: "pointer",
-          }}
         >
-          <img
-            src={selectedImage}
-            alt="Preview"
-            style={{
-              maxWidth: "90%",
-              maxHeight: "90%",
-              borderRadius: "10px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-            }}
-          />
+          <img src={selectedImage} alt="Preview" />
         </div>
       )}
     </div>
