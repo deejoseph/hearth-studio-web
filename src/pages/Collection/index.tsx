@@ -2,14 +2,14 @@ import Section from "@/components/Section";
 import CategoryCard from "@/components/CategoryCard";
 import FeaturedSplit from "@/components/FeaturedSplit";
 import Button from "@/components/Button";
-import celebrationImg from "@/assets/images/collection/Celebration.png";
-import coffeeImg from "@/assets/images/collection/Coffeecup.png";
-import teaImg from "@/assets/images/collection/Teaset.png";
-import decorImg from "@/assets/images/collection/Lampbase.png";
-import craftImg from "@/assets/images/collection/Craftsmanship.png";
-import personalImg from "@/assets/images/collection/Personalization.png";
-import weddingImg from "@/assets/images/collection/wedding.png";
-import translucencyImg from "@/assets/images/collection/Translucency.png";
+import celebrationImg from "@/assets/images/collection/Celebration.jpg";
+import coffeeImg from "@/assets/images/collection/Coffeecup.jpg";
+import teaImg from "@/assets/images/collection/Teaset.jpg";
+import decorImg from "@/assets/images/collection/Lampbase.jpg";
+import craftImg from "@/assets/images/collection/Craftsmanship.jpg";
+import personalImg from "@/assets/images/collection/Personalization.jpg";
+import weddingImg from "@/assets/images/collection/wedding.jpg";
+import translucencyImg from "@/assets/images/collection/Translucency.jpg";
 
 export default function CollectionsPage() {
   return (

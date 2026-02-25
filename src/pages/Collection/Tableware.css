@@ -1,12 +1,15 @@
+/* 页面整体样式 */
 .tableware-page {
   padding: 60px 80px;
   font-family: "Helvetica Neue", sans-serif;
 }
 
+/* Loading 状态 */
 .loading {
   padding: 40px;
 }
 
+/* 产品部分的样式 */
 .product-section {
   margin-bottom: 80px;
 }
@@ -17,12 +20,14 @@
   font-weight: 500;
 }
 
+/* 使用 CSS Grid 来处理产品列表 */
 .tableware-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 40px;
 }
 
+/* 产品卡片的样式 */
 .product-card {
   border: 1px solid #eee;
   border-radius: 10px;
@@ -31,10 +36,12 @@
   transition: 0.3s;
 }
 
+/* Hover 动效 */
 .product-card:hover {
   transform: translateY(-4px);
 }
 
+/* 图片的样式 */
 .product-card img {
   width: 100%;
   height: 220px;
@@ -44,31 +51,37 @@
   cursor: pointer;
 }
 
+/* 图片 hover 动效 */
 .product-card img:hover {
   transform: scale(1.03);
 }
 
+/* 产品名称样式 */
 .product-card h3 {
   margin-top: 18px;
   font-weight: 500;
 }
 
+/* 产品描述样式 */
 .description {
   color: #777;
   font-size: 14px;
   margin-top: 8px;
 }
 
+/* 价格样式 */
 .price {
   font-weight: 600;
   margin-top: 10px;
 }
 
+/* 产品底部的样式 */
 .product-footer {
   margin-top: 40px;
   text-align: center;
 }
 
+/* 起始价格文本样式 */
 .starting-price {
   margin-bottom: 15px;
   font-size: 16px;
@@ -76,6 +89,7 @@
   letter-spacing: 0.5px;
 }
 
+/* 定制按钮样式 */
 .customize-btn {
   padding: 12px 28px;
   background: transparent;
@@ -87,11 +101,13 @@
   transition: all 0.3s ease;
 }
 
+/* 定制按钮 hover 效果 */
 .customize-btn:hover {
   background: #000;
   color: #fff;
 }
 
+/* 图片弹出窗口的样式 */
 .image-modal {
   position: fixed;
   top: 0;
@@ -111,4 +127,16 @@
   max-height: 90%;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .tableware-grid {
+    grid-template-columns: 1fr; /* 单列布局 */
+  }
+
+  /* 修改卡片内图片的高度 */
+  .product-card img {
+    height: auto;
+  }
 }

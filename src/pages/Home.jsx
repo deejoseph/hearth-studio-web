@@ -1,12 +1,12 @@
 import React from "react";
 import "./Home.css";
-import dragonKiln from "../assets/images/dragon-kiln.png";
-import carving from "../assets/images/carving.png";
-import cup from "../assets/images/translucent-cup.png";
-import dinner from "../assets/images/dinner.png";
-import cup1 from "../assets/images/cup1.png";
-import cup2 from "../assets/images/cup2.png";
-import cup3 from "../assets/images/cup3.png";
+import dragonKiln from "../assets/images/dragon-kiln.jpg";
+import carving from "../assets/images/carving.jpg";
+import cup from "../assets/images/translucent-cup.jpg";
+import dinner from "../assets/images/dinner.jpg";
+import cup1 from "../assets/images/cup1.jpg";
+import cup2 from "../assets/images/cup2.jpg";
+import cup3 from "../assets/images/cup3.jpg";
 
 const Home = () => {
   return (
