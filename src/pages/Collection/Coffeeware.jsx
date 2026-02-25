@@ -3,31 +3,31 @@ import { getProductCraftOptions } from "../../api/productService";
 
 const IMAGE_BASE = "https://www.ichessgeek.com/";
 
-export default function Tableware() {
+export default function Coffeeware() {
   const [craftData, setCraftData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-  async function fetchData() {
-    try {
-      const res = await getProductCraftOptions({
-        category: "tableware"
-      });
+    async function fetchData() {
+      try {
+        const res = await getProductCraftOptions({
+          category: "coffeeware"
+        });
 
-      if (res && res.success) {
-        setCraftData(res.data);
+        if (res && res.success) {
+          setCraftData(res.data);
+        }
+
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
       }
-
-    } catch (err) {
-      console.error("Fetch error:", err);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  fetchData();
-}, []);
+    fetchData();
+  }, []);
 
   if (loading) return <div style={{ padding: "40px" }}>Loading...</div>;
 

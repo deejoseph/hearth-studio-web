@@ -38,19 +38,19 @@ export default function CollectionsPage() {
             title="Coffee Ware"
             description="Refined forms for slow mornings."
             image={coffeeImg}
-            href="/collection/coffee"
+            href="/collection/coffeeware"
           />
           <CategoryCard
             title="Tea Ware"
             description="Porcelain shaped for stillness."
             image={teaImg}
-            href="/collection/tea"
+            href="/collection/teaware"
           />
           <CategoryCard
             title="Home Décor"
             description="Objects that anchor a space."
             image={decorImg}
-            href="/collection/decor"
+            href="/collection/homedecor"
           />
         </div>
       </Section>

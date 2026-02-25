@@ -1,16 +1,13 @@
-// API 服务器地址
 const API_BASE = "/api/hearthstudio/v1";
 
-// 图片服务器地址（⚠ 注意带 www）
 export const IMAGE_BASE = "https://www.ichessgeek.com/";
 
-/**
- * 获取某个 product 的工艺选项
- */
-export async function getProductCraftOptions(productId) {
+export async function getProductCraftOptions(params = {}) {
   try {
+    const query = new URLSearchParams(params).toString();
+
     const response = await fetch(
-      `${API_BASE}/product_craft_options/?product_id=${productId}`
+      `${API_BASE}/product_craft_options/?${query}`
     );
 
     if (!response.ok) {

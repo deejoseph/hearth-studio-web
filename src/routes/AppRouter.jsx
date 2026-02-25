@@ -7,13 +7,11 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Customize from "../pages/Customize";
 
-import Collection from "../pages/Collection";
-import Tableware from "../pages/Collection/Tableware";
-
-// 如果还没创建这三个文件，先删除下面三行和对应路由
-// import CoffeeWare from "../pages/Collection/CoffeeWare";
-// import TeaWare from "../pages/Collection/TeaWare";
-// import HomeDecor from "../pages/Collection/HomeDecor";
+import Collection from "../pages/collection";
+import Tableware from "../pages/collection/Tableware";
+import Coffeeware from "../pages/collection/Coffeeware";
+import TeaWare from "../pages/collection/Teaware";
+import HomeDecor from "../pages/collection/Homedecor";
 
 export default function AppRouter() {
   return (
@@ -24,13 +22,13 @@ export default function AppRouter() {
         <Route element={<MainLayout />}>
 
           <Route path="/" element={<Home />} />
-          <Route path="/collection" element={<Collection />} />          
-          <Route path="/collection/:productId" element={<Tableware />} />
-          
-          {/* 还没做就先别写 */}
-          {/* <Route path="/collection/coffeeware" element={<CoffeeWare />} />
+          <Route path="/collection" element={<Collection />} />
+
+          {/* ✅ 分类页面 */}
+          <Route path="/collection/tableware" element={<Tableware />} />
+          <Route path="/collection/coffeeware" element={<Coffeeware />} />
           <Route path="/collection/teaware" element={<TeaWare />} />
-          <Route path="/collection/home-decor" element={<HomeDecor />} /> */}
+          <Route path="/collection/homedecor" element={<HomeDecor />} />
 
           <Route path="/customize" element={<Customize />} />
 

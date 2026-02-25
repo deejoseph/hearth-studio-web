@@ -3,33 +3,35 @@ import { getProductCraftOptions } from "../../api/productService";
 
 const IMAGE_BASE = "https://www.ichessgeek.com/";
 
-export default function Tableware() {
+export default function TeaWare() {
   const [craftData, setCraftData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-  async function fetchData() {
-    try {
-      const res = await getProductCraftOptions({
-        category: "tableware"
-      });
+    async function fetchData() {
+      try {
+        const res = await getProductCraftOptions({
+          category: "teaware"
+        });
 
-      if (res && res.success) {
-        setCraftData(res.data);
+        if (res && res.success) {
+          setCraftData(res.data);
+        }
+      } catch (err) {
+        console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
       }
-
-    } catch (err) {
-      console.error("Fetch error:", err);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  fetchData();
-}, []);
+    fetchData();
+  }, []);
 
   if (loading) return <div style={{ padding: "40px" }}>Loading...</div>;
+
+  if (!craftData.length)
+    return <div style={{ padding: "40px" }}>No products available.</div>;
 
   const groupedByProduct = craftData.reduce((acc, item) => {
     if (!acc[item.product_id]) {
@@ -49,17 +51,9 @@ export default function Tableware() {
 
         return (
           <section key={productId} style={{ marginBottom: "60px" }}>
-            <h2 style={{ marginBottom: "20px" }}>
-              {group.name}
-            </h2>
+            <h2 style={{ marginBottom: "20px" }}>{group.name}</h2>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "30px",
-                flexWrap: "wrap",
-              }}
-            >
+            <div style={{ display: "flex", gap: "30px", flexWrap: "wrap" }}>
               {group.items.map((item) => (
                 <div
                   key={item.id}
@@ -93,12 +87,7 @@ export default function Tableware() {
                     {item.description}
                   </p>
 
-                  <p
-                    style={{
-                      fontWeight: "bold",
-                      marginTop: "10px",
-                    }}
-                  >
+                  <p style={{ fontWeight: "bold", marginTop: "10px" }}>
                     ${item.price}
                   </p>
                 </div>
@@ -132,7 +121,6 @@ export default function Tableware() {
               maxWidth: "90%",
               maxHeight: "90%",
               borderRadius: "10px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
             }}
           />
         </div>
