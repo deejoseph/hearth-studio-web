@@ -8,28 +8,32 @@
   background-color: #f4f2ee;
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
-/* 只作用于 Bridge 页面标题 */
+/* =========================
+   Page Title
+========================= */
+
 .bridge-page h1 {
   text-align: center;
   font-size: 2.6rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.5px;
   color: #2f2f2f;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .bridge-page h2 {
   text-align: center;
   font-size: 1.3rem;
   font-weight: 400;
-  color: #6f8f7a; /* 低饱和青瓷色 */
-  margin-bottom: 30px;
+  color: #6f8f7a; /* Soft teal color */
+  margin-bottom: 40px;
 }
 
 /* =========================
-   Order Status
+   Order Status Section
 ========================= */
 
 .order-status {
@@ -43,8 +47,8 @@
 .order-status h3 {
   font-size: 1.2rem;
   font-weight: 500;
-  color: #8c7b5e; /* 温暖陶土色 */
-  margin-bottom: 6px;
+  color: #8c7b5e; /* Warm earth tone */
+  margin-bottom: 8px;
 }
 
 .order-status p {
@@ -54,7 +58,7 @@
 }
 
 /* =========================
-   Buttons
+   Buttons (Submit Button)
 ========================= */
 
 .action-buttons {
@@ -72,15 +76,21 @@
   cursor: pointer;
   transition: all 0.3s ease;
   letter-spacing: 0.5px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
 }
 
 .submit-btn:hover {
   background-color: #5e7a68;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.submit-btn:active {
+  transform: translateY(1px);
 }
 
 /* =========================
-   Product Header
+   Product Header Section
 ========================= */
 
 .product-header {
@@ -93,11 +103,12 @@
 .product-image img {
   width: 240px;
   border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  object-fit: cover;
 }
 
 /* =========================
-   Pattern Preview
+   Pattern Preview Section
 ========================= */
 
 .pattern-thumb-preview {
@@ -108,6 +119,7 @@
   background: #f1efe9;
   padding: 14px 18px;
   border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .pattern-thumb-preview img {
@@ -115,15 +127,146 @@
   height: 80px;
   object-fit: cover;
   border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: transform 0.3s ease;
+}
+
+.pattern-thumb-preview img:hover {
+  transform: scale(1.05);
 }
 
 /* =========================
-   Price
+   Price Display Section
 ========================= */
 
 .price-placeholder {
   color: #8a8a8a;
   font-weight: 400;
   margin-top: 10px;
+}
+
+/* =========================
+   Form Section Styling
+========================= */
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+  color: #333;
+  background-color: #fff;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #6f8f7a;
+  box-shadow: 0 0 4px rgba(111, 143, 122, 0.4);
+}
+
+/* =========================
+   Pattern Gallery (All Patterns)
+========================= */
+
+.pattern-gallery {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.pattern-card {
+  width: 160px;
+  text-align: center;
+  background-color: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.pattern-card img {
+  width: 100%;
+  max-width: 130px;
+  height: auto;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.pattern-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* =========================
+   Customize Upload Message
+========================= */
+
+.customize-message {
+  background-color: #f1efe9;
+  padding: 15px;
+  margin-top: 20px;
+  border-radius: 12px;
+  color: #555;
+  font-size: 1rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.customize-message p {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* BridgePage.css */
+
+/* Modal (Image Zoom) */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.modal-content img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Close Modal on click */
+.modal-content:hover {
+  cursor: pointer;
 }

@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { getProductCraftOptions } from "../../api/productService";
 import { useNavigate } from "react-router-dom";
-import "./Tableware.css"; // 复用统一样式
+import "./Tableware.css";
 
 const IMAGE_BASE = "https://www.ichessgeek.com/";
 
-export default function TeaWare() {
+export default function Tableware() {
   const [craftData, setCraftData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [patternType, setPatternType] = useState("");  // For selecting Pattern Type (Preset or Custom)
+  const [patterns, setPatterns] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,9 +33,26 @@ export default function TeaWare() {
     fetchData();
   }, []);
 
+  // Fetch patterns when Preset is selected
+  useEffect(() => {
+    if (patternType === "Preset") {
+      async function fetchPatterns() {
+        try {
+          const res = await fetch("/api/hearthstudio/v1/get_patterns.php");
+          const data = await res.json();
+          if (data.success) {
+            setPatterns(data.patterns);
+          }
+        } catch (err) {
+          console.error("Error fetching patterns:", err);
+        }
+      }
+
+      fetchPatterns();
+    }
+  }, [patternType]);
+
   if (loading) return <div className="loading">Loading...</div>;
-  if (!craftData.length)
-    return <div className="loading">No products available.</div>;
 
   // 按 product 分组
   const groupedByProduct = craftData.reduce((acc, item) => {
@@ -51,7 +70,6 @@ export default function TeaWare() {
     <div className="tableware-page">
       {Object.keys(groupedByProduct).map((productId) => {
         const group = groupedByProduct[productId];
-
         const startingPrice = Math.min(
           ...group.items.map((item) => Number(item.price))
         );
@@ -75,15 +93,13 @@ export default function TeaWare() {
                     />
                   </div>
 
-                  {/* 内容区域 */}
+                  {/* 内容 */}
                   <div className="card-body">
                     <h3>{item.craft_name}</h3>
-                    <p className="description">
-                      {item.description}
-                    </p>
+                    <p className="description">{item.description}</p>
                   </div>
 
-                  {/* 底部区域（关键） */}
+                  {/* 👇 关键：底部区域 */}
                   <div className="card-footer">
                     <p className="price">${item.price}</p>
 
@@ -108,7 +124,6 @@ export default function TeaWare() {
                       Customize {item.craft_name}
                     </button>
                   </div>
-
                 </div>
               ))}
             </div>
@@ -128,6 +143,47 @@ export default function TeaWare() {
           onClick={() => setSelectedImage(null)}
         >
           <img src={selectedImage} alt="Preview" />
+        </div>
+      )}
+
+      {/* Pattern Type Selection */}
+      <div className="form-group">
+        <label>Pattern Type</label>
+        <select
+          value={patternType}
+          onChange={(e) => setPatternType(e.target.value)}
+        >
+          <option value="">Select Pattern Type</option>
+          <option value="Preset">Preset</option>
+          <option value="Custom">Custom Upload</option>
+        </select>
+      </div>
+
+      {/* If Preset is selected, show pattern options */}
+      {patternType === "Preset" && (
+        <div className="patterns-selection">
+          {patterns.map((pattern) => (
+            <div key={pattern.id} className="pattern-card">
+              <img
+                src={`https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`}
+                alt={pattern.name}
+                onClick={() =>
+                  navigate(
+                    `/bridge/${productId}/${item.craft_type_id}`,
+                    {
+                      state: {
+                        productId: item.product_id,
+                        productName: group.name,
+                        craftTypeId: item.craft_type_id,
+                        patternId: pattern.id, // Send the selected pattern ID
+                      },
+                    }
+                  )
+                }
+              />
+              <span>{pattern.name}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
