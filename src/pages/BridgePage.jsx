@@ -15,6 +15,7 @@ const BridgePage = () => {
 
   const [orderStatus] = useState("pending_design");
   const [patternThumb, setPatternThumb] = useState(null);
+  const [patterns, setPatterns] = useState([]);
 
   const [formData, setFormData] = useState({
     is_public: 0,
@@ -24,6 +25,25 @@ const BridgePage = () => {
     pattern_id: "",
     custom_notes: ""
   });
+
+  // Fetch patterns from the backend when the page loads
+  useEffect(() => {
+    const fetchPatterns = async () => {
+      try {
+        const res = await fetch(
+          `/api/hearthstudio/v1/product_craft_options/get_product_design_data.php?product_id=${productId}`
+        );
+        const data = await res.json();
+        if (data.success) {
+          setPatterns(data.patterns); // Store the patterns data
+        }
+      } catch (err) {
+        console.error("Error fetching patterns:", err);
+      }
+    };
+
+    fetchPatterns();
+  }, [productId]);
 
   // 🔹 Fetch pattern thumbnail when pattern_id changes
   useEffect(() => {
@@ -127,7 +147,7 @@ const BridgePage = () => {
         />
       </div>
 
-      {/* Pattern ID */}
+      {/* Pattern Selection */}
       <div className="form-group">
         <label>Pattern Selection</label>
         <input
@@ -138,11 +158,21 @@ const BridgePage = () => {
           }
         />
 
-        {/* ✅ Thumbnail Preview */}
-        {patternThumb && (
-          <div className="pattern-thumb-preview">
-            <img src={patternThumb} alt="Pattern Preview" />
-            <span>Pattern #{formData.pattern_id}</span>
+        {/* ✅ Pattern Cards */}
+        {patterns.length > 0 && (
+          <div className="pattern-selection">
+            {patterns.map((pattern) => (
+              <div key={pattern.id} className="pattern-card">
+                <img
+                  src={`https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`}
+                  alt={pattern.name}
+                  onClick={() =>
+                    setFormData({ ...formData, pattern_id: pattern.id })
+                  }
+                />
+                <span>{pattern.name}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
