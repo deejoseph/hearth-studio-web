@@ -32,10 +32,10 @@ export default function HomeDecor() {
   }, []);
 
   if (loading) return <div className="loading">Loading...</div>;
-
   if (!craftData.length)
     return <div className="loading">No products available.</div>;
 
+  // 按 product 分组
   const groupedByProduct = craftData.reduce((acc, item) => {
     if (!acc[item.product_id]) {
       acc[item.product_id] = {
@@ -63,21 +63,52 @@ export default function HomeDecor() {
             <div className="tableware-grid">
               {group.items.map((item) => (
                 <div key={item.id} className="product-card">
-                  <img
-                    src={IMAGE_BASE + item.image_url}
-                    alt={item.craft_name}
-                    onClick={() =>
-                      setSelectedImage(IMAGE_BASE + item.image_url)
-                    }
-                  />
 
-                  <h3>{item.craft_name}</h3>
+                  {/* 图片区域 */}
+                  <div className="card-image">
+                    <img
+                      src={IMAGE_BASE + item.image_url}
+                      alt={item.craft_name}
+                      onClick={() =>
+                        setSelectedImage(IMAGE_BASE + item.image_url)
+                      }
+                    />
+                  </div>
 
-                  <p className="description">
-                    {item.description}
-                  </p>
+                  {/* 内容区域 */}
+                  <div className="card-body">
+                    <h3>{item.craft_name}</h3>
+                    <p className="description">
+                      {item.description}
+                    </p>
+                  </div>
 
-                  <p className="price">${item.price}</p>
+                  {/* 底部区域（按钮贴底关键） */}
+                  <div className="card-footer">
+                    <p className="price">${item.price}</p>
+
+                    <button
+                      className="customize-btn"
+                      onClick={() =>
+                        navigate(
+                          `/bridge/${item.product_id}/${item.craft_type_id}`,
+                          {
+                            state: {
+                              productId: item.product_id,
+                              productName: group.name,
+                              craftTypeId: item.craft_type_id,
+                              craftName: item.craft_name,
+                              price: item.price,
+                              imageUrl: IMAGE_BASE + item.image_url,
+                            },
+                          }
+                        )
+                      }
+                    >
+                      Customize {item.craft_name}
+                    </button>
+                  </div>
+
                 </div>
               ))}
             </div>
@@ -86,13 +117,6 @@ export default function HomeDecor() {
               <p className="starting-price">
                 Starting from ${startingPrice}
               </p>
-
-              <button
-                className="customize-btn"
-                onClick={() => navigate(`/product/${productId}`)}
-              >
-                Customize
-              </button>
             </div>
           </section>
         );

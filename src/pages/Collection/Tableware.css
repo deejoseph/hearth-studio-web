@@ -34,6 +34,9 @@
   padding: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 /* Hover 动效 */
@@ -60,6 +63,10 @@
 .product-card h3 {
   margin-top: 18px;
   font-weight: 500;
+}
+
+.card-footer {
+  margin-top: auto;
 }
 
 /* 产品描述样式 */
