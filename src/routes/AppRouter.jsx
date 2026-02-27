@@ -39,8 +39,8 @@ export default function AppRouter() {
 
           {/* Customize 页面（后续用 orderId） */}
           <Route
-            path="/customize/:orderId"
-            element={<Customize />}
+          path="/customize"
+          element={<Customize />}
           />
 
         </Route>

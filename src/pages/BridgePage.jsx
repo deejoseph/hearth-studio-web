@@ -24,11 +24,13 @@ const BridgePage = () => {
     craft_type_id: craftTypeId || "",
     pattern_id: "",
     custom_notes: "",
-    pattern_type_id: "1", // Default is Preset
+    pattern_type_id: "1",
     base_inscription: "",
   });
 
-  // Fetch patterns from the backend when the page loads
+  /* ==============================
+     Fetch patterns
+  ============================== */
   useEffect(() => {
     const fetchPatterns = async () => {
       try {
@@ -37,7 +39,7 @@ const BridgePage = () => {
         );
         const data = await res.json();
         if (data.success) {
-          setPatterns(data.patterns); // Store the patterns data
+          setPatterns(data.patterns);
         }
       } catch (err) {
         console.error("Error fetching patterns:", err);
@@ -47,24 +49,41 @@ const BridgePage = () => {
     fetchPatterns();
   }, [productId]);
 
+  /* ==============================
+     Submit Order (安全修复核心)
+  ============================== */
   const handleSubmitOrder = async () => {
     try {
+
+      // 🔒 核心修复逻辑
+      const safePatternId =
+        craftTypeId === "4" && formData.pattern_type_id === "1"
+          ? formData.pattern_id || null
+          : null;
+
+      const payload = {
+        productId,
+        status: "pending_design",
+        ...formData,
+        pattern_id: safePatternId,   // 👈 强制安全值
+      };
+
+      console.log("Submitting order payload:", payload);
+
       const response = await fetch("/api/hearthstudio/v1/create_order.php", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          productId,
-          status: "pending_design",
-          ...formData
-        })
+        body: JSON.stringify(payload)
       });
 
       const result = await response.json();
 
       if (result.success) {
-        navigate(`/customize/${result.orderId}`);
+        navigate("/customize", {
+          state: { newOrderId: result.orderId }
+        });
       } else {
         console.error("Order creation failed:", result.message);
       }
@@ -73,13 +92,14 @@ const BridgePage = () => {
     }
   };
 
-  // Handle image click (open modal)
+  /* ==============================
+     Modal Controls
+  ============================== */
   const openModal = (imageUrl) => {
     setSelectedImage(imageUrl);
     setIsModalOpen(true);
   };
 
-  // Close modal
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedImage(null);
@@ -87,24 +107,26 @@ const BridgePage = () => {
 
   return (
     <div className="bridge-page">
+
       {/* Product Header */}
       <div className="product-header">
         <div className="product-image">
           <img 
             src={imageUrl} 
             alt={productName} 
-            onClick={() => openModal(imageUrl)} // Open modal on click
+            onClick={() => openModal(imageUrl)}
           />
         </div>
 
         <div className="product-info">
           <h1>{productName}</h1>
 
-          {/* ✅ engraving 价格安全显示 */}
           {price ? (
             <h2>Starting from ${price}</h2>
           ) : (
-            <h2 className="price-placeholder">Price available after design selection</h2>
+            <h2 className="price-placeholder">
+              Price available after design selection
+            </h2>
           )}
         </div>
       </div>
@@ -117,6 +139,7 @@ const BridgePage = () => {
         </p>
       </div>
 
+      {/* Base Inscription */}
       <div className="form-group">
         <label>Base Inscription (Optional)</label>
         <input
@@ -134,21 +157,24 @@ const BridgePage = () => {
         <label>Craft Type</label>
         <input
           type="text"
-          value={craftName} // Display the craft name
+          value={craftName}
           disabled
         />
       </div>
 
-      {/* Only show Pattern Type and Pattern Selection if craft_type_id is 4 */}
+      {/* Pattern Section */}
       {craftTypeId === "4" && (
         <>
-          {/* Pattern Type (Preset or Custom Upload) */}
           <div className="form-group">
             <label>Pattern Type</label>
             <select
               value={formData.pattern_type_id}
               onChange={(e) =>
-                setFormData({ ...formData, pattern_type_id: e.target.value })
+                setFormData({
+                  ...formData,
+                  pattern_type_id: e.target.value,
+                  pattern_id: ""   // 🔒 切换类型时清空 pattern_id
+                })
               }
             >
               <option value="1">Preset</option>
@@ -156,46 +182,47 @@ const BridgePage = () => {
             </select>
           </div>
 
-          {/* Display all pattern images when 'Preset' is selected */}
           {formData.pattern_type_id === "1" && (
-            <div className="pattern-gallery">
-              {patterns.map((pattern) => (
-                <div key={pattern.id} className="pattern-card">
-                  <img
-                    src={`https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`}
-                    alt={pattern.name}
-                    onClick={() => openModal(`https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`)} // Open modal on click
-                  />
-                  <span>{pattern.name}</span>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="pattern-gallery">
+                {patterns.map((pattern) => (
+                  <div key={pattern.id} className="pattern-card">
+                    <img
+                      src={`https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`}
+                      alt={pattern.name}
+                      onClick={() =>
+                        openModal(
+                          `https://www.ichessgeek.com/HearthStudio${pattern.thumbnail_url}`
+                        )
+                      }
+                    />
+                    <span>{pattern.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="form-group">
+                <label>Pattern Selection</label>
+                <select
+                  value={formData.pattern_id}
+                  onChange={(e) =>
+                    setFormData({ ...formData, pattern_id: e.target.value })
+                  }
+                >
+                  <option value="">Select a Pattern</option>
+                  {patterns.map((pattern) => (
+                    <option key={pattern.id} value={pattern.id}>
+                      {pattern.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
           )}
 
-          {/* Display message if 'Custom Upload' is selected */}
           {formData.pattern_type_id === "2" && (
             <div className="customize-message">
               <p>Please upload your custom pattern in the next step of customization.</p>
-            </div>
-          )}
-
-          {/* Pattern Selection */}
-          {formData.pattern_type_id === "1" && (
-            <div className="form-group">
-              <label>Pattern Selection</label>
-              <select
-                value={formData.pattern_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, pattern_id: e.target.value })
-                }
-              >
-                <option value="">Select a Pattern</option>
-                {patterns.map((pattern) => (
-                  <option key={pattern.id} value={pattern.id}>
-                    {pattern.name}
-                  </option>
-                ))}
-              </select>
             </div>
           )}
         </>
@@ -252,7 +279,7 @@ const BridgePage = () => {
         </button>
       </div>
 
-      {/* Modal for Image Zoom */}
+      {/* Modal */}
       {isModalOpen && (
         <div className="modal" onClick={closeModal}>
           <div className="modal-content">
