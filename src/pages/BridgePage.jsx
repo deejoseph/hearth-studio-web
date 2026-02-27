@@ -25,6 +25,7 @@ const BridgePage = () => {
     pattern_id: "",
     custom_notes: "",
     pattern_type_id: "1", // Default is Preset
+    base_inscription: "",
   });
 
   // Fetch patterns from the backend when the page loads
@@ -114,6 +115,18 @@ const BridgePage = () => {
         <p>
           We are awaiting your design details to begin the customization process.
         </p>
+      </div>
+
+      <div className="form-group">
+        <label>Base Inscription (Optional)</label>
+        <input
+          type="text"
+          value={formData.base_inscription}
+          onChange={(e) =>
+            setFormData({ ...formData, base_inscription: e.target.value })
+          }
+          placeholder="Text to be carved at the bottom of the piece"
+        />
       </div>
 
       {/* Craft Type */}
@@ -228,7 +241,7 @@ const BridgePage = () => {
           }
         />
         <p className="hint-text">
-          Let us know your required date and intended use.
+          Every handcrafted detail matters. Please describe preferred dimensions, glaze tone, packaging style, intended use, or any reference ideas as clearly as possible. Detailed notes help us shorten the customization process.
         </p>
       </div>
 
