@@ -7,6 +7,7 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Customize from "../pages/Customize";
 import BridgePage from "../pages/BridgePage";
+import OrderDetail from "../pages/OrderDetail";
 
 import Collection from "../pages/collection";
 import Tableware from "../pages/collection/Tableware";
@@ -19,7 +20,7 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
 
-        {/* 主布局 */}
+        {/* ================= Main Layout ================= */}
         <Route element={<MainLayout />}>
 
           <Route path="/" element={<Home />} />
@@ -31,21 +32,27 @@ export default function AppRouter() {
           <Route path="/collection/teaware" element={<TeaWare />} />
           <Route path="/collection/homedecor" element={<HomeDecor />} />
 
-          {/* 桥梁页面（带参数） */}
+          {/* 桥梁页面 */}
           <Route
             path="/bridge/:productId/:craftTypeId"
             element={<BridgePage />}
           />
 
-          {/* Customize 页面（后续用 orderId） */}
+          {/* 时间轴页面 */}
           <Route
-          path="/customize"
-          element={<Customize />}
+            path="/customize"
+            element={<Customize />}
+          />
+
+          {/* 单个订单详情页面 */}
+          <Route
+            path="/order/:id"
+            element={<OrderDetail />}
           />
 
         </Route>
 
-        {/* Auth 布局 */}
+        {/* ================= Auth Layout ================= */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />

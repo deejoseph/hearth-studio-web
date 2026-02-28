@@ -11,7 +11,14 @@ const BridgePage = () => {
     return <div className="bridge-page">No product selected.</div>;
   }
 
-  const { productId, productName, price, imageUrl, craftTypeId, craftName } = productData;
+  const {
+    productId,
+    productName,
+    price,
+    imageUrl,
+    craftTypeId,
+    craftName
+  } = productData;
 
   const [orderStatus] = useState("pending_design");
   const [patterns, setPatterns] = useState([]);
@@ -25,7 +32,7 @@ const BridgePage = () => {
     pattern_id: "",
     custom_notes: "",
     pattern_type_id: "1",
-    base_inscription: "",
+    base_inscription: ""
   });
 
   /* ==============================
@@ -50,12 +57,10 @@ const BridgePage = () => {
   }, [productId]);
 
   /* ==============================
-     Submit Order (安全修复核心)
+     Submit Order (最终修复版)
   ============================== */
   const handleSubmitOrder = async () => {
     try {
-
-      // 🔒 核心修复逻辑
       const safePatternId =
         craftTypeId === "4" && formData.pattern_type_id === "1"
           ? formData.pattern_id || null
@@ -65,7 +70,8 @@ const BridgePage = () => {
         productId,
         status: "pending_design",
         ...formData,
-        pattern_id: safePatternId,   // 👈 强制安全值
+        pattern_id: safePatternId,
+        image_url: imageUrl   // ✅🔥 关键修复：传递封面图片
       };
 
       console.log("Submitting order payload:", payload);
@@ -81,9 +87,7 @@ const BridgePage = () => {
       const result = await response.json();
 
       if (result.success) {
-        navigate("/customize", {
-          state: { newOrderId: result.orderId }
-        });
+        navigate(`/order/${result.orderId}`);
       } else {
         console.error("Order creation failed:", result.message);
       }
@@ -95,8 +99,8 @@ const BridgePage = () => {
   /* ==============================
      Modal Controls
   ============================== */
-  const openModal = (imageUrl) => {
-    setSelectedImage(imageUrl);
+  const openModal = (img) => {
+    setSelectedImage(img);
     setIsModalOpen(true);
   };
 
@@ -111,16 +115,15 @@ const BridgePage = () => {
       {/* Product Header */}
       <div className="product-header">
         <div className="product-image">
-          <img 
-            src={imageUrl} 
-            alt={productName} 
+          <img
+            src={imageUrl}
+            alt={productName}
             onClick={() => openModal(imageUrl)}
           />
         </div>
 
         <div className="product-info">
           <h1>{productName}</h1>
-
           {price ? (
             <h2>Starting from ${price}</h2>
           ) : (
@@ -148,18 +151,13 @@ const BridgePage = () => {
           onChange={(e) =>
             setFormData({ ...formData, base_inscription: e.target.value })
           }
-          placeholder="Text to be carved at the bottom of the piece"
         />
       </div>
 
       {/* Craft Type */}
       <div className="form-group">
         <label>Craft Type</label>
-        <input
-          type="text"
-          value={craftName}
-          disabled
-        />
+        <input type="text" value={craftName} disabled />
       </div>
 
       {/* Pattern Section */}
@@ -173,7 +171,7 @@ const BridgePage = () => {
                 setFormData({
                   ...formData,
                   pattern_type_id: e.target.value,
-                  pattern_id: ""   // 🔒 切换类型时清空 pattern_id
+                  pattern_id: ""
                 })
               }
             >
@@ -222,7 +220,7 @@ const BridgePage = () => {
 
           {formData.pattern_type_id === "2" && (
             <div className="customize-message">
-              <p>Please upload your custom pattern in the next step of customization.</p>
+              <p>Please upload your custom pattern in the next step.</p>
             </div>
           )}
         </>
@@ -257,7 +255,7 @@ const BridgePage = () => {
         </label>
       </div>
 
-      {/* Customer Notes */}
+      {/* Notes */}
       <div className="form-group">
         <label>Customer Notes</label>
         <textarea
@@ -267,9 +265,6 @@ const BridgePage = () => {
             setFormData({ ...formData, custom_notes: e.target.value })
           }
         />
-        <p className="hint-text">
-          Every handcrafted detail matters. Please describe preferred dimensions, glaze tone, packaging style, intended use, or any reference ideas as clearly as possible. Detailed notes help us shorten the customization process.
-        </p>
       </div>
 
       {/* Submit */}
