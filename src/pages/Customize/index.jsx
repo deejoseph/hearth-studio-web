@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import "./Customize.css";
+import studioHero from "../../assets/images/studio-hero.jpg";
+import studioHero2 from "../../assets/images/studio-hero-2.jpg";
+import { useNavigate } from "react-router-dom";
 
 export default function Customize() {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch("/api/hearthstudio/v1/get_order_board.php")
@@ -44,7 +48,7 @@ export default function Customize() {
 
       <div className="studio-hero">
         <img
-          src="src/assets/images/studio-hero.jpg"
+          src={studioHero}
           alt="Current Season"
         />
       </div>
@@ -85,7 +89,7 @@ export default function Customize() {
           {index === 1 && (
             <div className="studio-hero next-season-hero">
               <img
-                src="src/assets/images/studio-hero-2.jpg"
+                src={studioHero2}
                 alt="Next Season"
               />
             </div>
@@ -147,7 +151,13 @@ export default function Customize() {
                             className={`order-card ${
                               isPublic ? "public" : "private"
                             }`}
-                          >
+                            onClick={() => {
+                              if (isPublic) {
+                                navigate(`/order/${order.id}`);
+                              }
+                            }}
+                            style={{ cursor: isPublic ? "pointer" : "default" }}
+                            >
                             <img
                               src={productImage}
                               alt="product"

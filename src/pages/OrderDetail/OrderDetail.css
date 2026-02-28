@@ -1,234 +1,146 @@
-/* ====== CONTAINER ====== */
-
 .order-detail-container {
   max-width: 900px;
-  margin: 0 auto;
-  padding: 80px 20px;
-  background-color: #fdfcf9;
-  min-height: 100vh;
+  margin: 60px auto;
+  padding: 20px;
   font-family: "Georgia", serif;
 }
 
-/* ====== HEADER ====== */
-
 .order-header {
-  margin-bottom: 60px;
-  border-bottom: 1px solid #e5e2da;
-  padding-bottom: 30px;
+  margin-bottom: 40px;
 }
 
 .order-header h1 {
   font-size: 28px;
-  letter-spacing: 1px;
   margin-bottom: 10px;
 }
 
-.order-header p {
-  color: #6b6b6b;
-  margin: 4px 0;
-  font-size: 14px;
+.order-cover {
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 10px;
 }
 
-/* ====== TIMELINE WRAPPER ====== */
+.current-status {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #8c6239;
+}
 
-.timeline-wrapper {
+/* TIMELINE */
+
+.timeline-section {
+  border-left: 2px solid #ccc;
+  padding-left: 20px;
+}
+
+.timeline-stage {
+  margin-bottom: 30px;
   position: relative;
-  padding-left: 40px;
-}
-
-/* vertical line */
-.timeline-wrapper::before {
-  content: "";
-  position: absolute;
-  left: 14px;
-  top: 0;
-  width: 2px;
-  height: 100%;
-  background-color: #ddd8cc;
-}
-
-/* ====== STATUS CARD ====== */
-
-.status-card {
-  position: relative;
-  margin-bottom: 40px;
-  background-color: #ffffff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  opacity: 0.6;
   transition: all 0.3s ease;
 }
 
-/* circle node */
-.status-card::before {
-  content: "";
-  position: absolute;
-  left: -32px;
-  top: 28px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background-color: #b8a98f;
-  border: 3px solid #fdfcf9;
+.timeline-stage.active {
+  opacity: 1;
+  transform: translateX(5px);
 }
 
-/* ====== CARD STATES ====== */
-
-.status-card.locked {
-  opacity: 0.5;
-  pointer-events: none;
+.timeline-stage.completed {
+  opacity: 0.9;
 }
 
-.status-card.completed {
-  border-left: 4px solid #8c7b6b;
-}
-
-.status-card.active {
-  border-left: 4px solid #c4a484;
-  transform: scale(1.01);
-}
-
-/* ====== CARD HEADER ====== */
-
-.status-header {
+.timeline-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  cursor: pointer;
 }
 
-.status-header h3 {
-  font-size: 18px;
-  margin: 0;
-  letter-spacing: 0.5px;
+.timeline-dot {
+  width: 14px;
+  height: 14px;
+  background: #ccc;
+  border-radius: 50%;
+  margin-right: 10px;
 }
 
-.status-meta {
-  font-size: 12px;
-  color: #888;
+.timeline-stage.active .timeline-dot {
+  background: #8c6239;
 }
 
-/* ====== STATUS BODY ====== */
-
-.status-body {
-  margin-top: 20px;
+.timeline-stage.completed .timeline-dot {
+  background: #4caf50;
 }
 
-.status-body p {
-  font-size: 14px;
-  color: #444;
-  line-height: 1.6;
-}
-
-/* ====== IMAGE GALLERY ====== */
-
-.status-images {
-  margin-top: 15px;
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.status-images img {
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 8px;
-  transition: transform 0.2s ease;
-}
-
-.status-images img:hover {
-  transform: scale(1.05);
-}
-
-/* ====== MESSAGE AREA ====== */
-
-.message-area {
-  margin-top: 20px;
-}
-
-.message {
-  background-color: #f3f1ec;
-  padding: 10px 14px;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
-
-.message strong {
-  color: #5b4f43;
-}
-
-/* ====== INPUT SECTION ====== */
-
-.input-section {
+.timeline-images {
   margin-top: 15px;
 }
 
-.input-section textarea {
-  width: 100%;
-  min-height: 80px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
+.timeline-image {
+  width: 120px;
+  margin-right: 10px;
+  border-radius: 6px;
+}
+
+.message-block {
+  margin-top: 10px;
+}
+
+.message.customer {
+  background: #f5f5f5;
   padding: 10px;
-  font-family: inherit;
-  font-size: 14px;
-  resize: vertical;
+  border-radius: 6px;
+  margin-bottom: 8px;
 }
 
-.input-section input[type="file"] {
-  margin-top: 10px;
+.message.studio {
+  background: #e8f5e9;
+  padding: 10px;
+  border-radius: 6px;
 }
 
-.input-section button {
+/* PAYMENT BUTTON */
+
+.pay-button {
   margin-top: 10px;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 10px 16px;
+  background: #8c6239;
+  color: white;
   border: none;
-  background-color: #8c7b6b;
-  color: white;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
 }
 
-.input-section button:hover {
-  background-color: #6e5f52;
+.pay-button:hover {
+  opacity: 0.9;
 }
 
-/* ====== SHARE SECTION ====== */
+/* SKELETON */
 
-.share-section {
-  margin-top: 20px;
-  border-top: 1px solid #eee;
-  padding-top: 15px;
-  display: flex;
-  gap: 10px;
+.skeleton-header,
+.skeleton-image,
+.skeleton-line {
+  background: #eee;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  animation: pulse 1.5s infinite;
 }
 
-.share-section button {
-  background-color: transparent;
-  border: 1px solid #c4a484;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.skeleton-header {
+  height: 30px;
+  width: 60%;
 }
 
-.share-section button:hover {
-  background-color: #c4a484;
-  color: white;
+.skeleton-image {
+  height: 300px;
+  width: 100%;
 }
 
-/* ====== RESPONSIVE ====== */
+.skeleton-line {
+  height: 20px;
+  width: 80%;
+}
 
-@media (max-width: 768px) {
-  .order-detail-container {
-    padding: 40px 15px;
-  }
-
-  .status-images img {
-    width: 80px;
-    height: 80px;
-  }
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
