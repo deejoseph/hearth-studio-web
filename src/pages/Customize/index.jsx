@@ -42,13 +42,10 @@ export default function Customize() {
   return (
     <div className="customize-container">
 
-      {/* ======================= */}
-      {/* Studio Hero */}
-      {/* ======================= */}
       <div className="studio-hero">
         <img
           src="src/assets/images/studio-hero.jpg"
-          alt="Studio atmosphere"
+          alt="Current Season"
         />
       </div>
 
@@ -56,9 +53,6 @@ export default function Customize() {
         Studio Commission Board
       </h1>
 
-      {/* ======================= */}
-      {/* Booking Status */}
-      {/* ======================= */}
       <div className="booking-status-wrapper">
         {isFull ? (
           <div className="booking-status closed">
@@ -85,160 +79,110 @@ export default function Customize() {
         )}
       </div>
 
-      {/* ======================= */}
-      {/* Seasons */}
-      {/* ======================= */}
-      {board.seasons.map((season) => (
-        <div key={season.id} className="season-section">
+      {board.seasons.map((season, index) => (
+        <div key={season.id}>
 
-          <div className="season-header">
-            <h2>{season.name}</h2>
-            <div className="season-meta">
-              {season.start_date} → {season.end_date}
-              {season.order_deadline && (
-                <span>
-                  Order Deadline: {season.order_deadline}
-                </span>
-              )}
-              <span>
-                Production: {season.production_cycle}
-              </span>
+          {index === 1 && (
+            <div className="studio-hero next-season-hero">
+              <img
+                src="src/assets/images/studio-hero-2.jpg"
+                alt="Next Season"
+              />
             </div>
-          </div>
+          )}
 
-          <div className="season-summary">
-            Total Orders: {season.used_slots} / {season.total_slots}
-          </div>
+          <div className="season-section">
 
-          {season.statuses?.map((status) => {
+            <div className="season-header">
+              <h2>{season.name}</h2>
+              <div className="season-meta">
+                {season.start_date} → {season.end_date}
+                <span>
+                  Production: {season.production_cycle}
+                </span>
+              </div>
+            </div>
 
-            const highlightDeposit =
-              status.status_code === "awaiting_deposit";
+            <div className="season-summary">
+              Total Orders: {season.used_slots} / {season.total_slots}
+            </div>
 
-            const highlightBalance =
-              status.status_code === "awaiting_balance";
+            {season.statuses?.map((status) => {
 
-            const isProduction =
-              status.status_code === "in_production";
+              const orders = status.orders || [];
 
-            return (
-              <div
-                key={status.status_id}
-                className="status-block"
-              >
-
-                {/* Status Title */}
-                <div className="status-title">
-                  {status.status_label} ({status.orders.length})
-                </div>
-
-                <div className="status-description">
-                  {status.status_description}
-                </div>
-
-                {/* Deposit Alert */}
-                {highlightDeposit && (
-                  <div className="payment-alert deposit">
-                    <strong>Deposit Required</strong> — 
-                    Production will begin once payment is confirmed.
-                  </div>
-                )}
-
-                {/* Final Payment Alert */}
-                {highlightBalance && (
-                  <div className="payment-alert final">
-                    <strong>Final Payment Required</strong> — 
-                    Shipping will proceed after balance is received.
-                  </div>
-                )}
-
+              return (
                 <div
-                  className={
-                    isProduction
-                      ? "status-production"
-                      : "status-default"
-                  }
+                  key={status.status_id}
+                  className="status-block"
                 >
-                  <div className="order-grid">
 
-                    {status.orders.map((order) => {
+                  <div className="status-title">
+                    {status.status_label} ({orders.length})
+                  </div>
 
-                      const productImage =
-                        order.product_image ||
-                        "/images/default-product.jpg";
+                  <div className="status-description">
+                    {status.status_description}
+                  </div>
 
-                      const customerName =
-                        order.customer_name ||
-                        "Private Client";
+                  <div className="status-default">
+                    <div className="order-grid">
 
-                      const progress =
-                        order.progress_percentage ?? 45;
+                      {orders.map((order) => {
 
-                      const latestUpdate =
-                        order.latest_update ||
-                        "Studio update will appear here.";
+                        const productImage =
+                          order.product_image ||
+                          "/images/default-product.jpg";
 
-                      return (
-                        <div
-                          key={order.id}
-                          className={`order-card ${
-                            order.is_public
-                              ? "public"
-                              : "private"
-                          }`}
-                        >
-                          {order.is_public ? (
-                            <>
-                              {/* Product Thumbnail */}
-                              <img
-                                src={productImage}
-                                alt="product"
-                                className="order-thumb"
-                              />
+                        const isPublic = Boolean(order.is_public);
 
-                              <div className="order-info">
+                        const displayName =
+                          typeof order.customer_name === "string"
+                            ? order.customer_name.trim()
+                            : "";
+
+                        return (
+                          <div
+                            key={order.id}
+                            className={`order-card ${
+                              isPublic ? "public" : "private"
+                            }`}
+                          >
+                            <img
+                              src={productImage}
+                              alt="product"
+                              className="order-thumb"
+                            />
+
+                            {!isPublic && (
+                              <div className="order-lock-badge">
+                                🔒 Private
+                              </div>
+                            )}
+
+                            <div className="order-footer">
+                              <div className="order-number">
                                 Order #{order.id}
                               </div>
 
-                              {/* Hover Username */}
-                              <div className="order-hover-name">
-                                {customerName}
-                              </div>
-
-                              {/* Production Enhanced UI */}
-                              {isProduction && (
-                                <div className="production-area">
-                                  <div className="progress-bar">
-                                    <div
-                                      className="progress-bar-inner"
-                                      style={{
-                                        width: `${progress}%`,
-                                      }}
-                                    />
-                                  </div>
-
-                                  <div className="production-note">
-                                    {latestUpdate}
-                                  </div>
+                              {isPublic && displayName && (
+                                <div className="order-name">
+                                  {displayName}
                                 </div>
                               )}
-                            </>
-                          ) : (
-                            <div className="order-private">
-                              🔒 Private Order
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          </div>
+                        );
+                      })}
 
+                    </div>
                   </div>
+
                 </div>
+              );
+            })}
 
-              </div>
-            );
-          })}
-
+          </div>
         </div>
       ))}
 

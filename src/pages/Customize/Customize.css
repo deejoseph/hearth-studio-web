@@ -146,19 +146,13 @@
 }
 
 /* =========================
-   Status Backgrounds
+   Status Background
 ========================= */
 
 .status-default {
   background-color: #f4f6f8;
   padding: 30px;
   border-radius: 16px;
-}
-
-.status-production {
-  background: linear-gradient(135deg, #f7f4ef, #f2e8dc);
-  padding: 40px;
-  border-radius: 18px;
 }
 
 /* =========================
@@ -172,7 +166,7 @@
 }
 
 /* =========================
-   Order Card (Image Mode)
+   Order Card
 ========================= */
 
 .order-card {
@@ -195,7 +189,7 @@
 }
 
 .order-card.private {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -210,65 +204,40 @@
 }
 
 /* =========================
-   Order Info Footer
+   Bottom Black Footer
 ========================= */
 
-.order-info {
-  padding: 12px;
-  font-size: 13px;
+.order-footer {
+  background: #000;
+  color: #fff;
+  padding: 12px 10px;
   text-align: center;
-  color: #444;
+}
+
+.order-number {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.order-name {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* =========================
-   Hover Username Overlay
+   Private Badge
 ========================= */
 
-.order-hover-name {
+.order-lock-badge {
   position: absolute;
-  bottom: 0;
-  width: 100%;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.65);
+  top: 10px;
+  right: 10px;
+  background: rgba(0,0,0,0.6);
   color: white;
-  font-size: 13px;
-  text-align: center;
-  opacity: 0;
-  transition: 0.3s ease;
-}
-
-.order-card.public:hover .order-hover-name {
-  opacity: 1;
-}
-
-/* =========================
-   Production Enhanced UI
-========================= */
-
-.progress-bar {
-  height: 6px;
-  background: #eee;
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 10px;
-}
-
-.progress-bar-inner {
-  height: 100%;
-  background: #b08968;
-}
-
-.production-note {
   font-size: 12px;
-  color: #666;
-  margin-top: 10px;
-  line-height: 1.6;
-}
-
-.production-thumb {
-  width: 100%;
-  border-radius: 8px;
-  margin-top: 10px;
+  padding: 4px 8px;
+  border-radius: 20px;
 }
 
 /* =========================
@@ -277,4 +246,51 @@
 
 .customize-footer-space {
   height: 80px;
+}
+
+.next-season-hero {
+  margin-top: 120px;
+  margin-bottom: 40px;
+  opacity: 0.95;
+}
+
+/* =========================
+   Responsive
+========================= */
+
+@media (max-width: 768px) {
+
+  .customize-container {
+    margin: 40px auto;
+    padding: 0 18px;
+  }
+
+  .studio-hero {
+    height: 200px;
+    border-radius: 14px;
+  }
+
+  .order-card {
+    width: calc(50% - 13px);
+  }
+
+  .order-thumb {
+    height: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .order-card {
+    width: 100%;
+  }
+
+  .order-thumb {
+    height: 180px;
+  }
+
+  .season-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
 }

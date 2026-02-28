@@ -1,74 +1,70 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import React from "react";
+import "../OrderDetail/OrderDetail.css";
 
-
-export default function OrderDetail() {
-  const { id } = useParams();
-  const [order, setOrder] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/hearthstudio/v1/get_order.php?id=${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setOrder(data.order);
-        }
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="order-detail-container">
-        Loading order...
-      </div>
-    );
-  }
-
-  if (!order) {
-    return (
-      <div className="order-detail-container">
-        Order not found.
-      </div>
-    );
-  }
-
+const OrderDetail = () => {
   return (
     <div className="order-detail-container">
-      <h1>Order #{order.id}</h1>
 
-      <div className="order-section">
-        <h3>Status</h3>
-        <p>{order.status}</p>
+      {/* HEADER */}
+      <div className="order-header">
+        <h1>Order #HS2026-001</h1>
+        <p>Client: Sarah Johnson</p>
+        <p>Product: Custom Bridge Tea Set</p>
+        <p>Status: In Design Stage</p>
+        <p>Created: Feb 25, 2026</p>
       </div>
 
-      <div className="order-section">
-        <h3>Shipping Address</h3>
-        <p>{order.address || "Not provided"}</p>
+      {/* PROGRESS */}
+      <div className="progress-section">
+        <h2>Progress</h2>
+        <ul className="timeline">
+          <li className="completed">Deposit Paid</li>
+          <li className="active">Design Draft</li>
+          <li className="pending">Crafting</li>
+        </ul>
       </div>
 
-      <div className="order-section">
-        <h3>Base Inscription</h3>
-        <p>{order.base_inscription || "None"}</p>
-      </div>
+      {/* PAYMENT */}
+      <div className="payment-section">
+        <h2>Payment</h2>
 
-      <div className="order-section">
-        <h3>Customer Notes</h3>
-        <p>{order.custom_notes || "None"}</p>
-      </div>
-
-      {order.cover_image_url && (
-        <div className="order-section">
-          <h3>Cover Image</h3>
-          <img
-            src={order.cover_image_url}
-            alt="cover"
-            className="order-cover-image"
-          />
+        <div className="payment-card">
+          <h3>Deposit</h3>
+          <p>$300 - Paid</p>
         </div>
-      )}
+
+        <div className="payment-card">
+          <h3>Final Payment</h3>
+          <p>$700 - Pending</p>
+          <button>Pay Now</button>
+        </div>
+      </div>
+
+      {/* DESIGN PREVIEW */}
+      <div className="design-preview">
+        <h2>Design Preview</h2>
+        <img src="/placeholder-design.jpg" alt="Design Preview" />
+        <div>
+          <button>Confirm Design</button>
+          <button>Request Revision</button>
+        </div>
+      </div>
+
+      {/* COMMUNICATION */}
+      <div className="communication-section">
+        <h2>Communication</h2>
+
+        <div className="message">
+          <p><strong>Client:</strong> Can we adjust the bridge curve?</p>
+        </div>
+
+        <div className="message">
+          <p><strong>Studio:</strong> Updated draft will be ready tomorrow.</p>
+        </div>
+      </div>
+
     </div>
   );
-}
+};
+
+export default OrderDetail;
