@@ -194,189 +194,238 @@ export default function OrderDetail() {
           </p>
         )}
 
-        {order.cover_image_url && (
-          <div className="product-image-wrapper">
-            <img
-              src={fullUrl(order.cover_image_url)}
-              alt="Product"
-              className="product-image"
-              onClick={() =>
-                openLightbox(
-                  [fullUrl(order.cover_image_url)],
-                  0
-                )
-              }
-            />
-          </div>
-        )}
+        {/* ===== 顶部产品 & Pattern 区域 ===== */}
+<div className="top-preview-section">
+
+  {/* 主产品图 */}
+  <div className="preview-box">
+    <h3>Final Product</h3>
+
+    {order.cover_image_url ? (
+      <img
+        src={fullUrl(order.cover_image_url)}
+        alt="Product"
+        className="preview-img"
+        onClick={() =>
+          openLightbox(
+            [fullUrl(order.cover_image_url)],
+            0
+          )
+        }
+      />
+    ) : (
+      <div className="empty-box">No image</div>
+    )}
+  </div>
+
+  {/* Present Pattern */}
+  <div className="preview-box">
+    <h3>Present Pattern</h3>
+
+    {order.pattern_image ? (
+      <img
+        src={fullUrl(order.pattern_image)}
+        alt="Pattern"
+        className="preview-img"
+        onClick={() =>
+          openLightbox(
+            [fullUrl(order.pattern_image)],
+            0
+          )
+        }
+      />
+    ) : (
+      <div className="empty-box">
+        No pattern selected
+      </div>
+    )}
+  </div>
+
+  {/* Customer Reference（只读） */}
+  <div className="preview-box">
+    <h3>Customer Upload</h3>
+
+    {order.customer_reference_image ? (
+      <img
+        src={fullUrl(order.customer_reference_image)}
+        alt="Reference"
+        className="preview-img"
+        onClick={() =>
+          openLightbox(
+            [fullUrl(order.customer_reference_image)],
+            0
+          )
+        }
+      />
+    ) : (
+      <div className="empty-box">
+        No reference image
+      </div>
+    )}
+  </div>
+</div>
+
+{/* ===== 预设按钮区 ===== */}
+<div className="top-action-buttons">
+  <button className="btn-payment disabled">
+    Pay Now
+  </button>
+
+  <button className="btn-share disabled">
+    Share
+  </button>
+</div>
       </div>
 
       {/* Timeline */}
       <div className="timeline-section">
         {timeline.map((stage) => {
-          const isActive = stage.is_current === 1;
-          const isCollapsed =
-            collapsedStages[stage.status_id];
+  const isActive = stage.is_current === 1;
+  const isCollapsed = collapsedStages[stage.status_id];
 
-          const customerImages =
-            stage.images
-              ?.filter((img) => img.customer_image)
-              .map((img) =>
-                fullUrl(img.customer_image)
-              ) || [];
+  const customerImages =
+    stage.images
+      ?.filter((img) => img.customer_image)
+      .map((img) => fullUrl(img.customer_image)) || [];
 
-          const studioImages =
-            stage.images
-              ?.filter((img) => img.studio_image)
-              .map((img) =>
-                fullUrl(img.studio_image)
-              ) || [];
+  const studioImages =
+    stage.images
+      ?.filter((img) => img.studio_image)
+      .map((img) => fullUrl(img.studio_image)) || [];
 
-          return (
-            <div
-              key={stage.status_id}
-              className="timeline-stage"
-            >
-              <div className="timeline-header">
-                <h2>{stage.label}</h2>
-                <button
-                  onClick={() =>
-                    setCollapsedStages((prev) => ({
-                      ...prev,
-                      [stage.status_id]:
-                        !prev[stage.status_id]
-                    }))
-                  }
-                >
-                  {isCollapsed
-                    ? "Expand"
-                    : "Collapse"}
-                </button>
+  return (
+    <div key={stage.status_id} className="timeline-stage">
+      <div className="timeline-header">
+        <h2>{stage.label}</h2>
+
+        <button
+          onClick={() =>
+            setCollapsedStages((prev) => ({
+              ...prev,
+              [stage.status_id]: !prev[stage.status_id]
+            }))
+          }
+        >
+          {isCollapsed ? "Expand" : "Collapse"}
+        </button>
+      </div>
+
+      {!isCollapsed && (
+        <>
+          {/* ===== 图片区 ===== */}
+          <div className="image-section">
+
+            {/* 客户图片 */}
+            <div className="image-block">
+              <h3>Client Uploads</h3>
+
+              <div className="image-grid">
+                {customerImages.map((img, index) => (
+                  <img
+                    key={index}
+                    src={img}
+                    alt=""
+                    className="thumb"
+                    onClick={() =>
+                      openLightbox(customerImages, index)
+                    }
+                  />
+                ))}
               </div>
 
-              {!isCollapsed && (
-                <>
-                  {/* 图片区 */}
-                  <div className="image-section">
-
-                    {/* 客户图片区 */}
-                    <div className="image-block">
-                      <h3>Client Uploads</h3>
-
-                      <div className="image-grid">
-                        {customerImages.map(
-                          (img, index) => (
-                            <img
-                              key={index}
-                              src={img}
-                              alt=""
-                              className="thumb"
-                              onClick={() =>
-                                openLightbox(
-                                  customerImages,
-                                  index
-                                )
-                              }
-                            />
-                          )
-                        )}
-                      </div>
-
-                      {isActive && (
-                        <div className="upload-button">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                              handleImageUpload(
-                                e,
-                                stage.status_id,
-                                order.id
-                              )
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Studio图片区 */}
-                    {studioImages.length > 0 && (
-                      <div className="image-block studio">
-                        <h3>Studio Updates</h3>
-                        <div className="image-grid">
-                          {studioImages.map(
-                            (img, index) => (
-                              <img
-                                key={index}
-                                src={img}
-                                alt=""
-                                className="thumb"
-                                onClick={() =>
-                                  openLightbox(
-                                    studioImages,
-                                    index
-                                  )
-                                }
-                              />
-                            )
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 消息区 */}
-                  <div className="timeline-messages">
-                    {stage.messages?.map(
-                      (msg) => (
-                        <div
-                          key={msg.id}
-                          className="message-block"
-                        >
-                          {msg.customer_message && (
-                            <div className="message customer">
-                              {msg.customer_message}
-                            </div>
-                          )}
-                          {msg.studio_reply && (
-                            <div className="message studio">
-                              {msg.studio_reply}
-                            </div>
-                          )}
-                        </div>
+              {/* 只有当前阶段可上传 */}
+              {isActive && (
+                <div className="upload-button">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      handleImageUpload(
+                        e,
+                        stage.status_id,
+                        order.id
                       )
-                    )}
-                  </div>
-
-                  {/* 输入区 */}
-                  {isActive && (
-                    <div className="message-input-area">
-                      <textarea
-                        value={newMessage}
-                        onChange={(e) =>
-                          setNewMessage(
-                            e.target.value
-                          )
-                        }
-                        placeholder="Write your message..."
-                      />
-                      <button
-                        onClick={() =>
-                          handleSendMessage(
-                            stage.status_id,
-                            order.id
-                          )
-                        }
-                      >
-                        Send
-                      </button>
-                    </div>
-                  )}
-                </>
+                    }
+                  />
+                </div>
               )}
             </div>
-          );
-        })}
+
+            {/* Studio 图片 */}
+            {studioImages.length > 0 && (
+              <div className="image-block studio">
+                <h3>Studio Updates</h3>
+                <div className="image-grid">
+                  {studioImages.map((img, index) => (
+                    <img
+                      key={index}
+                      src={img}
+                      alt=""
+                      className="thumb"
+                      onClick={() =>
+                        openLightbox(studioImages, index)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ===== 消息区 ===== */}
+          <div className="timeline-messages">
+            {stage.messages?.map((msg) => (
+              <div key={msg.id} className="message-block">
+                {msg.customer_message && (
+                  <div className="message customer">
+                    {msg.customer_message}
+                  </div>
+                )}
+                {msg.studio_reply && (
+                  <div className="message studio">
+                    {msg.studio_reply}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* ===== 阶段冻结提示 ===== */}
+          {!isActive && (
+            <div className="stage-locked">
+              This stage has been completed.
+              Communication is now closed.
+            </div>
+          )}
+
+          {/* ===== 输入区（仅当前阶段）===== */}
+          {isActive && (
+            <div className="message-input-area">
+              <textarea
+                value={newMessage}
+                onChange={(e) =>
+                  setNewMessage(e.target.value)
+                }
+                placeholder="Write your message..."
+              />
+              <button
+                disabled={sending}
+                onClick={() =>
+                  handleSendMessage(
+                    stage.status_id,
+                    order.id
+                  )
+                }
+              >
+                {sending ? "Sending..." : "Send"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+})}
       </div>
 
       {/* ⭐ 专业灯箱 */}
