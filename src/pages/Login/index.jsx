@@ -1,8 +1,11 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     email: "",
@@ -18,7 +21,7 @@ export default function Login() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!form.email || !form.password) {
@@ -28,17 +31,48 @@ export default function Login() {
 
     setError("");
 
-    // 模拟登录成功
-    console.log("Login data:", form);
+    try {
+      const response = await fetch(
+        "/api/hearthstudio/v1/login.php",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.password
+          })
+        }
+      );
 
-    navigate("/");
+      const data = await response.json();
+
+      if (!data.success) {
+        setError(data.message);
+        return;
+      }
+
+      login(data.user);
+
+      const redirectPath = location.state?.from || "/";
+      const productData = location.state?.productData || null;
+
+      navigate(redirectPath, {
+        state: productData,
+        replace: true
+      });
+
+    } catch (err) {
+      setError("Login failed. Please try again.");
+    }
   };
 
   return (
     <>
       <h2 className="auth-title">Welcome Back</h2>
       <p className="auth-subtitle">
-        Enter your details to access your account
+        Sign in to continue your journey
       </p>
 
       <form onSubmit={handleSubmit} className="auth-form">
@@ -61,10 +95,6 @@ export default function Login() {
           onChange={handleChange}
         />
 
-        <div className="auth-forgot">
-          <Link to="/forgot-password">Forgot password?</Link>
-        </div>
-
         {error && <p className="auth-error">{error}</p>}
 
         <button type="submit" className="auth-button">
@@ -74,7 +104,10 @@ export default function Login() {
       </form>
 
       <p className="auth-switch">
-        Don't have an account? <Link to="/register">Register</Link>
+        Don’t have an account?{" "}
+        <Link to="/register" state={location.state}>
+          Create one
+        </Link>
       </p>
     </>
   );

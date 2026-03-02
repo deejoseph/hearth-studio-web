@@ -15,8 +15,11 @@ import Coffeeware from "../pages/collection/Coffeeware";
 import TeaWare from "../pages/collection/Teaware";
 import HomeDecor from "../pages/collection/Homedecor";
 
+import { AuthProvider } from "../context/AuthContext";
+
 export default function AppRouter() {
   return (
+    <AuthProvider>
     <BrowserRouter>
       <Routes>
 
@@ -60,5 +63,6 @@ export default function AppRouter() {
 
       </Routes>
     </BrowserRouter>
+    </AuthProvider>
   );
 }

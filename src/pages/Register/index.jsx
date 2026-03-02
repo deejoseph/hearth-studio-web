@@ -1,8 +1,11 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -20,7 +23,7 @@ export default function Register() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!form.name || !form.email || !form.password || !form.confirmPassword) {
@@ -35,9 +38,43 @@ export default function Register() {
 
     setError("");
 
-    console.log("Register data:", form);
+    try {
+      const response = await fetch(
+        "/api/hearthstudio/v1/register.php",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: form.name,
+            email: form.email,
+            password: form.password
+          })
+        }
+      );
 
-    navigate("/login");
+      const data = await response.json();
+
+      if (!data.success) {
+        setError(data.message);
+        return;
+      }
+
+      // 🔥 注册成功自动登录
+      login(data.user);
+
+      const redirectPath = location.state?.from || "/";
+      const productData = location.state?.productData || null;
+
+      navigate(redirectPath, {
+        state: productData,
+        replace: true
+      });
+
+    } catch (err) {
+      setError("Registration failed. Please try again.");
+    }
   };
 
   return (
@@ -94,7 +131,10 @@ export default function Register() {
       </form>
 
       <p className="auth-switch">
-        Already have an account? <Link to="/login">Sign In</Link>
+        Already have an account?{" "}
+        <Link to="/login" state={location.state}>
+          Sign In
+        </Link>
       </p>
     </>
   );
