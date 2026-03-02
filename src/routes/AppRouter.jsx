@@ -16,6 +16,8 @@ import TeaWare from "../pages/collection/Teaware";
 import HomeDecor from "../pages/collection/Homedecor";
 
 import { AuthProvider } from "../context/AuthContext";
+import ForgotPassword from "../pages/auth/ForgotPassword";
+import ResetPassword from "../pages/auth/ResetPassword";
 
 export default function AppRouter() {
   return (
@@ -61,7 +63,9 @@ export default function AppRouter() {
           <Route path="/register" element={<Register />} />
         </Route>
 
-      </Routes>
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        </Routes>
     </BrowserRouter>
     </AuthProvider>
   );

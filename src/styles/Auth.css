@@ -136,3 +136,10 @@
     transform: translateY(0);
   }
 }
+
+.auth-success {
+  color: #4ade80;
+  font-size: 13px;
+  margin-bottom: 15px;
+  text-align: center;
+}

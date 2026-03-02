@@ -69,46 +69,52 @@ export default function Login() {
   };
 
   return (
-    <>
-      <h2 className="auth-title">Welcome Back</h2>
-      <p className="auth-subtitle">
-        Sign in to continue your journey
-      </p>
+  <>
+    <h2 className="auth-title">Welcome Back</h2>
+    <p className="auth-subtitle">
+      Sign in to continue your journey
+    </p>
 
-      <form onSubmit={handleSubmit} className="auth-form">
+    <form onSubmit={handleSubmit} className="auth-form">
 
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          className="auth-input"
-          value={form.email}
-          onChange={handleChange}
-        />
+      <input
+        type="email"
+        name="email"
+        placeholder="Email"
+        className="auth-input"
+        value={form.email}
+        onChange={handleChange}
+      />
 
-        <input
-          type="password"
-          name="password"
-          placeholder="Password"
-          className="auth-input"
-          value={form.password}
-          onChange={handleChange}
-        />
+      <input
+        type="password"
+        name="password"
+        placeholder="Password"
+        className="auth-input"
+        value={form.password}
+        onChange={handleChange}
+      />
 
-        {error && <p className="auth-error">{error}</p>}
+      {error && <p className="auth-error">{error}</p>}
 
-        <button type="submit" className="auth-button">
-          Sign In
-        </button>
+      <button type="submit" className="auth-button">
+        Sign In
+      </button>
 
-      </form>
-
-      <p className="auth-switch">
-        Don’t have an account?{" "}
-        <Link to="/register" state={location.state}>
-          Create one
+      <p className="auth-forgot">
+        <Link to="/forgot-password">
+          Forgot password?
         </Link>
       </p>
-    </>
-  );
+
+    </form>
+
+    <p className="auth-switch">
+      Don’t have an account?{" "}
+      <Link to="/register" state={location.state}>
+        Create one
+      </Link>
+    </p>
+  </>
+);
 }
