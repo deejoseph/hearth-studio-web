@@ -59,8 +59,20 @@ export default function OrderDetail() {
     fetchOrderDetail();
   }, [id]);
 
-  const fullUrl = (path) =>
-    path?.startsWith("http") ? path : `${BASE_URL}${path}`;
+  const fullUrl = (path) => {
+  if (!path) return "";
+
+  // 如果已经是完整URL
+  if (path.startsWith("http")) return path;
+
+  // 如果已经带 /HearthStudio，直接拼域名
+  if (path.startsWith("/HearthStudio")) {
+    return `https://www.ichessgeek.com${path}`;
+  }
+
+  // 其他情况走标准 BASE_URL
+  return `${BASE_URL}${path}`;
+};
 
   const openLightbox = (images, index) => {
     setLightbox({
