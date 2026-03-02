@@ -2,7 +2,7 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import "./OrderDetail.css";
 
-const BASE_URL = "https://www.ichessgeek.com";
+const BASE_URL = "https://www.ichessgeek.com/HearthStudio";
 
 export default function OrderDetail() {
   const { id } = useParams();
