@@ -4,8 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
+  const location = useLocation();  
 
   const [form, setForm] = useState({
     name: "",
@@ -60,16 +59,9 @@ export default function Register() {
         setError(data.message);
         return;
       }
-
-      // 🔥 注册成功自动登录
-      login(data.user);
-
-      const redirectPath = location.state?.from || "/";
-      const productData = location.state?.productData || null;
-
-      navigate(redirectPath, {
-        state: productData,
-        replace: true
+      
+      navigate("/verify-email", {
+        state: { email: data.email }
       });
 
     } catch (err) {

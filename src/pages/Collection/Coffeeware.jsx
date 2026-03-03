@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getProductCraftOptions } from "../../api/productService";
 import { useNavigate } from "react-router-dom";
 import "./Tableware.css";
+import { useAuth } from "../../context/AuthContext";
 
 const IMAGE_BASE = "https://www.ichessgeek.com/";
 
@@ -10,6 +11,7 @@ export default function Tableware() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     async function fetchData() {
@@ -84,21 +86,38 @@ export default function Tableware() {
 
                     <button
                       className="customize-btn"
-                      onClick={() =>
-                        navigate(
-                          `/bridge/${item.product_id}/${item.craft_type_id}`,
-                          {
-                            state: {
-                              productId: item.product_id,
-                              productName: group.name,
-                              craftTypeId: item.craft_type_id,
-                              craftName: item.craft_name,
-                              price: item.price,
-                              imageUrl: IMAGE_BASE + item.image_url,
-                            },
-                          }
-                        )
-                      }
+                      onClick={() => {
+  if (!user) {
+    navigate("/login", {
+      state: {
+        from: `/bridge/${item.product_id}/${item.craft_type_id}`,
+        productData: {
+          productId: item.product_id,
+          productName: group.name,
+          craftTypeId: item.craft_type_id,
+          craftName: item.craft_name,
+          price: item.price,
+          imageUrl: IMAGE_BASE + item.image_url,
+        }
+      }
+    });
+    return;
+  }
+
+  navigate(
+    `/bridge/${item.product_id}/${item.craft_type_id}`,
+    {
+      state: {
+        productId: item.product_id,
+        productName: group.name,
+        craftTypeId: item.craft_type_id,
+        craftName: item.craft_name,
+        price: item.price,
+        imageUrl: IMAGE_BASE + item.image_url,
+      }
+    }
+  );
+}}
                     >
                       Customize {item.craft_name}
                     </button>

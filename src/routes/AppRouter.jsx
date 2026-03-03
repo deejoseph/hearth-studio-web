@@ -18,6 +18,7 @@ import HomeDecor from "../pages/collection/Homedecor";
 import { AuthProvider } from "../context/AuthContext";
 import ForgotPassword from "../pages/auth/ForgotPassword";
 import ResetPassword from "../pages/auth/ResetPassword";
+import VerifyEmail from "../pages/VerifyEmail";
 
 export default function AppRouter() {
   return (
@@ -65,6 +66,7 @@ export default function AppRouter() {
 
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         </Routes>
     </BrowserRouter>
     </AuthProvider>
