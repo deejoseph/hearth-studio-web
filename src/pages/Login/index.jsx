@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { login as loginRequest } from "../../api/authService";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -32,21 +33,10 @@ export default function Login() {
     setError("");
 
     try {
-      const response = await fetch(
-        "/api/hearthstudio/v1/login.php",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            email: form.email,
-            password: form.password
-          })
-        }
-      );
-
-      const data = await response.json();
+      const data = await loginRequest({
+        email: form.email,
+        password: form.password
+      });
 
       if (!data.success) {
         setError(data.message);
