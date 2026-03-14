@@ -1,6 +1,11 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./OrderDetail.css";
+import {
+  createRound,
+  getOrderDetail
+} from "../../api/orderService";
+import { uploadImage } from "../../api/uploadService";
 
 const BASE_URL = "https://www.ichessgeek.com/HearthStudio";
 
@@ -22,20 +27,53 @@ export default function OrderDetail() {
     index: 0
   });
 
-  const fetchOrderDetail = async () => {
+  const lastChangeRef = useRef("");
+
+  const calcSignature = (data) => {
+    if (!data) return "";
+    let maxTs = 0;
+    let msgCount = 0;
+    let imgCount = 0;
+    const safeTime = (v) => {
+      if (!v) return 0;
+      const t = Date.parse(v);
+      return Number.isNaN(t) ? 0 : t;
+    };
+
+    (data.timeline || []).forEach((stage) => {
+      (stage.messages || []).forEach((msg) => {
+        msgCount += 1;
+        maxTs = Math.max(
+          maxTs,
+          safeTime(msg.customer_message_at),
+          safeTime(msg.studio_reply_at)
+        );
+      });
+      (stage.images || []).forEach((img) => {
+        imgCount += 1;
+        maxTs = Math.max(
+          maxTs,
+          safeTime(img.created_at)
+        );
+      });
+    });
+
+    const statusId = data.order_info?.status_id || "";
+    return `${statusId}|${maxTs}|${msgCount}|${imgCount}`;
+  };
+
+  const fetchOrderDetail = async (opts = {}) => {
     setLoading(true);
     setError(false);
 
     try {
-      const res = await fetch(
-        `/api/hearthstudio/v1/get_order_detail.php?id=${id}`
-      );
-      if (!res.ok) throw new Error("Network error");
-
-      const data = await res.json();
+      const data = await getOrderDetail(id);
 
       if (data.success && data.order_info) {
         setOrderData(data);
+        if (!opts.skipLastChange) {
+          lastChangeRef.current = calcSignature(data);
+        }
 
         const initialCollapse = {};
         data.timeline.forEach((stage) => {
@@ -57,6 +95,25 @@ export default function OrderDetail() {
 
   useEffect(() => {
     fetchOrderDetail();
+  }, [id]);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const data = await getOrderDetail(id);
+        if (data?.success) {
+          const nextSignature = calcSignature(data);
+          if (nextSignature !== lastChangeRef.current) {
+            setOrderData(data);
+            lastChangeRef.current = nextSignature;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
   }, [id]);
 
   const fullUrl = (path) => {
@@ -112,20 +169,11 @@ export default function OrderDetail() {
     setSending(true);
 
     try {
-      const res = await fetch(
-        "/api/hearthstudio/v1/create_round.php",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            order_id: orderId,
-            status_id: statusId,
-            message: newMessage
-          })
-        }
-      );
-
-      const data = await res.json();
+      const data = await createRound({
+        order_id: orderId,
+        status_id: statusId,
+        message: newMessage
+      });
 
       if (data.success) {
         setNewMessage("");
@@ -153,15 +201,7 @@ export default function OrderDetail() {
     setUploading(true);
 
     try {
-      const res = await fetch(
-        "/api/hearthstudio/v1/upload_image.php",
-        {
-          method: "POST",
-          body: formData
-        }
-      );
-
-      const data = await res.json();
+      const data = await uploadImage(formData);
 
       if (data.success) {
         await fetchOrderDetail();

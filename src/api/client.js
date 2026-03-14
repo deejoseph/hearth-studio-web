@@ -22,6 +22,9 @@ export async function request(path, options = {}) {
     timeout = 15000
   } = options;
 
+  const isFormData =
+    typeof FormData !== "undefined" && body instanceof FormData;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -29,7 +32,7 @@ export async function request(path, options = {}) {
     const res = await fetch(url, {
       method,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(headers || {})
       },
       body,

@@ -1,0 +1,13 @@
+Array
+(
+    [productId] => 4
+    [status] => pending_design
+    [is_public] => 1
+    [expected_date] => 2026-05-30
+    [craft_type_id] => 4
+    [pattern_id] => 10
+    [custom_notes] => 测试
+    [pattern_type_id] => 1
+    [base_inscription] => 御用
+    [image_url] => https://www.ichessgeek.com/HearthStudio/Collection/Tableware/plate_engraving_1.jpg
+)
