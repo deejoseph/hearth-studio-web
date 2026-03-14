@@ -9,7 +9,7 @@ const Home = () => {
     <main className="home">
       <section
         className="hero"
-        style={{ backgroundImage: "url(/hearth-studio.jpg)" }}
+        style={{ backgroundImage: "url(/public/hearth-studio.jpg)" }}
       >
         <div className="hero-content">
           <p className="eyebrow">Hearth Studio · Custom Ceramics</p>
