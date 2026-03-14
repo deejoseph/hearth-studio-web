@@ -3,6 +3,7 @@ import MainLayout from "../layout/MainLayout";
 import AuthLayout from "../layout/AuthLayout";
 
 import Home from "../pages/Home";
+import Cover from "../pages/Cover";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import Customize from "../pages/Customize";
@@ -29,7 +30,8 @@ export default function AppRouter() {
         {/* ================= Main Layout ================= */}
         <Route element={<MainLayout />}>
 
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Cover />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/collection" element={<Collection />} />
 
           {/* 分类页面 */}

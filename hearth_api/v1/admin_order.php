@@ -86,6 +86,15 @@ function createThumbnail($source, $destination, $newWidth) {
     imagejpeg($thumb, $destination, 85);
 }
 
+function buildFullUrl($path) {
+    if (!$path) return '';
+    if (strpos($path, 'http') === 0) return $path;
+    if (strpos($path, '/HearthStudio') === 0) {
+        return "https://www.ichessgeek.com" . $path;
+    }
+    return "https://www.ichessgeek.com/HearthStudio" . $path;
+}
+
 function getOrderLastChange($conn, $orderId) {
     $stmt = $conn->prepare("
         SELECT GREATEST(
@@ -136,8 +145,12 @@ if (isset($_GET['poll']) && $_GET['poll'] === '1') {
 $ai_settings = [
     'qwen_api_key' => '',
     'gemini_api_key' => '',
+    'zhipu_api_key' => '',
     'ai_api_endpoint_qwen' => '',
-    'ai_api_endpoint_gemini' => ''
+    'ai_api_endpoint_gemini' => '',
+    'ai_api_endpoint_zhipu' => '',
+    'zhipu_model' => '',
+    'qwen_model' => ''
 ];
 
 function maskSecret($value) {
@@ -168,7 +181,9 @@ function aiDecrypt($ciphertext, $secret) {
 
 if ($admin_id > 0) {
     $stmt = $conn->prepare("
-        SELECT qwen_api_key, gemini_api_key, ai_api_endpoint_qwen, ai_api_endpoint_gemini
+        SELECT qwen_api_key, gemini_api_key, zhipu_api_key,
+               ai_api_endpoint_qwen, ai_api_endpoint_gemini, ai_api_endpoint_zhipu,
+               zhipu_model, qwen_model
         FROM admin_users
         WHERE id = ?
         LIMIT 1
@@ -186,8 +201,8 @@ function callAiPolish($provider, $text, $lang, $settings) {
     $provider = strtolower($provider);
     $lang = strtolower($lang) === 'en' ? 'en' : 'zh';
 
-    $system_prompt_zh = "你是陶艺工作室客服，请将下面内容润色为专业、礼貌、清晰且温暖的客户回复，保持事实不新增无依据的信息。";
-    $system_prompt_en = "You are a ceramic studio customer support agent. Polish the message into a professional, polite, clear, and warm reply in English. Do not add unverified details.";
+    $system_prompt_zh = "你是面向美国客户的陶艺工作室客服。请将内容润色为专业、礼貌、清晰且简洁的回复，直接回应客户问题，避免推销和长篇大论。必要时可简短提到“参与式定制，让作品承载客户想法与记忆”。不要编造未确认信息。";
+    $system_prompt_en = "You are a ceramic studio customer support agent serving U.S. clients. Rewrite the message in English to be professional, polite, clear, and concise. Answer the customer’s question directly and avoid salesy language or long paragraphs. If relevant, briefly mention that this is a participatory custom process that preserves the client’s ideas and memories. Do not add unverified details.";
 
     if ($provider === 'qwen') {
         $api_key = $settings['qwen_api_key'] ?? '';
@@ -196,10 +211,21 @@ function callAiPolish($provider, $text, $lang, $settings) {
             return ['ok' => false, 'error' => 'Qwen API 未配置（需要 URL 与 Key）'];
         }
 
+        $model = $settings['qwen_model'] ?? '';
+        if (!$model) $model = 'qwen-plus';
+        if (substr($endpoint, -strlen('/chat/completions')) !== '/chat/completions') {
+            $endpoint = rtrim($endpoint, '/') . '/chat/completions';
+        }
+
         $payload = [
-            'text' => $text,
-            'lang' => $lang,
-            'task' => 'polish'
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $lang === 'en' ? $system_prompt_en : $system_prompt_zh],
+                ['role' => 'user', 'content' => $lang === 'en'
+                    ? "Please polish the following message and reply in English:\n" . $text
+                    : $text]
+            ],
+            'temperature' => 0.6
         ];
 
         $headers = [
@@ -226,8 +252,8 @@ function callAiPolish($provider, $text, $lang, $settings) {
         ];
 
     } elseif ($provider === 'zhipu') {
-        $api_key = $settings['qwen_api_key'] ?? '';
-        $endpoint = $settings['ai_api_endpoint_qwen'] ?? '';
+        $api_key = $settings['zhipu_api_key'] ?? '';
+        $endpoint = $settings['ai_api_endpoint_zhipu'] ?? '';
         if (!$api_key || !$endpoint) {
             return ['ok' => false, 'error' => '智谱 API 未配置（需要 URL 与 Key）'];
         }
@@ -237,8 +263,11 @@ function callAiPolish($provider, $text, $lang, $settings) {
             $user_text = "Please polish the following message and reply in English:\n" . $text;
         }
 
+        $model = $settings['zhipu_model'] ?? '';
+        if (!$model) $model = 'glm-4';
+
         $payload = [
-            'model' => 'glm-4',
+            'model' => $model,
             'messages' => [
                 ['role' => 'system', 'content' => $lang === 'en' ? $system_prompt_en : $system_prompt_zh],
                 ['role' => 'user', 'content' => $user_text]
@@ -302,17 +331,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ai_settings'])) {
     if (!$ai_secret) {
         $ai_message = "AI_SECRET_KEY 未配置，无法保存 API 密钥。";
     } else {
-        $provider = $_POST['ai_provider'] ?? 'qwen';
+        $provider = $_POST['ai_provider'] ?? ($_SESSION['ai_provider'] ?? $ai_provider);
         $provider = in_array($provider, ['qwen', 'gemini', 'zhipu'], true) ? $provider : 'qwen';
         $new_api_key = trim($_POST['ai_api_key'] ?? '');
         $new_api_url = trim($_POST['ai_api_endpoint'] ?? '');
+        $new_model = trim($_POST['ai_model'] ?? '');
 
         $update_fields = [];
         $params = [];
         $types = '';
 
-        $key_column = $provider === 'gemini' ? 'gemini_api_key' : 'qwen_api_key';
-        $url_column = $provider === 'gemini' ? 'ai_api_endpoint_gemini' : 'ai_api_endpoint_qwen';
+        if ($provider === 'gemini') {
+            $key_column = 'gemini_api_key';
+            $url_column = 'ai_api_endpoint_gemini';
+        } elseif ($provider === 'zhipu') {
+            $key_column = 'zhipu_api_key';
+            $url_column = 'ai_api_endpoint_zhipu';
+        } else {
+            $key_column = 'qwen_api_key';
+            $url_column = 'ai_api_endpoint_qwen';
+        }
 
         if ($new_api_key !== '') {
             $update_fields[] = $key_column . " = ?";
@@ -323,6 +361,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ai_settings'])) {
             $update_fields[] = $url_column . " = ?";
             $params[] = $new_api_url;
             $types .= 's';
+        }
+        if ($new_model !== '') {
+            if ($provider === 'zhipu') {
+                $update_fields[] = "zhipu_model = ?";
+                $params[] = $new_model;
+                $types .= 's';
+            }
+            if ($provider === 'qwen') {
+                $update_fields[] = "qwen_model = ?";
+                $params[] = $new_model;
+                $types .= 's';
+            }
         }
 
         if (!empty($update_fields) && $admin_id > 0) {
@@ -335,7 +385,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_ai_settings'])) {
             $ai_message = "AI 配置已保存。";
 
             $stmt = $conn->prepare("
-                SELECT qwen_api_key, gemini_api_key, ai_api_endpoint_qwen, ai_api_endpoint_gemini
+                SELECT qwen_api_key, gemini_api_key, zhipu_api_key,
+                       ai_api_endpoint_qwen, ai_api_endpoint_gemini, ai_api_endpoint_zhipu,
+                       zhipu_model, qwen_model
                 FROM admin_users
                 WHERE id = ?
                 LIMIT 1
@@ -432,6 +484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['polish_lang'])) {
     $ai_provider = $_SESSION['ai_provider'] ?? $ai_provider;
     $ai_settings['qwen_api_key'] = aiDecrypt($ai_settings['qwen_api_key'] ?? '', $ai_secret);
     $ai_settings['gemini_api_key'] = aiDecrypt($ai_settings['gemini_api_key'] ?? '', $ai_secret);
+    $ai_settings['zhipu_api_key'] = aiDecrypt($ai_settings['zhipu_api_key'] ?? '', $ai_secret);
 
     if (!$reply_draft) {
         $ai_message = "请先输入需要润色的基础信息。";
@@ -560,6 +613,8 @@ $order = null;
 $messages = null;
 $images = null;
 $next_status = null;
+$pattern_image_url = null;
+$customer_reference_image = null;
 
 if ($order_id) {
 
@@ -574,6 +629,21 @@ if ($order_id) {
     $order = $stmt->get_result()->fetch_assoc();
 
     if ($order) {
+        if (!empty($order['pattern_id'])) {
+            $stmt = $conn->prepare("
+                SELECT image_url
+                FROM patterns
+                WHERE id = ?
+                LIMIT 1
+            ");
+            $stmt->bind_param("i", $order['pattern_id']);
+            $stmt->execute();
+            $patternRow = $stmt->get_result()->fetch_assoc();
+            $pattern_image_url = $patternRow ? $patternRow['image_url'] : null;
+        }
+
+        $customer_reference_image = $order['customer_reference_image'] ?? null;
+
 
         $stmt = $conn->prepare("
             SELECT id, label
@@ -632,6 +702,117 @@ require_once(__DIR__ . "/admin_layout.php");
 .message.studio {
     background: #f2fbf6;
     border-color: #d3f0df;
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.badge.green {
+    background: #e7f7ee;
+    color: #1f7a4d;
+    border: 1px solid #ccead9;
+}
+.badge.red {
+    background: #fdeaea;
+    color: #b42318;
+    border: 1px solid #f6c9c9;
+}
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 12px 0;
+}
+.preview-card {
+    background: #f8f9fd;
+    border: 1px solid #e6e9f2;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    min-height: 260px;
+}
+.preview-card img {
+    width: 100%;
+    max-width: 240px;
+    height: 180px;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 0 auto;
+}
+.preview-empty {
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #777;
+    border: 1px dashed #d7dbe7;
+    border-radius: 8px;
+    background: #fff;
+    max-width: 240px;
+    margin: 0 auto;
+}
+.carousel {
+    position: relative;
+    padding: 0 24px;
+    overflow: hidden;
+}
+.carousel-viewport {
+    overflow: hidden;
+    width: 100%;
+    max-width: 780px;
+    margin: 0 auto;
+}
+.carousel-track {
+    display: flex;
+    gap: 12px;
+    padding-bottom: 6px;
+    width: max-content;
+    transition: transform 0.35s ease;
+}
+.carousel-track::-webkit-scrollbar {
+    height: 8px;
+}
+.carousel-track::-webkit-scrollbar-thumb {
+    background: #cbd3e1;
+    border-radius: 999px;
+}
+.carousel-item {
+    flex: 0 0 auto;
+    width: 240px;
+}
+.carousel-item img {
+    width: 100%;
+    height: 170px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    display: block;
+}
+.carousel-btn {
+    position: absolute;
+    top: 40%;
+    transform: translateY(-50%);
+    background: #4e73df;
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    cursor: pointer;
+    z-index: 2;
+}
+.carousel-btn.prev {
+    left: 0;
+}
+.carousel-btn.next {
+    right: 0;
 }
 .reply-section {
     margin-top: 16px;
@@ -727,6 +908,56 @@ require_once(__DIR__ . "/admin_layout.php");
 <hr>
 <h2>Order #<?php echo $order['order_number']; ?></h2>
 <p><strong>Status:</strong> <?php echo $order['label']; ?></p>
+<p><strong>Deposit Paid:</strong>
+    <?php if (intval($order['deposit_paid']) === 1): ?>
+        <span class="badge green">Paid</span>
+    <?php else: ?>
+        <span class="badge red">Unpaid</span>
+    <?php endif; ?>
+</p>
+<p><strong>Balance Paid:</strong>
+    <?php if (intval($order['balance_paid']) === 1): ?>
+        <span class="badge green">Paid</span>
+    <?php else: ?>
+        <span class="badge red">Unpaid</span>
+    <?php endif; ?>
+</p>
+
+<div class="preview-grid">
+    <div class="preview-card">
+        <h4>Final Product</h4>
+        <?php $cover = buildFullUrl($order['cover_image_url'] ?? ''); ?>
+        <?php if ($cover): ?>
+            <a href="<?php echo htmlspecialchars($cover); ?>" target="_blank">
+                <img src="<?php echo htmlspecialchars($cover); ?>" alt="Product">
+            </a>
+        <?php else: ?>
+            <div class="preview-empty">No image</div>
+        <?php endif; ?>
+    </div>
+    <div class="preview-card">
+        <h4>Present Pattern</h4>
+        <?php $pattern = buildFullUrl($pattern_image_url ?? ''); ?>
+        <?php if ($pattern): ?>
+            <a href="<?php echo htmlspecialchars($pattern); ?>" target="_blank">
+                <img src="<?php echo htmlspecialchars($pattern); ?>" alt="Pattern">
+            </a>
+        <?php else: ?>
+            <div class="preview-empty">No pattern selected</div>
+        <?php endif; ?>
+    </div>
+    <div class="preview-card">
+        <h4>Customer Upload</h4>
+        <?php $customer_ref = buildFullUrl($customer_reference_image ?? ''); ?>
+        <?php if ($customer_ref): ?>
+            <a href="<?php echo htmlspecialchars($customer_ref); ?>" target="_blank">
+                <img src="<?php echo htmlspecialchars($customer_ref); ?>" alt="Reference">
+            </a>
+        <?php else: ?>
+            <div class="preview-empty">No reference image</div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <?php if ($next_status): ?>
 <form method="POST">
@@ -788,16 +1019,27 @@ require_once(__DIR__ . "/admin_layout.php");
 
         <form method="POST" class="reply-form" style="margin-bottom:12px;">
             <input type="hidden" name="order_id" value="<?php echo $order_id; ?>">
-            <input type="hidden" name="ai_provider" value="<?php echo htmlspecialchars($ai_provider); ?>">
+            <input type="hidden" id="ai_provider_hidden" name="ai_provider" value="<?php echo htmlspecialchars($ai_provider); ?>">
         <div class="reply-actions" style="margin-top:0;">
             <?php
-            $current_url = $ai_provider === 'gemini'
-                ? ($ai_settings['ai_api_endpoint_gemini'] ?? '')
-                : ($ai_settings['ai_api_endpoint_qwen'] ?? '');
+            if ($ai_provider === 'gemini') {
+                $current_url = $ai_settings['ai_api_endpoint_gemini'] ?? '';
+            } elseif ($ai_provider === 'zhipu') {
+                $current_url = $ai_settings['ai_api_endpoint_zhipu'] ?? '';
+            } else {
+                $current_url = $ai_settings['ai_api_endpoint_qwen'] ?? '';
+            }
             ?>
             <input type="text" name="ai_api_endpoint" placeholder="API URL"
                    value="<?php echo htmlspecialchars($current_url); ?>">
             <input type="text" name="ai_api_key" placeholder="API Key（留空表示不修改）">
+            <?php if ($ai_provider === 'zhipu'): ?>
+                <input type="text" name="ai_model" placeholder="Zhipu Model（如 glm-4）"
+                       value="<?php echo htmlspecialchars($ai_settings['zhipu_model'] ?? ''); ?>">
+            <?php elseif ($ai_provider === 'qwen'): ?>
+                <input type="text" name="ai_model" placeholder="Qwen Model（如 qwen-plus）"
+                       value="<?php echo htmlspecialchars($ai_settings['qwen_model'] ?? ''); ?>">
+            <?php endif; ?>
             <button class="btn btn-primary" name="set_ai_settings">保存 API 配置</button>
         </div>
         <div style="font-size:12px;color:#6b7280;margin-top:6px;">
@@ -810,11 +1052,14 @@ require_once(__DIR__ . "/admin_layout.php");
         <?php
         $saved_qwen = $ai_secret ? aiDecrypt($ai_settings['qwen_api_key'] ?? '', $ai_secret) : '';
         $saved_gemini = $ai_secret ? aiDecrypt($ai_settings['gemini_api_key'] ?? '', $ai_secret) : '';
+        $saved_zhipu = $ai_secret ? aiDecrypt($ai_settings['zhipu_api_key'] ?? '', $ai_secret) : '';
         ?>
-        <?php if ($saved_qwen || $saved_gemini): ?>
+        <?php if ($saved_qwen || $saved_gemini || $saved_zhipu): ?>
             <div style="font-size:12px;color:#6b7280;margin-top:6px;">
-                已保存密钥：Qwen <?php echo htmlspecialchars(maskSecret($saved_qwen)); ?>，
-                Gemini <?php echo htmlspecialchars(maskSecret($saved_gemini)); ?>
+                已保存密钥：
+                Qwen <?php echo htmlspecialchars(maskSecret($saved_qwen)); ?>，
+                Gemini <?php echo htmlspecialchars(maskSecret($saved_gemini)); ?>，
+                Zhipu <?php echo htmlspecialchars(maskSecret($saved_zhipu)); ?>
             </div>
         <?php endif; ?>
     </form>
@@ -833,17 +1078,32 @@ require_once(__DIR__ . "/admin_layout.php");
 <hr>
 <h3>Progress Images</h3>
 
-<div style="display:flex; flex-wrap:wrap; gap:15px;">
-
-<?php while ($img = $images->fetch_assoc()): ?>
-
-    <a href="<?php echo htmlspecialchars($img['studio_image']); ?>" target="_blank">
-        <img src="<?php echo htmlspecialchars($img['studio_image']); ?>" 
-             style="width:240px; height:auto; border-radius:8px; cursor:pointer;">
-    </a>
-
-<?php endwhile; ?>
-
+<div class="carousel">
+    <button type="button" class="carousel-btn prev" id="studio-carousel-prev">‹</button>
+    <div class="carousel-viewport">
+        <div class="carousel-track" id="studio-carousel">
+            <?php
+            $has_studio_images = false;
+            while ($img = $images->fetch_assoc()):
+                $studio_img = buildFullUrl($img['studio_image'] ?? '');
+                if ($studio_img):
+                    $has_studio_images = true;
+            ?>
+                    <div class="carousel-item">
+                        <a href="<?php echo htmlspecialchars($studio_img); ?>" target="_blank">
+                            <img src="<?php echo htmlspecialchars($studio_img); ?>" alt="Studio Update">
+                        </a>
+                    </div>
+            <?php
+                endif;
+            endwhile;
+            if (!$has_studio_images):
+            ?>
+                <div class="preview-empty" style="width:240px;">No images yet</div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <button type="button" class="carousel-btn next" id="studio-carousel-next">›</button>
 </div>
 
 <form method="POST" enctype="multipart/form-data" class="upload-form">
@@ -898,6 +1158,56 @@ require_once(__DIR__ . "/admin_layout.php");
             console.error(err);
         }
     }, 6000);
+})();
+
+(function () {
+    const select = document.getElementById("ai_provider");
+    const hidden = document.getElementById("ai_provider_hidden");
+    if (!select || !hidden) return;
+    const sync = () => {
+        hidden.value = select.value;
+    };
+    select.addEventListener("change", sync);
+    sync();
+})();
+
+(function () {
+    const track = document.getElementById("studio-carousel");
+    if (!track) return;
+    const prev = document.getElementById("studio-carousel-prev");
+    const next = document.getElementById("studio-carousel-next");
+    const items = Array.from(track.querySelectorAll(".carousel-item"));
+    if (!items.length) {
+        if (prev) prev.style.display = "none";
+        if (next) next.style.display = "none";
+        return;
+    }
+
+    const gap = 12;
+    const itemWidth = 240 + gap;
+    let index = 0;
+
+    const update = () => {
+        const maxIndex = Math.max(0, items.length - 1);
+        if (index < 0) index = 0;
+        if (index > maxIndex) index = maxIndex;
+        track.style.transform = `translateX(${-index * itemWidth}px)`;
+    };
+
+    if (prev) {
+        prev.addEventListener("click", () => {
+            index -= 1;
+            update();
+        });
+    }
+    if (next) {
+        next.addEventListener("click", () => {
+            index += 1;
+            update();
+        });
+    }
+
+    update();
 })();
 </script>
 

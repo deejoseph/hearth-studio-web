@@ -1,97 +1,121 @@
-import React from "react";
 import "./Home.css";
-import dragonKiln from "../assets/images/dragon-kiln.jpg";
-import carving from "../assets/images/carving.jpg";
-import cup from "../assets/images/translucent-cup.jpg";
-import dinner from "../assets/images/dinner.jpg";
 import cup1 from "../assets/images/cup1.jpg";
 import cup2 from "../assets/images/cup2.jpg";
 import cup3 from "../assets/images/cup3.jpg";
+import carving from "../assets/images/carving.jpg";
 
 const Home = () => {
   return (
-    <div className="home">
-
-      {/* ================= HERO ================= */}
+    <main className="home">
       <section
         className="hero"
-        style={{
-          backgroundImage: `url(${dragonKiln})`,
-          backgroundPosition: "70% center"
-        }}
+        style={{ backgroundImage: "url(/hearth-studio.jpg)" }}
       >
-        <div className="hero-overlay" />
         <div className="hero-content">
+          <p className="eyebrow">Hearth Studio · Custom Ceramics</p>
           <h1>
-            Light carved <br />
-            into stoneware.
+            Create a ceramic piece with us, not just from us.
           </h1>
-          <p>From fire and earth.</p>
-          <button className="hero-btn">Explore the Collection</button>
+          <p className="hero-subtitle">
+            A collaborative process that turns your ideas into
+            a kiln‑fired memory.
+          </p>
+          <div className="hero-actions">
+            <a className="btn ghost" href="/collection">
+              View Gallery
+            </a>
+          </div>
+          <div className="hero-micro">
+            Serving U.S. customers · Hand‑engraved · Studio updates
+          </div>
         </div>
+        <div className="hero-visual" aria-hidden="true" />
       </section>
 
-      {/* ================= CRAFT ================= */}
-      <section className="split-section">
-        <div className="split-image">
-          <img src={carving} alt="Carving process" />
-        </div>
-
-        <div className="split-text">
-          <h2>Where hands meet clay.</h2>
+      <section className="story">
+        <div className="section-header">
+          <h2>Order Stories</h2>
           <p>
-            Each line is carved before the flame completes its work.
-            The blade meets raw stoneware, shaping patterns
-            that only light can reveal.
+            Each piece begins with a real person, a real memory.
           </p>
         </div>
+        <div className="story-grid">
+          <article className="story-card">
+            <div className="story-media">
+              <img src={carving} alt="Order story preview" />
+              <span className="story-badge">Coming Soon</span>
+            </div>
+            <div className="story-body">
+              <h3>Order #28 · Pet Portrait</h3>
+              <p>
+                A golden retriever memorialized in green glaze.
+              </p>
+              <button className="story-link" type="button">
+                Watch on YouTube
+              </button>
+            </div>
+          </article>
+          <article className="story-card">
+            <div className="story-media">
+              <img src={cup1} alt="Order story preview" />
+              <span className="story-badge">Coming Soon</span>
+            </div>
+            <div className="story-body">
+              <h3>Order #31 · Relief Mug</h3>
+              <p>
+                A family portrait turned into a daily ritual.
+              </p>
+              <button className="story-link" type="button">
+                Watch on YouTube
+              </button>
+            </div>
+          </article>
+          <article className="story-card">
+            <div className="story-media">
+              <img src={cup2} alt="Order story preview" />
+              <span className="story-badge">Coming Soon</span>
+            </div>
+            <div className="story-body">
+              <h3>Order #36 · Memory Tile</h3>
+              <p>
+                A botanical sketch preserved in ceramic.
+              </p>
+              <button className="story-link" type="button">
+                Watch on YouTube
+              </button>
+            </div>
+          </article>
+          <article className="story-card">
+            <div className="story-media">
+              <img src={cup3} alt="Order story preview" />
+              <span className="story-badge">Coming Soon</span>
+            </div>
+            <div className="story-body">
+              <h3>Order #42 · Keepsake Cup</h3>
+              <p>
+                Hand‑etched text for a milestone gift.
+              </p>
+              <button className="story-link" type="button">
+                Watch on YouTube
+              </button>
+            </div>
+          </article>
+        </div>
       </section>
 
-      {/* ================= LIGHT ================= */}
-      <section className="split-section reverse">
-        <div className="split-image">
-          <img src={cup} alt="Translucent celadon cup" />
-        </div>
-
-        <div className="split-text">
-          <h2>Carved to reveal light.</h2>
+      <section className="cta">
+        <div className="cta-card">
+          <h2>Ready to begin?</h2>
           <p>
-            Celadon carries the memory of earth.
-            It is light that awakens the carving.
-            Hold it to the sun and the design breathes.
+            Tell us what you want to create and we’ll guide the
+            next steps.
           </p>
+          <a className="btn primary" href="/customize">
+            Start Your Custom Piece
+          </a>
         </div>
       </section>
-
-      {/* ================= LIFE ================= */}
-      <section className="split-section">
-        <div className="split-image">
-          <img src={dinner} alt="Dinner table scene" />
-        </div>
-
-        <div className="split-text">
-          <h2>Craft, lived.</h2>
-          <p>
-            Not confined to tradition, but placed at your table.
-            Shared in quiet mornings, admired across warm dinners.
-          </p>
-        </div>
-      </section>
-
-      {/* ================= ART GALLERY ================= */}
-      <section className="gallery-grid">
-        <img src={cup1} alt="Cup detail" />
-        <img src={cup2} alt="Cup detail" />
-        <img src={cup3} alt="Cup detail" />
-      </section>
-
-      {/* ================= FINAL CTA ================= */}
-      <section className="final-cta">
-        <h2>Bring light to your table.</h2>
-        <button className="hero-btn dark">View Collection</button>
-      </section>
-
-    </div>
+    </main>
   );
 };
 
