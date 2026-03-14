@@ -1,4 +1,10 @@
 # AI Agent Context - Hearth Studio
+# Hearth Studio – AI Context Guide
+
+This document provides essential context for AI coding agents
+working on the Hearth Studio repository.
+
+Agents should read this file before making code changes.
 
 ## 1. Project Overview
 Hearth Studio 是一个定制陶瓷订单管理系统，用于生产个性化产品（如定制宠物浮雕杯）。系统由两部分组成：面向客户的下单网站，以及内部的管理后台。

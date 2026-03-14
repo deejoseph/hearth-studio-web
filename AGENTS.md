@@ -1,7 +1,12 @@
-# AI Agent Context
+# AI Agent Instructions
 
-All AI coding agents working on this repository must read:
+Before modifying this repository, read:
 
 docs/ai-context.md
 
-before generating or modifying code.
+Important rules:
+
+- Prefer incremental improvements
+- Avoid breaking existing functionality
+- Use the API layer in src/api/
+- Do not introduce new frameworks without approval
