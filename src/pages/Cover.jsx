@@ -1,15 +1,10 @@
 import "./Home.css";
-import cup1 from "../assets/images/cup1.jpg";
 import cup2 from "../assets/images/cup2.jpg";
 import cup3 from "../assets/images/cup3.jpg";
-import carving from "../assets/images/carving.jpg";
 
 const Cover = () => {
   return (
     <main className="home">
-      <a className="sr-only" href="/customize">
-        Start Your Custom Piece
-      </a>
       <section className="story">
         <div className="section-header">
           <h2>Order Stories</h2>
@@ -18,28 +13,54 @@ const Cover = () => {
         <div className="story-grid">
           <article className="story-card">
             <div className="story-media">
-              <img src={carving} alt="Hand carving process" />
+              <img src="/pet-portrait.jpg" alt="Pet portrait order story" />
               <span className="story-badge">Coming Soon</span>
             </div>
             <div className="story-body">
               <h3>Order #28 - Pet Portrait</h3>
               <p>A golden retriever memorialized in green glaze.</p>
-              <button className="story-link" type="button">
-                Watch on YouTube
-              </button>
+              <a
+                className="story-link"
+                href="https://www.youtube.com/watch?v=_voqLeXDNTg"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Full Story
+              </a>
+              <a
+                className="story-link story-moments"
+                href="https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QuCAiGmDGZWvBLyTIDlg3D"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Moments
+              </a>
             </div>
           </article>
           <article className="story-card">
             <div className="story-media">
-              <img src={cup1} alt="Relief mug order story" />
+              <img src="/wedding-gift.jpg" alt="Wedding gift order story" />
               <span className="story-badge">Coming Soon</span>
             </div>
             <div className="story-body">
-              <h3>Order #31 - Relief Mug</h3>
-              <p>A family portrait turned into a daily ritual.</p>
-              <button className="story-link" type="button">
-                Watch on YouTube
-              </button>
+              <h3>Order #38 - Wedding Gift</h3>
+              <p>A handcrafted keepsake created for a wedding celebration.</p>
+              <a
+                className="story-link"
+                href="https://www.youtube.com/watch?v=GCXAOyTNrQk"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Full Story
+              </a>
+              <a
+                className="story-link story-moments"
+                href="https://www.youtube.com/playlist?list=PL8Eui6FZ9u0TuHRrBNjWRH1E_I6aSxH72"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Moments
+              </a>
             </div>
           </article>
           <article className="story-card">
@@ -50,9 +71,22 @@ const Cover = () => {
             <div className="story-body">
               <h3>Order #36 - Memory Tile</h3>
               <p>A botanical sketch preserved in ceramic.</p>
-              <button className="story-link" type="button">
-                Watch on YouTube
-              </button>
+              <a
+                className="story-link"
+                href="https://www.youtube.com/watch?v=4xDzrJKXOOY"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Full Story
+              </a>
+              <a
+                className="story-link story-moments"
+                href="https://www.youtube.com/playlist?list=PLrAXtmRdnEQx8i9HfJCH0z8G9z0y8q5b2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Moments
+              </a>
             </div>
           </article>
           <article className="story-card">
@@ -63,9 +97,22 @@ const Cover = () => {
             <div className="story-body">
               <h3>Order #42 - Keepsake Cup</h3>
               <p>Hand-etched text for a milestone gift.</p>
-              <button className="story-link" type="button">
-                Watch on YouTube
-              </button>
+              <a
+                className="story-link"
+                href="https://www.youtube.com/watch?v=DWcJFNfaw9c"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Full Story
+              </a>
+              <a
+                className="story-link story-moments"
+                href="https://www.youtube.com/playlist?list=PLrAXtmRdnEQx8i9HfJCH0z8G9z0y8q5b2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Watch Moments
+              </a>
             </div>
           </article>
         </div>

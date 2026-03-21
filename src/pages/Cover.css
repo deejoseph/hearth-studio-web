@@ -2,7 +2,7 @@
 
 body {
   margin: 0;
-  padding-top: 80px; /* 为固定 Header 预留空间 */
+  padding-top: 80px;
   font-family: "Inter", sans-serif;
   font-weight: 400;
   color: #222;
@@ -61,10 +61,11 @@ h1, h2 {
 .hero-btn {
   margin-top: 32px;
   padding: 14px 32px;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255,255,255,0.6);
   backdrop-filter: blur(4px);
-  color: white;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   transition: 0.3s ease;
   font-weight: 500;
@@ -79,7 +80,7 @@ h1, h2 {
 }
 
 .hero-btn:hover {
-  background: white;
+  background: rgba(255, 255, 255, 0.96);
   color: black;
 }
 
@@ -154,8 +155,6 @@ h1, h2 {
 /* ================= DESKTOP ================= */
 
 @media (min-width: 1024px) {
-
-  /* Hero 保持沉浸，但增加呼吸感 */
   .hero-content {
     max-width: 900px;
   }
@@ -164,7 +163,6 @@ h1, h2 {
     font-size: 80px;
   }
 
-  /* Split 改为左右布局 */
   .split-section {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -197,7 +195,6 @@ h1, h2 {
     margin: 0;
   }
 
-  /* Gallery 桌面三列 */
   .gallery-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -206,7 +203,6 @@ h1, h2 {
     height: 450px;
   }
 
-  /* CTA 呼吸感增强 */
   .final-cta {
     padding: 160px 0;
   }
@@ -216,10 +212,9 @@ h1, h2 {
   }
 }
 
-/* ================= MOBILE HERO 优化 ================= */
+/* ================= MOBILE HERO ================= */
 
 @media (max-width: 768px) {
-
   body {
     padding-top: 70px;
   }
@@ -247,5 +242,4 @@ h1, h2 {
     padding: 16px;
     font-size: 16px;
   }
-
 }

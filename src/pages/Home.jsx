@@ -1,4 +1,5 @@
 import "./Cover.css";
+import "./Home.css";
 import dragonKiln from "../assets/images/dragon-kiln.jpg";
 import carving from "../assets/images/carving.jpg";
 import cup from "../assets/images/translucent-cup.jpg";
@@ -24,6 +25,12 @@ const Home = () => {
             Hand-Carved in Stoneware.
           </h1>
           <p>From fire and earth.</p>
+          <a className="hero-btn hero-btn-primary" href="/story">
+            WATCH ORDER STORIES
+          </a>
+          <a className="hero-btn hero-btn-secondary" href="/collection">
+            EXPLORE COLLECTION
+          </a>
         </div>
       </section>
 
@@ -79,8 +86,8 @@ const Home = () => {
 
       <section className="final-cta">
         <h2>Continue Exploring.</h2>
-        <a className="hero-btn dark" href="/collection">
-          Explore Collection
+        <a className="hero-btn dark" href="/customize">
+          START YOUR CUSTOM PIECE
         </a>
       </section>
     </div>
