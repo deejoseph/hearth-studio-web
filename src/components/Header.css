@@ -1,0 +1,32 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+
+  background: #111;
+  padding: 16px 32px;
+
+  z-index: 1000;   /* 保证在最上层 */
+}
+
+.nav {
+  display: flex;
+  gap: 24px;
+}
+
+.nav-link {
+  color: white;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+
+.nav-link:hover {
+  opacity: 0.7;
+}
+
+/* 🔥 关键：当前路由高亮 */
+.nav-link.active {
+  border-bottom: 2px solid #fff;
+}
