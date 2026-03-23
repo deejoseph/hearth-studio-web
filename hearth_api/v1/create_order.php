@@ -146,7 +146,11 @@ $totalPrice = round($basePrice * $multiplier, 2);
     $depositRatio  = 0.50;
     $depositAmount = round($totalPrice * $depositRatio, 2);
 
-    $userId   = 2; // TODO: 改为真实登录用户
+    if (!isset($input['user_id'])) {
+        throw new Exception("Missing user_id");
+    }
+    $userId   = (int)$input['user_id'];
+    // TODO: replace with real authentication (session or token)
     $statusId = 1; // pending_design
 
     // ======================================================

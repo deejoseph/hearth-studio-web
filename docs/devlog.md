@@ -19,3 +19,58 @@
 - Confirm preferred Leonardo prompt variant for “tulip incised bisque plate” (avoid glossy glaze, avoid lotus).
 - Generate and save final story pack files in `Story/` (script + prompts).
 - Wire YouTube URL into Order #28 story card when available.
+
+## 2026-03-21
+
+### Overview
+Completed homepage UI/UX fixes and Story page video integration.
+
+### Key Changes
+
+#### 1. Homepage (Home.jsx)
+- Fixed Hero button visibility issue.
+- Improved contrast for primary and secondary CTAs.
+- Adjusted button styles for better UX.
+- Ensured buttons are above overlay (`z-index` fix).
+- Updated CTA logic:
+  - `Watch Order Stories` -> `/story`
+  - `Explore Collection` -> `/collection`
+  - Bottom CTA -> `/customize`
+
+#### 2. Story Page (Cover.jsx)
+- Implemented dual CTA structure:
+  - `Watch Full Story` -> YouTube long-form video
+  - `Watch Moments` -> YouTube Shorts playlist
+- Added real content:
+
+Order #28:
+- Image: `/pet-portrait.jpg`
+- Full Story: [https://www.youtube.com/watch?v=_voqLeXDNTg](https://www.youtube.com/watch?v=_voqLeXDNTg)
+- Moments: [https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QuCAiGmDGZWvBLyTIDlg3D](https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QuCAiGmDGZWvBLyTIDlg3D)
+
+Order #38:
+- Image: `/wedding-gift.jpg`
+- Full Story: [https://www.youtube.com/watch?v=GCXAOyTNrQk](https://www.youtube.com/watch?v=GCXAOyTNrQk)
+- Moments: [https://www.youtube.com/playlist?list=PL8Eui6FZ9u0TuHRrBNjWRH1E_I6aSxH72](https://www.youtube.com/playlist?list=PL8Eui6FZ9u0TuHRrBNjWRH1E_I6aSxH72)
+
+#### 3. SEO Improvements
+- Added homepage H1.
+- Updated meta title and description.
+- Added canonical URL.
+- Redirected `/home` -> `/`.
+
+#### 4. Architecture Decisions
+- Home = brand + emotional entry.
+- Story = conversion (real cases).
+- Collection = product browsing.
+- Customize = conversion action.
+
+#### 5. Current Status
+- Core frontend structure stabilized.
+- Story-driven marketing flow established.
+- Ready to focus on content (YouTube videos + Shorts).
+
+#### 6. Next Steps
+- Produce and publish more Story videos.
+- Improve Story page SEO (future).
+- Consider individual story landing pages.

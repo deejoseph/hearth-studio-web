@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import "./BridgePage.css";
 
 const BridgePage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const productData = location.state;
 
   if (!productData) {
@@ -61,6 +63,12 @@ const BridgePage = () => {
   ============================== */
   const handleSubmitOrder = async () => {
     try {
+      if (!user?.id) {
+        console.error("Missing authenticated user id.");
+        navigate("/login");
+        return;
+      }
+
       const safePatternId =
         craftTypeId === "4" && formData.pattern_type_id === "1"
           ? formData.pattern_id || null
@@ -69,6 +77,7 @@ const BridgePage = () => {
       const payload = {
         productId,
         status: "pending_design",
+        user_id: Number(user.id),
         ...formData,
         pattern_id: safePatternId,
         image_url: imageUrl   // ✅🔥 关键修复：传递封面图片
