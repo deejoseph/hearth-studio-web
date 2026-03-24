@@ -185,17 +185,23 @@
 
 .story-body {
   padding: 18px 20px 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  overflow: visible;
 }
 
 .story-body h3 {
   margin: 0 0 8px;
   font-size: 22px;
+  flex: 1 0 100%;
 }
 
 .story-body p {
   color: #6b625b;
   margin: 0 0 16px;
   line-height: 1.6;
+  flex: 1 0 100%;
 }
 
 .story-link {
@@ -209,6 +215,16 @@
   font-size: 12px;
   cursor: pointer;
   font-family: "Cormorant Garamond", serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
+  white-space: normal;
+  text-overflow: clip;
+  overflow: visible;
 }
 
 .story-link:hover {
@@ -217,7 +233,7 @@
 }
 
 .story-moments {
-  margin-left: 10px;
+  margin-left: 0;
   opacity: 0.8;
 }
 
@@ -340,5 +356,12 @@
 
   .story-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .story-body .story-link {
+    flex: 1 1 100%;
+    width: 100%;
   }
 }
