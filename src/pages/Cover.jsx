@@ -1,5 +1,4 @@
-import "./Home.css";
-import cup2 from "../assets/images/cup2.jpg";
+﻿import "./Home.css";
 import cup3 from "../assets/images/cup3.jpg";
 
 const Cover = () => {
@@ -65,15 +64,18 @@ const Cover = () => {
           </article>
           <article className="story-card">
             <div className="story-media">
-              <img src={cup2} alt="Memory tile order story" />
+              <img src="/lamp.jpg" alt="Order #45 story" />
               <span className="story-badge">Coming Soon</span>
             </div>
             <div className="story-body">
-              <h3>Order #36 - Memory Tile</h3>
-              <p>A botanical sketch preserved in ceramic.</p>
+              <h3>Order #45 &ndash; A Light That Understands</h3>
+              <p>
+                A thoughtful ceramic lamp designed for a father who refuses to
+                compromise on elegance&mdash;and a daughter who refuses to give up on him.
+              </p>
               <a
                 className="story-link"
-                href="https://www.youtube.com/watch?v=4xDzrJKXOOY"
+                href="https://youtu.be/LAs87W0PyYY"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -81,7 +83,7 @@ const Cover = () => {
               </a>
               <a
                 className="story-link story-moments"
-                href="https://www.youtube.com/playlist?list=PLrAXtmRdnEQx8i9HfJCH0z8G9z0y8q5b2"
+                href="https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QP0PpTB-ndY2ETN-dGJ2k6"
                 target="_blank"
                 rel="noopener noreferrer"
               >

@@ -1,2 +1,0 @@
-<?php
-return 'CHANGE_ME_32_CHAR_SECRET_KEY';
