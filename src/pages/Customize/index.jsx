@@ -1,25 +1,31 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import "./Customize.css";
 import studioHero from "../../assets/images/studio-hero.jpg";
 import studioHero2 from "../../assets/images/studio-hero-2.jpg";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { getOrderBoardWithViewer } from "../../api/orderService";
 
 export default function Customize() {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetch("/api/hearthstudio/v1/get_order_board.php")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
+    const loadBoard = async () => {
+      try {
+        const data = await getOrderBoardWithViewer(user?.id);
+        if (data?.success) {
           setBoard(data);
         }
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+      }
+    };
+
+    loadBoard();
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -100,7 +106,7 @@ export default function Customize() {
             <div className="season-header">
               <h2>{season.name}</h2>
               <div className="season-meta">
-                {season.start_date} → {season.end_date}
+                {season.start_date} &rarr; {season.end_date}
                 <span>
                   Production: {season.production_cycle}
                 </span>
@@ -138,7 +144,7 @@ export default function Customize() {
                           order.product_image ||
                           "/images/default-product.jpg";
 
-                        const isPublic = Boolean(order.is_public);
+                        const canView = Boolean(order.can_view);
 
                         const displayName =
                           typeof order.customer_name === "string"
@@ -149,14 +155,14 @@ export default function Customize() {
                           <div
                             key={order.id}
                             className={`order-card ${
-                              isPublic ? "public" : "private"
+                              canView ? "public" : "private"
                             }`}
                             onClick={() => {
-                              if (isPublic) {
+                              if (canView) {
                                 navigate(`/order/${order.id}`);
                               }
                             }}
-                            style={{ cursor: isPublic ? "pointer" : "default" }}
+                            style={{ cursor: canView ? "pointer" : "default" }}
                             >
                             <img
                               src={productImage}
@@ -164,9 +170,9 @@ export default function Customize() {
                               className="order-thumb"
                             />
 
-                            {!isPublic && (
+                            {!canView && (
                               <div className="order-lock-badge">
-                                🔒 Private
+                                &#128274; Private
                               </div>
                             )}
 
@@ -175,7 +181,7 @@ export default function Customize() {
                                 Order #{order.id}
                               </div>
 
-                              {isPublic && displayName && (
+                              {canView && displayName && (
                                 <div className="order-name">
                                   {displayName}
                                 </div>

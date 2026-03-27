@@ -3,14 +3,17 @@ import { useEffect, useRef, useState } from "react";
 import "./OrderDetail.css";
 import {
   createRound,
+  createShareLink,
   getOrderDetail
 } from "../../api/orderService";
 import { uploadImage } from "../../api/uploadService";
+import { useAuth } from "../../context/AuthContext";
 
 const BASE_URL = "https://www.ichessgeek.com/HearthStudio";
 
 export default function OrderDetail() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -18,6 +21,7 @@ export default function OrderDetail() {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [collapsedStages, setCollapsedStages] = useState({});
 
   // ⭐ 专业灯箱
@@ -67,7 +71,7 @@ export default function OrderDetail() {
     setError(false);
 
     try {
-      const data = await getOrderDetail(id);
+      const data = await getOrderDetail(id, user?.id);
 
       if (data.success && data.order_info) {
         setOrderData(data);
@@ -95,12 +99,12 @@ export default function OrderDetail() {
 
   useEffect(() => {
     fetchOrderDetail();
-  }, [id]);
+  }, [id, user?.id]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const data = await getOrderDetail(id);
+        const data = await getOrderDetail(id, user?.id);
         if (data?.success) {
           const nextSignature = calcSignature(data);
           if (nextSignature !== lastChangeRef.current) {
@@ -114,7 +118,7 @@ export default function OrderDetail() {
     }, 6000);
 
     return () => clearInterval(interval);
-  }, [id]);
+  }, [id, user?.id]);
 
   const fullUrl = (path) => {
   if (!path) return "";
@@ -214,6 +218,55 @@ export default function OrderDetail() {
     } finally {
       setUploading(false);
       e.target.value = "";
+    }
+  };
+
+  const handleShare = async (orderInfo) => {
+    if (!orderInfo?.id) return;
+
+    if ((Number(orderInfo.is_public) || 0) !== 1) {
+      alert("This order is private and cannot be shared.");
+      return;
+    }
+
+    setSharing(true);
+
+    try {
+      const data = await createShareLink({ order_id: orderInfo.id });
+
+      if (!data?.success || !data.share_url) {
+        alert(data?.message || "Failed to create share link.");
+        return;
+      }
+
+      const sharePayload = {
+        title: data.title || `Hearth Studio Order #${orderInfo.order_number}`,
+        text: data.text || "Follow this custom order journey on Hearth Studio.",
+        url: data.share_url
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(sharePayload);
+          return;
+        } catch (shareErr) {
+          if (shareErr?.name === "AbortError") {
+            return;
+          }
+        }
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(data.share_url);
+        alert("Share link copied to clipboard.");
+      } else {
+        window.prompt("Copy this share link:", data.share_url);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Share failed. Please try again.");
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -323,8 +376,12 @@ export default function OrderDetail() {
     Pay Now
   </button>
 
-  <button className="btn-share disabled">
-    Share
+  <button
+    className={`btn-share ${Number(order.is_public) === 1 ? "active" : "disabled"}`}
+    onClick={() => handleShare(order)}
+    disabled={sharing || Number(order.is_public) !== 1}
+  >
+    {sharing ? "Sharing..." : "Share"}
   </button>
 </div>
       </div>

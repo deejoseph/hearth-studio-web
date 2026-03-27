@@ -508,16 +508,32 @@
   border-radius: 28px;
   border: none;
   font-weight: 500;
-  cursor: not-allowed;
   opacity: 0.6;
 }
 
 .btn-payment {
   background: #8b5e3c;
   color: white;
+  cursor: not-allowed;
 }
 
 .btn-share {
   background: #ddd;
   color: #555;
+  cursor: not-allowed;
+}
+
+.btn-share.active {
+  background: #ddd;
+  color: #555;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.btn-share.active:hover {
+  opacity: 0.85;
+}
+
+.btn-share:disabled {
+  cursor: not-allowed;
 }

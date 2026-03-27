@@ -22,12 +22,29 @@ export function getOrderBoard() {
   return request("/get_order_board.php");
 }
 
-export function getOrderDetail(id) {
-  return request(`/get_order_detail.php?id=${id}`);
+export function getOrderBoardWithViewer(viewerUserId) {
+  const query = viewerUserId
+    ? `?viewer_user_id=${encodeURIComponent(viewerUserId)}`
+    : "";
+  return request(`/get_order_board.php${query}`);
+}
+
+export function getOrderDetail(id, viewerUserId) {
+  const query = viewerUserId
+    ? `&viewer_user_id=${encodeURIComponent(viewerUserId)}`
+    : "";
+  return request(`/get_order_detail.php?id=${id}${query}`);
 }
 
 export function createRound(payload) {
   return request("/create_round.php", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function createShareLink(payload) {
+  return request("/create_share_link.php", {
     method: "POST",
     body: JSON.stringify(payload)
   });

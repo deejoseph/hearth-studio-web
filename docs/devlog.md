@@ -74,3 +74,18 @@ Order #38:
 - Produce and publish more Story videos.
 - Improve Story page SEO (future).
 - Consider individual story landing pages.
+
+---
+
+### 2026-03-26 Story Content Update
+
+#### Story Page (Cover.jsx)
+- Replaced the previous `Order #36` story card with `Order #45`.
+- Updated title to: `Order #45 – A Light That Understands`.
+- Updated description to:
+  `A thoughtful ceramic lamp designed for a father who refuses to compromise on elegance—and a daughter who refuses to give up on him.`
+- Updated image to: `/lamp.jpg` (from `public/lamp.jpg`).
+- Updated `Watch Full Story`:
+  [https://youtu.be/LAs87W0PyYY](https://youtu.be/LAs87W0PyYY)
+- Updated `Watch Moments`:
+  [https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QP0PpTB-ndY2ETN-dGJ2k6](https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QP0PpTB-ndY2ETN-dGJ2k6)
