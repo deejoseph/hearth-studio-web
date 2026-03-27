@@ -13,18 +13,37 @@ export default function Customize() {
   const { user } = useAuth();
 
   useEffect(() => {
+    let alive = true;
+
     const loadBoard = async () => {
       try {
-        const data = await getOrderBoardWithViewer(user?.id);
-        if (data?.success) {
+        let viewerUserId = user?.id || 0;
+        if (!viewerUserId) {
+          try {
+            const raw = localStorage.getItem("user");
+            const parsed = raw ? JSON.parse(raw) : null;
+            viewerUserId = parsed?.id || 0;
+          } catch {
+            viewerUserId = 0;
+          }
+        }
+
+        const data = await getOrderBoardWithViewer(viewerUserId);
+        if (alive && data?.success) {
           setBoard(data);
         }
       } finally {
-        setLoading(false);
+        if (alive) {
+          setLoading(false);
+        }
       }
     };
 
     loadBoard();
+
+    return () => {
+      alive = false;
+    };
   }, [user?.id]);
 
   if (loading) {
@@ -144,7 +163,11 @@ export default function Customize() {
                           order.product_image ||
                           "/images/default-product.jpg";
 
+                        const isPrivate = !Boolean(order.is_public);
                         const canView = Boolean(order.can_view);
+                        const cardClass = canView
+                          ? (isPrivate ? "private-own" : "public")
+                          : "private";
 
                         const displayName =
                           typeof order.customer_name === "string"
@@ -154,9 +177,7 @@ export default function Customize() {
                         return (
                           <div
                             key={order.id}
-                            className={`order-card ${
-                              canView ? "public" : "private"
-                            }`}
+                            className={`order-card ${cardClass}`}
                             onClick={() => {
                               if (canView) {
                                 navigate(`/order/${order.id}`);
@@ -170,7 +191,7 @@ export default function Customize() {
                               className="order-thumb"
                             />
 
-                            {!canView && (
+                            {isPrivate && (
                               <div className="order-lock-badge">
                                 &#128274; Private
                               </div>

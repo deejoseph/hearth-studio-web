@@ -89,3 +89,28 @@ Order #38:
   [https://youtu.be/LAs87W0PyYY](https://youtu.be/LAs87W0PyYY)
 - Updated `Watch Moments`:
   [https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QP0PpTB-ndY2ETN-dGJ2k6](https://www.youtube.com/playlist?list=PL8Eui6FZ9u0QP0PpTB-ndY2ETN-dGJ2k6)
+
+---
+
+### 2026-03-27 Frontend Update
+
+#### Order Detail Share MVP
+- Enabled `Share` button on Order Detail page.
+- Added Web Share API flow (mobile/system share sheet).
+- Added fallback for unsupported environments:
+  - copy share URL to clipboard
+  - manual prompt fallback when clipboard API is unavailable
+- Added sharing loading state (`Sharing...`) and error handling.
+- Share button is enabled only for share-allowed orders.
+
+#### Customize Visibility Rules
+- Updated Customize page to use API-driven visibility (`can_view`) instead of local `is_public` hard-blocking.
+- Behavior now matches product rule:
+  - all orders are visible as cards
+  - private orders from other users are visible but not openable
+  - current user's own private orders are visible and openable
+
+#### Encoding Fix
+- Fixed garbled symbols in Customize page:
+  - date separator now uses `&rarr;`
+  - private badge now uses `&#128274; Private`

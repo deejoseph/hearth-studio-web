@@ -193,6 +193,16 @@
   cursor: not-allowed;
 }
 
+.order-card.private-own {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.order-card.private-own:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
 /* =========================
    Product Thumbnail
 ========================= */
