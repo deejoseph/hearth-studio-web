@@ -15,6 +15,61 @@
   font-weight: 400;
 }
 
+.onboarding-banner {
+  position: relative;
+  margin: 22px 8vw 0;
+  padding: 20px 20px 18px;
+  border: 1px solid #e3d8cc;
+  background: #fffaf5;
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(32, 28, 26, 0.08);
+}
+
+.onboarding-banner h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.onboarding-banner p {
+  margin: 8px 0;
+  line-height: 1.55;
+  color: #4d433d;
+}
+
+.onboarding-banner a {
+  color: #8c4f39;
+}
+
+.onboarding-close {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  border: none;
+  background: transparent;
+  color: #7a6a5f;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.onboarding-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.onboarding-dark-btn {
+  background: transparent !important;
+  color: #2b2b2b !important;
+  border: 1px solid #bfae9f !important;
+}
+
+.onboarding-dark-btn:hover {
+  background: #f0e4d7 !important;
+  color: #2b2b2b !important;
+  border: 1px solid #f0e4d7 !important;
+}
+
 .home h1,
 .home h2,
 .home h3 {
@@ -360,6 +415,20 @@
 }
 
 @media (max-width: 640px) {
+  .onboarding-banner {
+    margin: 14px 5vw 0;
+    padding: 18px 14px 14px;
+  }
+
+  .onboarding-banner h2 {
+    font-size: 24px;
+  }
+
+  .onboarding-actions .hero-btn {
+    width: 100%;
+    text-align: center;
+  }
+
   .story-body .story-link {
     flex: 1 1 100%;
     width: 100%;

@@ -36,6 +36,16 @@ export function AuthProvider({ children }) {
     setUser(userData);
   };
 
+  const updateUser = (partialUser) => {
+    if (!partialUser || typeof partialUser !== "object") return;
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...partialUser };
+      localStorage.setItem("user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   // 🔥 退出登录
   const logout = () => {
     localStorage.removeItem("user");
@@ -43,7 +53,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

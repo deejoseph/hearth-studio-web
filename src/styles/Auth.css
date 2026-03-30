@@ -89,6 +89,52 @@
   background: rgba(255,255,255,0.08);
 }
 
+.auth-textarea {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+}
+
+.auth-field-group {
+  margin-bottom: 18px;
+}
+
+.auth-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #cfcfcf;
+  font-size: 13px;
+}
+
+.auth-file-input {
+  padding: 10px 12px;
+}
+
+.auth-file-input::file-selector-button {
+  margin-right: 10px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.auth-subhint {
+  margin: 8px 0 0;
+  color: #cfcfcf;
+  font-size: 12px;
+}
+
+.auth-avatar-preview {
+  margin-top: 10px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
 /* ===== Verification Code Inputs ===== */
 
 .code-input-group {
@@ -103,18 +149,23 @@
   height: 55px;
   font-size: 22px;
   text-align: center;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: #ffffff;
+  border: 1px solid #c8c8c8;
   border-radius: 10px;
-  color: #fff;
+  color: #111111;
   transition: all 0.2s ease;
 }
 
 .code-input:focus {
   border-color: #d4af37;
-  background: rgba(255,255,255,0.08);
+  background: #ffffff;
   outline: none;
   box-shadow: 0 0 10px rgba(212,175,55,0.4);
+}
+
+.code-input::selection {
+  background: #f3d67a;
+  color: #111111;
 }
 
 /* ===== Buttons ===== */

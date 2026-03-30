@@ -13,6 +13,7 @@
 .nav {
   display: flex;
   gap: 24px;
+  align-items: center;
 }
 
 .nav-link {
@@ -29,4 +30,35 @@
 /* 🔥 关键：当前路由高亮 */
 .nav-link.active {
   border-bottom: 2px solid #fff;
+}
+
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+.nav-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.logout-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }

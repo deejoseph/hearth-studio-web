@@ -41,3 +41,14 @@ export function resetPassword(payload) {
     body: JSON.stringify(payload)
   });
 }
+
+export function getMe() {
+  return request("/me.php");
+}
+
+export function updateProfile(payload) {
+  return request("/update-profile.php", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}

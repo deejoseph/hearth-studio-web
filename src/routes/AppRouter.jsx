@@ -9,6 +9,7 @@ import Register from "../pages/Register";
 import Customize from "../pages/Customize";
 import BridgePage from "../pages/BridgePage";
 import OrderDetail from "../pages/OrderDetail";
+import Profile from "../pages/Profile";
 
 import Collection from "../pages/collection";
 import Tableware from "../pages/collection/Tableware";
@@ -58,6 +59,7 @@ export default function AppRouter() {
             path="/order/:id"
             element={<OrderDetail />}
           />
+          <Route path="/profile" element={<Profile />} />
 
         </Route>
 

@@ -1,5 +1,7 @@
+import { useEffect, useMemo, useState } from "react";
 import "./Cover.css";
 import "./Home.css";
+import { useAuth } from "../context/AuthContext";
 import dragonKiln from "../assets/images/dragon-kiln.jpg";
 import carving from "../assets/images/carving.jpg";
 import cup from "../assets/images/translucent-cup.jpg";
@@ -9,8 +11,60 @@ import cup2 from "../assets/images/cup2.jpg";
 import cup3 from "../assets/images/cup3.jpg";
 
 const Home = () => {
+  const { user } = useAuth();
+  const onboardingKey = useMemo(() => {
+    if (!user) return "onboarding-dismissed:guest";
+    const id = user.email || user.username || user.id || "user";
+    return `onboarding-dismissed:${id}`;
+  }, [user]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem(onboardingKey);
+    setShowOnboarding(dismissed !== "1");
+  }, [onboardingKey]);
+
+  const dismissOnboarding = () => {
+    localStorage.setItem(onboardingKey, "1");
+    setShowOnboarding(false);
+  };
+
   return (
     <div className="home">
+      {showOnboarding && (
+        <section className="onboarding-banner" role="status" aria-live="polite">
+          <button
+            className="onboarding-close"
+            onClick={dismissOnboarding}
+            aria-label="Close onboarding notice"
+          >
+            x
+          </button>
+          <h2>Welcome to Hearth Studio</h2>
+          <p>
+            Our website is still under active construction. Thank you for your
+            patience if anything feels incomplete.
+          </p>
+          <p>
+            Suggestions and criticism are welcome:
+            {" "}
+            <a href="mailto:admin@ichessgeek.com">admin@ichessgeek.com</a>
+          </p>
+          <p>
+            You can also send your custom requirements directly by email, and
+            our administrator will follow up with you.
+          </p>
+          <div className="onboarding-actions">
+            <a className="hero-btn hero-btn-primary" href="mailto:admin@ichessgeek.com">
+              EMAIL ADMIN
+            </a>
+            <a className="hero-btn hero-btn-secondary onboarding-dark-btn" href="/customize">
+              START CUSTOMIZE PAGE
+            </a>
+          </div>
+        </section>
+      )}
+
       <section
         className="hero"
         style={{

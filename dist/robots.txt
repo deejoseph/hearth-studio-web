@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hearthstudio.com/sitemap.xml
+Sitemap: https://www.ichessgeek.com/sitemap.xml
