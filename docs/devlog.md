@@ -1,5 +1,32 @@
 ﻿# Dev Log
 
+## 2026-04-02
+
+### Customize Quarter Navigation
+- Reworked Customize page into quarter-by-quarter paging with left/right navigation.
+- Added end-of-range notices when reaching earliest/latest available quarter.
+- Updated booking policy copy in English:
+  - only current + next quarter are accepted for reservation
+  - urgent orders prioritize current quarter
+  - non-urgent orders can be scheduled into next quarter
+  - customers can contact admin for date adjustments
+- Updated hero switching logic by quarter page state and switched next-quarter hero asset to `studio-hero3.jpg`.
+
+### Mobile Navigation & English UI
+- Replaced narrow-screen header overflow with mobile menu mode (`Menu`/`Close`) and collapsible nav links.
+- Ensured newly added user-facing notices and policy prompts are in English.
+- Updated footer copyright text to `(c) 2026 Hearth Studio`.
+
+### API Enhancements (hearth-api)
+- `get_order_board.php`:
+  - added `quarter_offset` paging behavior and pagination metadata
+  - added season slot summaries used for current/next quarter booking decisions
+  - adjusted quarter browsing to allow forward inspection of upcoming seasons
+- Added admin email notifications to `admin@ichessgeek.com`:
+  - on new order creation (`create_order.php`)
+  - on new open customer message round (`create_round.php`, `is_closed = 0`)
+- Added shared notification helper: `config/admin_notify.php`.
+
 ## 2026-03-30
 
 ### SEO & Routing
@@ -149,4 +176,6 @@ Order #38:
 - Fixed garbled symbols in Customize page:
   - date separator now uses `&rarr;`
   - private badge now uses `&#128274; Private`
+
+
 

@@ -29,6 +29,15 @@ export function getOrderBoardWithViewer(viewerUserId) {
   return request(`/get_order_board.php${query}`);
 }
 
+export function getOrderBoardByQuarterOffset(viewerUserId, quarterOffset = 0) {
+  const params = new URLSearchParams();
+  if (viewerUserId) {
+    params.set("viewer_user_id", String(viewerUserId));
+  }
+  params.set("quarter_offset", String(quarterOffset));
+  return request(`/get_order_board.php?${params.toString()}`);
+}
+
 export function getOrderDetail(id, viewerUserId) {
   const query = viewerUserId
     ? `&viewer_user_id=${encodeURIComponent(viewerUserId)}`

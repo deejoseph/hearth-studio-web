@@ -2,13 +2,16 @@
 import "./Customize.css";
 import studioHero from "../../assets/images/studio-hero.jpg";
 import studioHero2 from "../../assets/images/studio-hero-2.jpg";
+import studioHero3 from "../../assets/images/studio-hero3.jpg";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { getOrderBoardWithViewer } from "../../api/orderService";
+import { getOrderBoardByQuarterOffset } from "../../api/orderService";
 
 export default function Customize() {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [quarterOffset, setQuarterOffset] = useState(0);
+  const [pagerNotice, setPagerNotice] = useState("");
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -28,7 +31,7 @@ export default function Customize() {
           }
         }
 
-        const data = await getOrderBoardWithViewer(viewerUserId);
+        const data = await getOrderBoardByQuarterOffset(viewerUserId, quarterOffset);
         if (alive && data?.success) {
           setBoard(data);
         }
@@ -44,7 +47,19 @@ export default function Customize() {
     return () => {
       alive = false;
     };
-  }, [user?.id]);
+  }, [user?.id, quarterOffset]);
+
+  useEffect(() => {
+    if (!board?.pagination) return;
+    const returnedOffset = Number(board.pagination.offset ?? 0);
+    if (quarterOffset > returnedOffset) {
+      setPagerNotice("You are already at the latest available quarter.");
+    } else if (quarterOffset < returnedOffset) {
+      setPagerNotice("You are already at the earliest available quarter.");
+    } else {
+      setPagerNotice("");
+    }
+  }, [board?.pagination, quarterOffset]);
 
   if (loading) {
     return (
@@ -63,18 +78,35 @@ export default function Customize() {
   }
 
   const currentSeason = board.seasons[0];
-  const slotsLeft =
-    currentSeason.total_slots - currentSeason.used_slots;
+  const slotsLeft = currentSeason.total_slots - currentSeason.used_slots;
 
   const isFull = slotsLeft <= 0;
+  const quarterViewOffset = quarterOffset;
+  const isCurrentQuarter = quarterViewOffset === 0;
+  const nextSeasonInfo = board.pagination?.next_season || null;
+  const canCarryToNextQuarter =
+    Boolean(nextSeasonInfo) && Number(nextSeasonInfo.slots_left) > 0;
+  const nextQuarterAlsoFull =
+    Boolean(nextSeasonInfo) && Number(nextSeasonInfo.slots_left) <= 0;
+
+  const handlePrevQuarter = () => {
+    if (loading) return;
+    setPagerNotice("");
+    setQuarterOffset((prev) => prev - 1);
+  };
+
+  const handleNextQuarter = () => {
+    if (loading) return;
+    setPagerNotice("");
+    setQuarterOffset((prev) => prev + 1);
+  };
 
   return (
     <div className="customize-container">
-
       <div className="studio-hero">
         <img
-          src={studioHero}
-          alt="Current Season"
+          src={isCurrentQuarter ? studioHero : (quarterViewOffset > 0 ? studioHero3 : studioHero2)}
+          alt="Season Hero"
         />
       </div>
 
@@ -82,18 +114,43 @@ export default function Customize() {
         Studio Commission Board
       </h1>
 
-      <div className="booking-status-wrapper">
-        {isFull ? (
-          <div className="booking-status closed">
-            <div className="booking-title">
-              This Season Is Fully Booked
-            </div>
-            <div className="booking-sub">
-              New commissions will be scheduled into{" "}
-              {board.seasons[1]?.name}
-            </div>
+      <div className="quarter-pager">
+        <button
+          className="quarter-nav-btn"
+          onClick={handlePrevQuarter}
+          disabled={loading}
+        >
+          &larr; Previous Quarter
+        </button>
+
+        <div className="quarter-pager-center">
+          <div className="quarter-pager-title">{currentSeason.name}</div>
+          <div className="quarter-pager-tip">
+            Default shows current quarter. You can flip left or right to view other quarters.
           </div>
-        ) : (
+        </div>
+
+        <button
+          className="quarter-nav-btn"
+          onClick={handleNextQuarter}
+          disabled={loading}
+        >
+          Next Quarter &rarr;
+        </button>
+      </div>
+
+      {pagerNotice && (
+        <div className="quarter-pager-notice">{pagerNotice}</div>
+      )}
+
+      <div className="booking-policy-note">
+        We only accept custom reservations for the current quarter and the next quarter.
+        Urgent orders are prioritized in the current quarter, while non-urgent orders can be scheduled into the next quarter.
+        If you need a date adjustment, please contact the administrator.
+      </div>
+
+      <div className="booking-status-wrapper">
+        {!isFull ? (
           <div className="booking-status available">
             <div className="booking-title">
               Now Accepting Commissions
@@ -105,23 +162,44 @@ export default function Customize() {
               Production Cycle: {currentSeason.production_cycle}
             </div>
           </div>
+        ) : isCurrentQuarter && canCarryToNextQuarter ? (
+          <div className="booking-status available">
+            <div className="booking-title">
+              This Quarter Is Full, Still Accepting Next Quarter
+            </div>
+            <div className="booking-sub">
+              New commissions will be scheduled into {" "}
+              {nextSeasonInfo?.name || board.pagination?.next_name || "the next quarter"}
+            </div>
+            <div className="booking-production">
+              Next quarter slots left: {nextSeasonInfo?.slots_left} / {nextSeasonInfo?.total_slots}
+            </div>
+          </div>
+        ) : isCurrentQuarter && nextQuarterAlsoFull ? (
+          <div className="booking-status closed">
+            <div className="booking-title">
+              This Quarter And Next Quarter Are Fully Booked
+            </div>
+            <div className="booking-sub">
+              We are not accepting new commissions right now.
+            </div>
+          </div>
+        ) : (
+          <div className="booking-status closed">
+            <div className="booking-title">
+              This Season Is Fully Booked
+            </div>
+            <div className="booking-sub">
+              New commissions will be scheduled into {" "}
+              {board.pagination?.next_name || "the next quarter"}
+            </div>
+          </div>
         )}
       </div>
 
-      {board.seasons.map((season, index) => (
+      {board.seasons.map((season) => (
         <div key={season.id}>
-
-          {index === 1 && (
-            <div className="studio-hero next-season-hero">
-              <img
-                src={studioHero2}
-                alt="Next Season"
-              />
-            </div>
-          )}
-
           <div className="season-section">
-
             <div className="season-header">
               <h2>{season.name}</h2>
               <div className="season-meta">
@@ -137,7 +215,6 @@ export default function Customize() {
             </div>
 
             {season.statuses?.map((status) => {
-
               const orders = status.orders || [];
 
               return (
@@ -145,7 +222,6 @@ export default function Customize() {
                   key={status.status_id}
                   className="status-block"
                 >
-
                   <div className="status-title">
                     {status.status_label} ({orders.length})
                   </div>
@@ -156,9 +232,7 @@ export default function Customize() {
 
                   <div className="status-default">
                     <div className="order-grid">
-
                       {orders.map((order) => {
-
                         const productImage =
                           order.product_image ||
                           "/images/default-product.jpg";
@@ -184,7 +258,7 @@ export default function Customize() {
                               }
                             }}
                             style={{ cursor: canView ? "pointer" : "default" }}
-                            >
+                          >
                             <img
                               src={productImage}
                               alt="product"
@@ -211,14 +285,11 @@ export default function Customize() {
                           </div>
                         );
                       })}
-
                     </div>
                   </div>
-
                 </div>
               );
             })}
-
           </div>
         </div>
       ))}
