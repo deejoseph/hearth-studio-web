@@ -1,5 +1,14 @@
 ﻿# Dev Log
 
+## 2026-04-03
+
+### Story Page Update
+- Replaced the fourth story card from Order #42 to Order # 50 - Love That Traveled Too Far.
+- Updated description to: Not all transfers look like transactions. Some travel quietly-disguised as art.
+- Updated image to /family.jpg (source: public/family.jpg).
+- Updated Watch Full Story link to: https://youtu.be/n21yEkZwT1A.
+- Updated Watch Moments link to: https://www.youtube.com/playlist?list=PL8Eui6FZ9u0TxJABWLxjyhYmUCBQglilD.
+
 ## 2026-04-02
 
 ### Customize Quarter Navigation
@@ -176,6 +185,7 @@ Order #38:
 - Fixed garbled symbols in Customize page:
   - date separator now uses `&rarr;`
   - private badge now uses `&#128274; Private`
+
 
 
 

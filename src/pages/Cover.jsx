@@ -1,5 +1,4 @@
 ﻿import "./Home.css";
-import cup3 from "../assets/images/cup3.jpg";
 
 const Cover = () => {
   return (
@@ -93,15 +92,15 @@ const Cover = () => {
           </article>
           <article className="story-card">
             <div className="story-media">
-              <img src={cup3} alt="Keepsake cup order story" />
+              <img src="/family.jpg" alt="Order #50 story" />
               <span className="story-badge">Coming Soon</span>
             </div>
             <div className="story-body">
-              <h3>Order #42 - Keepsake Cup</h3>
-              <p>Hand-etched text for a milestone gift.</p>
+              <h3>Order # 50 - Love That Traveled Too Far</h3>
+              <p>Not all transfers look like transactions. Some travel quietly&mdash;disguised as art.</p>
               <a
                 className="story-link"
-                href="https://www.youtube.com/watch?v=DWcJFNfaw9c"
+                href="https://youtu.be/n21yEkZwT1A"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -109,7 +108,7 @@ const Cover = () => {
               </a>
               <a
                 className="story-link story-moments"
-                href="https://www.youtube.com/playlist?list=PLrAXtmRdnEQx8i9HfJCH0z8G9z0y8q5b2"
+                href="https://www.youtube.com/playlist?list=PL8Eui6FZ9u0TxJABWLxjyhYmUCBQglilD"
                 target="_blank"
                 rel="noopener noreferrer"
               >
