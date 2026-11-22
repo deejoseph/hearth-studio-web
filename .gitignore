@@ -1,0 +1,9 @@
+# Server-only: holds the MySQL credentials. The live copy sits at
+# /public_html/api/v1/db_config.php and is also blocked by v1/.htaccess.
+db_config.php
+chess_mail_config.php
+
+error_log
+*.log
+*.bak
+.DS_Store

@@ -1,0 +1,8 @@
+# The live copies on the server are LF. Pinning LF here keeps `cmp` against a
+# file downloaded over FTP meaningful; without it a checkout on Windows would
+# rewrite every file to CRLF and every comparison would report a phantom diff.
+*.php text eol=lf
+*.htaccess text eol=lf
+.htaccess text eol=lf
+*.sql text eol=lf
+.gitignore text eol=lf
