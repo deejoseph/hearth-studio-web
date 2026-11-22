@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>编程学习工具箱 · 位运算</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230f172a'/%3E%3Crect x='10' y='10' width='20' height='20' rx='4' fill='%232563eb'/%3E%3Crect x='34' y='10' width='20' height='20' rx='4' fill='%237c3aed'/%3E%3Crect x='10' y='34' width='20' height='20' rx='4' fill='%23059669'/%3E%3Crect x='34' y='34' width='20' height='20' rx='4' fill='%23334155'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --blue: #2563eb; --purple: #7c3aed; --green: #059669;
+    --orange: #d97706; --red: #dc2626;
+    --ink: #1e293b; --dim: #64748b; --line: #cbd5e1; --bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--ink); }
+  header { background: #fff; border-bottom: 1px solid var(--line); padding: 10px 20px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  header .brand { font-weight: 700; font-size: 17px; }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  nav button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 16px; font-size: 14px; cursor: pointer; }
+  nav button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  nav button:disabled { color: #94a3b8; cursor: default; }
+  main { max-width: 980px; margin: 18px auto; padding: 0 14px; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .panel h2 { margin: 0 0 10px; font-size: 15px; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ops { display: flex; gap: 6px; }
+  .ops button { width: 46px; height: 38px; font-size: 18px; font-family: Consolas, monospace; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+  .ops button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .controls label { font-size: 14px; display: flex; align-items: center; gap: 5px; }
+  .controls input[type=number] { width: 60px; padding: 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 14px; }
+  .rule { margin-top: 10px; font-size: 14px; color: var(--dim); }
+  .rule code { background: var(--bg); padding: 1px 6px; border-radius: 4px; font-family: Consolas, monospace; color: var(--ink); }
+  .operand-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .operand-head .name { font-weight: 700; font-size: 15px; }
+  .operand-head .expr { font-family: Consolas, monospace; font-size: 14px; color: var(--dim); }
+  .bits { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 4px 0 8px; }
+  .bit { flex: 0 0 auto; width: 24px; height: 30px; margin-right: 2px; border: 1px solid var(--line); border-radius: 4px; background: #fff; font-family: Consolas, monospace; font-size: 15px; color: #94a3b8; display: inline-flex; align-items: center; justify-content: center; position: relative; padding: 0; }
+  button.bit { cursor: pointer; }
+  .bit.gap { margin-left: 10px; }
+  .bit.on { color: #fff; }
+  .row-a .bit.on { background: var(--blue); border-color: var(--blue); }
+  .row-b .bit.on { background: var(--purple); border-color: var(--purple); }
+  .row-r .bit.on { background: var(--green); border-color: var(--green); }
+  .bit.filled { background: #fef3c7; border-color: var(--orange); color: var(--orange); }
+  .bit.filled.on { background: var(--orange); color: #fff; }
+  .bit.sign { border-bottom-width: 3px; border-bottom-color: var(--red); }
+  .bit.hl { outline: 2px solid #f59e0b; outline-offset: 1px; }
+  .bit .idx { position: absolute; top: -15px; left: 0; right: 0; font-size: 9px; color: #94a3b8; text-align: center; }
+  .bits { padding-top: 18px; }
+  .values { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .values label { font-size: 12px; color: var(--dim); display: flex; flex-direction: column; gap: 3px; }
+  .values input { font-family: Consolas, monospace; font-size: 13px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; }
+  .values input.invalid { border-color: var(--red); background: #fef2f2; }
+  .values .v-dec { width: 120px; } .values .v-hex { width: 110px; }
+  .values .v-oct { width: 120px; } .values .v-bin { width: 300px; flex-grow: 1; }
+  .values input[readonly] { background: var(--bg); color: var(--ink); }
+  .legend { font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 12px; vertical-align: -1px; }
+  #bitRule { font-family: Consolas, monospace; font-size: 14px; min-height: 20px; margin-top: 6px; color: var(--ink); }
+  .warn { border-left: 4px solid var(--orange); background: #fffbeb; padding: 8px 12px; font-size: 13px; border-radius: 4px; margin-top: 10px; }
+  .warn.ub { border-color: var(--red); background: #fef2f2; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .presets button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+  .presets button:hover { border-color: var(--blue); color: var(--blue); }
+  .langtabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  .langtabs button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 5px 14px; font-size: 13px; cursor: pointer; }
+  .langtabs button.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  pre { margin: 0; background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow-x: auto; font-family: Consolas, monospace; font-size: 13px; line-height: 1.55; }
+  .langnote { font-size: 13px; color: var(--dim); margin-top: 8px; }
+  .copybtn { float: right; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 3px 12px; font-size: 12px; cursor: pointer; }
+  .ptr-layout { display: flex; gap: 16px; flex-wrap: wrap; }
+  .ptr-code { flex: 1 1 320px; background: #0f172a; border-radius: 8px; padding: 10px 0; font-family: Consolas, monospace; font-size: 13px; align-self: flex-start; }
+  .codeline { padding: 3px 12px; color: #e2e8f0; white-space: pre; }
+  .codeline .ln { display: inline-block; width: 22px; color: #475569; }
+  .codeline.cur { background: #1d4ed8; }
+  .ptr-side { flex: 1 1 300px; }
+  .ptr-explain { font-size: 14px; line-height: 1.6; min-height: 60px; }
+  .ptr-controls { display: flex; gap: 8px; margin: 10px 0; align-items: center; flex-wrap: wrap; }
+  .ptr-controls button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 16px; font-size: 14px; cursor: pointer; }
+  .ptr-controls button:disabled { color: #94a3b8; cursor: default; }
+  .ptr-controls .next { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .ptr-controls .next:disabled { background: #93c5fd; border-color: #93c5fd; color: #fff; }
+  .ptr-console { background: var(--bg); border-radius: 6px; padding: 8px 12px; font-family: Consolas, monospace; font-size: 13px; min-height: 34px; white-space: pre; }
+  .memgrid { position: relative; display: flex; flex-wrap: wrap; gap: 14px; padding-top: 52px; min-height: 130px; }
+  .memgrid svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .cell { width: 88px; border: 1px solid var(--line); border-radius: 8px; text-align: center; padding: 6px 4px; background: #fff; }
+  .cell .cname { font-size: 12px; color: var(--dim); }
+  .cell .cval { font-family: Consolas, monospace; font-size: 16px; font-weight: 600; margin: 4px 0; }
+  .cell .caddr { font-family: Consolas, monospace; font-size: 11px; color: #94a3b8; }
+  .cell.ptr { border-color: var(--purple); }
+  .cell.ptr .cval { color: var(--purple); font-size: 13px; }
+  .cell.changed { outline: 2px solid #f59e0b; outline-offset: 1px; }
+  .cell.garbage { border-color: var(--red); border-style: dashed; }
+  .cell.garbage .cval { color: var(--red); }
+  .ev { color: var(--green); font-weight: 600; }
+  .evhl { background: #fef3c7; border: 1px solid var(--orange); border-radius: 4px; padding: 0 4px; font-weight: 700; color: var(--orange); }
+  .skip { color: #94a3b8; text-decoration: line-through; }
+  .presets button.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .stack { display: flex; flex-direction: column; gap: 6px; min-width: 250px; }
+  .stackcap { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+  .frame { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: #fff; font-family: Consolas, monospace; }
+  .frame .fname { font-weight: 700; font-size: 14px; }
+  .frame .fargs { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .frame .fnote { font-size: 12px; color: var(--orange); margin-top: 2px; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .frame .fret { font-size: 12px; color: var(--green); font-weight: 700; margin-top: 2px; }
+  .frame.top { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+  .frame.returned { border-color: var(--green); background: #ecfdf5; box-shadow: none; }
+  .frame.main { border-style: dashed; }
+  .frame.main .fname { color: var(--dim); font-weight: 400; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; padding: 24px 4px 26px; min-height: 210px; }
+  .bar { flex: 1 1 0; max-width: 64px; background: #93c5fd; border-radius: 4px 4px 0 0; position: relative; transition: height .15s; }
+  .bar .bval { position: absolute; top: -20px; left: 0; right: 0; text-align: center; font-size: 12px; font-family: Consolas, monospace; }
+  .bar .bidx { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: 11px; color: #94a3b8; }
+  .bar.cmp { background: var(--orange); }
+  .bar.swap { background: var(--red); }
+  .bar.sorted { background: var(--green); }
+  .bar.pivot { background: var(--purple); }
+  .bar.hole { background: #e2e8f0; border: 1px dashed var(--purple); }
+  .bar.dim { opacity: .3; }
+  .bar.write { outline: 2px solid var(--orange); outline-offset: 1px; }
+  .bytes { display: flex; flex-wrap: wrap; gap: 3px; padding: 6px 0; }
+  .byte { width: 34px; height: 40px; border-radius: 4px; position: relative; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-family: Consolas, monospace; font-size: 12px; }
+  .byte .boff { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: 10px; color: #94a3b8; }
+  .byte.pad { background: repeating-linear-gradient(45deg, #e2e8f0, #e2e8f0 4px, #cbd5e1 4px, #cbd5e1 8px); color: #64748b; }
+  .byte.hl { outline: 2px solid #f59e0b; outline-offset: 1px; }
+  .byte.dim { opacity: .35; }
+  .bytes { padding-bottom: 22px; }
+  .mrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .mrow input[type=text] { width: 80px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; font-family: Consolas, monospace; font-size: 13px; }
+  .mrow select { padding: 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .mrow button { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 4px 9px; font-size: 13px; cursor: pointer; }
+  .mrow .swatch { width: 14px; height: 14px; border-radius: 3px; flex: 0 0 auto; }
+  .memzones { position: relative; padding: 4px 0; }
+  .memzones svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .zonelabel { font-size: 12px; font-weight: 600; color: var(--dim); margin: 2px 0 8px; }
+  .zonerow { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; min-height: 20px; }
+  .zonegap { height: 48px; }
+  .heapblock { border: 2px solid var(--green); border-radius: 8px; padding: 6px 8px; background: #f0fdf4; }
+  .heapblock.freed { border-color: #94a3b8; border-style: dashed; background: #f8fafc; }
+  .heapblock.leaked { border-color: var(--red); border-style: dashed; background: #fef2f2; }
+  .heapblock.changed { outline: 2px solid #f59e0b; outline-offset: 2px; }
+  .blockhead { font-size: 12px; text-align: center; margin-bottom: 6px; font-family: Consolas, monospace; color: var(--dim); }
+  .bstatus { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-left: 4px; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+  .heapblock .bstatus { background: #dcfce7; color: #166534; }
+  .heapblock.freed .bstatus { background: #e2e8f0; color: #475569; }
+  .heapblock.leaked .bstatus { background: #fee2e2; color: #991b1b; }
+  .blockelems { display: flex; gap: 4px; flex-wrap: wrap; align-items: stretch; }
+  .cell.elem { width: 58px; padding: 4px 2px; }
+  .cell.elem .cval { font-size: 14px; }
+  .heapblock.freed .cell .cval { color: #94a3b8; }
+  .cell.nullval .cval { color: var(--green); }
+  .elemore { display: inline-flex; align-items: center; font-family: Consolas, monospace; font-size: 12px; color: #94a3b8; padding: 0 4px; }
+  .heapstats { font-size: 13px; color: var(--dim); margin-top: 8px; }
+  footer { text-align: center; color: #94a3b8; font-size: 12px; padding: 10px 0 24px; }
+  header .back { margin-left: auto; font-size: 13px; color: var(--dim); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 5px 12px; white-space: nowrap; }
+  header .back:hover { color: var(--blue); border-color: var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">编程学习工具箱</span>
+  <nav id="toolNav"></nav>
+  <a class="back" href="/education">← 返回教育页</a>
+</header>
+<main id="toolHost"></main>
+<footer>纯前端单文件工具 · 可部署到任意静态网站 · 数据不出浏览器</footer>
+
+<script>
+'use strict';
+
+const u32 = x => x >>> 0;
+const s32 = x => x | 0;
+const hex = v => '0x' + u32(v).toString(16).toUpperCase().padStart(8, '0');
+const oct = v => '0' + u32(v).toString(8);
+const bin = v => u32(v).toString(2).padStart(32, '0').replace(/(.{4})(?=.)/g, '$1 ');
+const dec = (v, signed) => signed ? String(s32(v)) : String(u32(v));
+const cHex = v => '0x' + u32(v).toString(16);
+const pyHex = v => (v < 0 ? '-0x' : '0x') + Math.abs(v).toString(16);
+const pyOct = v => (v < 0 ? '-0o' : '0o') + Math.abs(v).toString(8);
+const pyBin = v => (v < 0 ? '-0b' : '0b') + Math.abs(v).toString(2);
+
+const OPS = {
+  '&':  { name: '按位与', rule: '两位都是 1 结果才是 1', truth: '0&0=0　0&1=0　1&0=0　1&1=1', arity: 2 },
+  '|':  { name: '按位或', rule: '任一位是 1 结果就是 1', truth: '0|0=0　0|1=1　1|0=1　1|1=1', arity: 2 },
+  '^':  { name: '按位异或', rule: '两位不同结果才是 1（相同为 0）', truth: '0^0=0　0^1=1　1^0=1　1^1=0', arity: 2 },
+  '~':  { name: '按位取反', rule: '每一位 0 变 1、1 变 0', truth: '~0=1　~1=0', arity: 1 },
+  '<<': { name: '左移', rule: '整体左移 n 位，低位补 0，高位移出丢弃（相当于 ×2ⁿ）', truth: '', arity: 1 },
+  '>>': { name: '右移', rule: '整体右移 n 位，高位补什么取决于有符号/无符号', truth: '', arity: 1 },
+};
+
+function makeBitwiseTool() {
+  const state = { a: u32(12), b: u32(10), op: '&', shift: 1, signed: true, lang: 'c' };
+
+  function compute() {
+    const { a, b, op, shift, signed } = state;
+    const n = shift & 31; // JS 移位语义：次数按 mod 32 截断
+    switch (op) {
+      case '&': return u32(a & b);
+      case '|': return u32(a | b);
+      case '^': return u32(a ^ b);
+      case '~': return u32(~a);
+      case '<<': return u32(a << n);
+      case '>>': return signed ? u32(s32(a) >> n) : u32(a >>> n);
+    }
+  }
+
+  function exprText() {
+    const { op, shift, a, b, signed } = state;
+    const av = dec(a, signed), bv = dec(b, signed);
+    if (op === '~') return `~${av}`;
+    if (op === '<<' || op === '>>') return `${av} ${op} ${shift}`;
+    return `${av} ${op} ${bv}`;
+  }
+
+  function warnings() {
+    const out = [];
+    const { op, shift, signed, a } = state;
+    if ((op === '<<' || op === '>>')) {
+      if (!Number.isInteger(shift) || shift < 0 || shift > 31) {
+        out.push({ ub: true, text: `C 标准：移位次数为负或 ≥ 32 是未定义行为（UB）！本页按常见编译器行为演示为 ${shift & 31} 次，但真实代码绝不能这样写。` });
+      } else if (op === '<<' && signed && shift > 0 && (u32(a) >>> (32 - shift)) !== 0) {
+        out.push({ ub: true, text: '有符号数左移时 1 被移入/移出符号位：在 C 中这是未定义行为（C++20 起明确定义为补码语义）。' });
+      }
+      if (op === '>>' && signed) {
+        out.push({ ub: false, text: '有符号右移在 C 中是“实现定义行为”：主流编译器（GCC/MSVC）做算术右移，高位补符号位。本页演示与此一致。' });
+      }
+      if (op === '>>' && !signed) {
+        out.push({ ub: false, text: '无符号右移是逻辑右移：高位一律补 0。' });
+      }
+    }
+    return out;
+  }
+
+  function genC() {
+    const { op, shift, signed, a, b } = state;
+    const T = signed ? 'int' : 'unsigned int';
+    const f = signed ? '%d' : '%u';
+    const lit = v => signed ? String(s32(v)) : hex(v) + 'u';
+    const r = compute();
+    const lines = [];
+    lines.push('#include <stdio.h>');
+    lines.push('');
+    lines.push('int main(void)');
+    lines.push('{');
+    lines.push(`    ${T} a = ${lit(a)};`);
+    if (OPS[op].arity === 2) lines.push(`    ${T} b = ${lit(b)};`);
+    const rhs = op === '~' ? '~a' : (op === '<<' || op === '>>') ? `a ${op} ${shift}` : `a ${op} b`;
+    lines.push(`    ${T} r = ${rhs};`);
+    lines.push(`    printf("r = ${f}, %#x, %#o\\n", r, r, r);`);
+    lines.push(`    /* 输出: r = ${dec(r, signed)}, ${cHex(r)}, ${oct(r)} */`);
+    lines.push('    return 0;');
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  function genPython() {
+    const { op, shift, signed, a, b } = state;
+    const r = compute();
+    const lines = [];
+    lines.push('MASK = 0xFFFFFFFF   # Python 整数无限位宽，用掩码模拟 32 位');
+    lines.push(`a = ${dec(a, false)} & MASK`);
+    if (OPS[op].arity === 2) lines.push(`b = ${dec(b, false)} & MASK`);
+    const rhs = op === '~' ? '~a' : (op === '<<' || op === '>>') ? `a ${op} ${shift}` : `a ${op} b`;
+    lines.push(`r = (${rhs}) & MASK   # 运算后截断到 32 位`);
+    if (signed) {
+      lines.push('if r >= 1 << 31:      # 按 32 位有符号补码解释');
+      lines.push('    r -= 1 << 32');
+    }
+    lines.push('print(r, hex(r), oct(r), bin(r))');
+    const rp = signed ? s32(r) : u32(r);
+    lines.push(`# 输出: ${rp} ${pyHex(rp)} ${pyOct(rp)} ${pyBin(rp)}`);
+    if (rp < 0) lines.push('# 注意: Python 负数的 hex() 是 -0x.. 形式，不是补码！');
+    return lines.join('\n');
+  }
+
+  function genJava() {
+    const { op, shift, signed, a, b } = state;
+    const r = compute();
+    const lines = [];
+    lines.push('public class BitDemo {');
+    lines.push('    public static void main(String[] args) {');
+    lines.push(`        int a = ${s32(a)};   // ${hex(a)}`);
+    if (OPS[op].arity === 2) lines.push(`        int b = ${s32(b)};`);
+    let rhs = op === '~' ? '~a' : (op === '<<' || op === '>>') ? `a ${op} ${shift}` : `a ${op} b`;
+    if (op === '>>' && !signed) {
+      rhs = `a >>> ${shift}`;
+      lines.push('        // Java 没有 unsigned int，逻辑右移用 >>>');
+    }
+    lines.push(`        int r = ${rhs};`);
+    lines.push('        System.out.printf("r = %d, %#x, %#o%n", r, r, r);');
+    lines.push(`        // 输出: r = ${s32(r)}, ${cHex(r)}, ${oct(r)}`);
+    if (!signed && op !== '>>') lines.push(`        // 按无符号看: ${u32(r)}（Integer.toUnsignedLong(r)）`);
+    lines.push('    }');
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  const LANG_NOTES = {
+    c: 'C/C++：有符号右移是实现定义行为（通常算术右移）；移位次数为负或 ≥ 位宽是 UB；C 没有二进制字面量（C23 起有 0b），C++14 起有 0b。',
+    python: 'Python：整数无限位宽，~x 等于 -x-1；负数按“无限位补码”理解，所以模拟 C 的 32 位行为必须 & 0xFFFFFFFF 截断。',
+    java: 'Java：int 恒为 32 位有符号补码；独有 >>> 逻辑右移；没有无符号整型（Java 8 起可用 Integer.toUnsignedString 等辅助方法）。',
+  };
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="controls">
+          <div class="ops" id="ops"></div>
+          <label id="shiftWrap">移位数 <input type="number" id="shiftN" min="0" max="31" value="1"></label>
+          <label><input type="checkbox" id="signedChk" checked> 按有符号 int 解释</label>
+        </div>
+        <div class="rule" id="opRule"></div>
+        <div class="rule">课堂示例：<span class="presets" id="presets"></span></div>
+      </div>
+      <div class="panel row-a" id="panelA">
+        <div class="operand-head"><span class="name" style="color:var(--blue)">操作数 A</span><span class="expr" id="exprA"></span><span class="legend">点击格子翻转 bit</span></div>
+        <div class="bits" id="bitsA"></div>
+        <div class="values" id="valsA"></div>
+      </div>
+      <div class="panel row-b" id="panelB">
+        <div class="operand-head"><span class="name" style="color:var(--purple)">操作数 B</span><span class="expr" id="exprB"></span></div>
+        <div class="bits" id="bitsB"></div>
+        <div class="values" id="valsB"></div>
+      </div>
+      <div class="panel row-r">
+        <div class="operand-head"><span class="name" style="color:var(--green)">结果</span><span class="expr" id="exprR"></span></div>
+        <div class="bits" id="bitsR"></div>
+        <div id="bitRule">把鼠标悬停在结果的某一位上，可以看到它是怎么算出来的。</div>
+        <div class="values" id="valsR"></div>
+        <div class="legend" id="shiftLegend" style="display:none"><span class="sw" style="background:var(--orange)"></span>移位后补入的位<span class="sw" style="background:#fff;border:1px solid var(--red)"></span>红色下划线 = 符号位（第 31 位）</div>
+        <div id="warns"></div>
+      </div>
+      <div class="panel">
+        <h2>代码对照 <button class="copybtn" id="copyCode">复制代码</button></h2>
+        <div class="langtabs" id="langtabs"></div>
+        <pre><code id="codeOut"></code></pre>
+        <div class="langnote" id="langNote"></div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    const opsEl = $('ops'), bitsA = $('bitsA'), bitsB = $('bitsB'), bitsR = $('bitsR');
+
+    Object.keys(OPS).forEach(op => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = op; btn.title = OPS[op].name; btn.dataset.op = op;
+      btn.addEventListener('click', () => { state.op = op; render(); });
+      opsEl.appendChild(btn);
+    });
+
+    const PRESETS = [
+      ['判断奇偶 (x & 1)', { a: u32(37), b: u32(1), op: '&' }],
+      ['取低 8 位 (x & 0xFF)', { a: u32(0x1234ABCD), b: u32(0xFF), op: '&' }],
+      ['置第 2 位 (x | 4)', { a: u32(40), b: u32(4), op: '|' }],
+      ['翻转指定位 (x ^ 4)', { a: u32(10), b: u32(4), op: '^' }],
+      ['左移 ×8 (x << 3)', { a: u32(5), op: '<<', shift: 3 }],
+      ['负数右移 (-8 >> 2)', { a: u32(-8), op: '>>', shift: 2, signed: true }],
+      ['取反 (~12)', { a: u32(12), op: '~' }],
+    ];
+    PRESETS.forEach(([label, patch]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label;
+      btn.addEventListener('click', () => { Object.assign(state, patch); render(); });
+      $('presets').appendChild(btn);
+    });
+
+    [['c', 'C/C++'], ['python', 'Python'], ['java', 'Java']].forEach(([id, label]) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = label; btn.dataset.lang = id;
+      btn.addEventListener('click', () => { state.lang = id; render(); });
+      $('langtabs').appendChild(btn);
+    });
+
+    function buildBits(container, row, clickable) {
+      container.innerHTML = '';
+      for (let i = 31; i >= 0; i--) {
+        const cell = document.createElement(clickable ? 'button' : 'span');
+        if (clickable) cell.type = 'button';
+        cell.className = 'bit' + (i % 4 === 0 && i !== 31 ? ' gap' : '') + (i === 31 ? ' sign' : '');
+        cell.dataset.idx = i; cell.dataset.row = row;
+        const idx = document.createElement('span');
+        idx.className = 'idx'; idx.textContent = i;
+        cell.appendChild(idx);
+        cell.appendChild(document.createTextNode('0'));
+        if (clickable) {
+          cell.addEventListener('click', () => {
+            if (row === 'a') state.a = u32(state.a ^ (1 << i));
+            else state.b = u32(state.b ^ (1 << i));
+            render();
+          });
+        } else {
+          cell.addEventListener('mouseenter', () => showBitRule(i));
+          cell.addEventListener('mouseleave', clearHl);
+        }
+        container.appendChild(cell);
+      }
+    }
+
+    function showBitRule(i) {
+      const { op, shift, signed } = state;
+      const r = compute();
+      const abit = (state.a >>> i) & 1, bbit = (state.b >>> i) & 1, rbit = (r >>> i) & 1;
+      let text;
+      if (op === '~') text = `位 ${i}: ~${abit} = ${rbit}`;
+      else if (op === '<<') text = shift > 0 && i < shift ? `位 ${i}: 左移后低位补 0` : `位 ${i}: 来自 A 的第 ${i - shift} 位 (${(state.a >>> (i - shift)) & 1})`;
+      else if (op === '>>') {
+        const src = i + shift;
+        text = src <= 31 ? `位 ${i}: 来自 A 的第 ${src} 位 (${(state.a >>> src) & 1})`
+          : `位 ${i}: 右移后高位补 ${signed ? '符号位' : '0'} (${rbit})`;
+      } else text = `位 ${i}: ${abit} ${op} ${bbit} = ${rbit}`;
+      $('bitRule').textContent = text;
+      ['a', 'b', 'r'].forEach(row => {
+        const c = host.querySelector(`.bit[data-row="${row}"][data-idx="${i}"]`);
+        if (c) c.classList.add('hl');
+      });
+    }
+    function clearHl() {
+      host.querySelectorAll('.bit.hl').forEach(c => c.classList.remove('hl'));
+      $('bitRule').textContent = '把鼠标悬停在结果的某一位上，可以看到它是怎么算出来的。';
+    }
+
+    const BASES = [
+      ['dec', '十进制', v => dec(v, state.signed)],
+      ['hex', '十六进制', hex],
+      ['oct', '八进制 (C 写法)', oct],
+      ['bin', '二进制', bin],
+    ];
+    function parseBase(kind, text) {
+      text = text.trim();
+      let m;
+      if (kind === 'dec') { if (!/^[+-]?\d+$/.test(text)) return null; return u32(parseInt(text, 10)); }
+      if (kind === 'hex') { text = text.replace(/^0x/i, ''); if (!/^[0-9a-f]{1,8}$/i.test(text)) return null; return u32(parseInt(text, 16)); }
+      if (kind === 'oct') { text = text.replace(/^0o/i, '').replace(/^0(?=\d)/, ''); if (!/^[0-7]{1,11}$/.test(text)) return null; return u32(parseInt(text, 8)); }
+      text = text.replace(/^0b/i, '').replace(/\s+/g, ''); if (!/^[01]{1,32}$/.test(text)) return null; return u32(parseInt(text, 2));
+    }
+    function buildValues(container, row) {
+      container.innerHTML = '';
+      BASES.forEach(([kind, label]) => {
+        const lab = document.createElement('label');
+        lab.textContent = label;
+        const inp = document.createElement('input');
+        inp.className = 'v-' + kind; inp.dataset.base = kind; inp.dataset.row = row;
+        inp.spellcheck = false;
+        if (row === 'r') inp.readOnly = true;
+        else inp.addEventListener('input', () => {
+          const v = parseBase(kind, inp.value);
+          if (v === null) { inp.classList.add('invalid'); return; }
+          inp.classList.remove('invalid');
+          state[row] = v;
+          render(inp);
+        });
+        lab.appendChild(inp);
+        container.appendChild(lab);
+      });
+    }
+
+    function paintBits(container, value, filledPred) {
+      container.querySelectorAll('.bit').forEach(cell => {
+        const i = +cell.dataset.idx;
+        const on = (value >>> i) & 1;
+        cell.classList.toggle('on', !!on);
+        cell.classList.toggle('filled', !!(filledPred && filledPred(i)));
+        cell.lastChild.textContent = on;
+      });
+    }
+    function paintValues(container, value, skipEl) {
+      container.querySelectorAll('input').forEach(inp => {
+        if (inp === skipEl) return;
+        inp.classList.remove('invalid');
+        inp.value = BASES.find(([k]) => k === inp.dataset.base)[2](value);
+      });
+    }
+
+    $('shiftN').addEventListener('input', () => {
+      const v = parseInt($('shiftN').value, 10);
+      state.shift = Number.isNaN(v) ? 0 : v;
+      render();
+    });
+    $('signedChk').addEventListener('change', () => { state.signed = $('signedChk').checked; render(); });
+    $('copyCode').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText($('codeOut').textContent); $('copyCode').textContent = '已复制'; }
+      catch { $('copyCode').textContent = '复制失败'; }
+      setTimeout(() => $('copyCode').textContent = '复制代码', 1500);
+    });
+
+    buildBits(bitsA, 'a', true);
+    buildBits(bitsB, 'b', true);
+    buildBits(bitsR, 'r', false);
+    buildValues($('valsA'), 'a');
+    buildValues($('valsB'), 'b');
+    buildValues($('valsR'), 'r');
+
+    function render(skipEl) {
+      const { op, shift, signed } = state;
+      const r = compute();
+      const info = OPS[op];
+
+      opsEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.op === op));
+      $('shiftWrap').style.display = (op === '<<' || op === '>>') ? '' : 'none';
+      $('shiftN').value = shift;
+      $('signedChk').checked = signed;
+      $('opRule').innerHTML = `<strong>${info.name}</strong>：${info.rule}${info.truth ? '　<code>' + info.truth + '</code>' : ''}`;
+
+      $('panelB').style.display = info.arity === 2 ? '' : 'none';
+      $('exprA').textContent = `a = ${dec(state.a, signed)}`;
+      $('exprB').textContent = `b = ${dec(state.b, signed)}`;
+      $('exprR').textContent = `${exprText()} = ${dec(r, signed)}`;
+
+      paintBits(bitsA, state.a);
+      paintBits(bitsB, state.b);
+      let filledPred = null;
+      if (op === '<<' && shift > 0 && shift <= 31) filledPred = i => i < shift;
+      if (op === '>>' && shift > 0 && shift <= 31) filledPred = i => i >= 32 - shift;
+      paintBits(bitsR, r, filledPred);
+      $('shiftLegend').style.display = filledPred ? '' : 'none';
+
+      paintValues($('valsA'), state.a, skipEl && skipEl.dataset.row === 'a' ? skipEl : null);
+      paintValues($('valsB'), state.b, skipEl && skipEl.dataset.row === 'b' ? skipEl : null);
+      paintValues($('valsR'), r);
+
+      $('warns').innerHTML = warnings().map(w => `<div class="warn${w.ub ? ' ub' : ''}">${w.ub ? '⚠ ' : 'ℹ '}${w.text}</div>`).join('');
+
+      host.querySelectorAll('#langtabs button').forEach(b => b.classList.toggle('active', b.dataset.lang === state.lang));
+      $('codeOut').textContent = state.lang === 'c' ? genC() : state.lang === 'python' ? genPython() : genJava();
+      $('langNote').textContent = LANG_NOTES[state.lang];
+    }
+
+    render();
+  }
+
+  return { id: 'bitwise', name: '位运算', mount };
+}
+
+function makePointerTool() {
+  const ADDR = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+  const mk = (id, label, type, addr, value, target) => ({ id, label, type, addr, value, target: target || null, garbage: false });
+  const get = (m, id) => m.cells.find(c => c.id === id);
+  const arrCells = (prefix, type, base, values) => values.map((v, i) => mk(prefix + i, prefix + '[' + i + ']', type, base + i * (type === 'char' ? 1 : 4), v));
+
+  const SCENARIOS = [
+    {
+      title: '① & 取地址 / * 解引用',
+      intro: '指针的核心就两个动作：&x 拿到 x 的地址，*p 顺着地址找到本体。点"下一步"逐行执行。',
+      code: ['int x = 12;', 'int *p = &x;', '*p = 99;', 'printf("%d\\n", x);'],
+      init: () => ({ cells: [], output: [] }),
+      steps: [
+        { line: 0, text: '创建 int 变量 x：分配 4 字节内存（示意地址 0x1000），写入 12。', changed: ['x'],
+          apply: m => { m.cells.push(mk('x', 'x', 'int', 0x1000, 12)); } },
+        { line: 1, text: '创建指针 p，把 &x（x 的地址 0x1000）存进去。注意 p 自己也是变量、也有地址 0x1004：指针就是"值是地址的变量"。', changed: ['p'],
+          apply: m => { m.cells.push(mk('p', 'p', 'int *', 0x1004, 0x1000, 'x')); } },
+        { line: 2, text: '*p = 99：顺着箭头找到 x 的本体，直接改它的内存。改的不是 p——p 里存的地址没变。', changed: ['x'],
+          apply: m => { get(m, 'x').value = 99; } },
+        { line: 3, text: 'x 已经变成 99。隔着指针改内存，这就是指针存在的意义。', changed: ['x'],
+          apply: m => { m.output.push('99'); } },
+      ],
+    },
+    {
+      title: '② 指针算术与数组',
+      intro: 'p++ 到底加几个字节？跟着地址看。',
+      code: ['int a[4] = {10, 20, 30, 40};', 'int *p = a;', 'p++;', 'p += 2;', 'printf("%d\\n", *p);'],
+      init: () => ({ cells: arrCells('a', 'int', 0x1000, [10, 20, 30, 40]), output: [] }),
+      steps: [
+        { line: 0, text: '数组的 4 个 int 在内存里连续存放，每个占 4 字节，地址依次 +4。', changed: ['a0', 'a1', 'a2', 'a3'], apply: () => {} },
+        { line: 1, text: '数组名 a 在表达式里"退化"为首元素地址 &a[0]，所以 p 指向 a[0]。', changed: ['p'],
+          apply: m => { m.cells.push(mk('p', 'p', 'int *', 0x1010, 0x1000, 'a0')); } },
+        { line: 2, text: 'p++ 不是 +1 字节，是 +1 个元素 = +4 字节：0x1000 → 0x1004，指向 a[1]。', changed: ['p'],
+          apply: m => { const p = get(m, 'p'); p.value = 0x1004; p.target = 'a1'; } },
+        { line: 3, text: 'p += 2 同理：+2 个元素 = +8 字节，0x1004 → 0x100C，指向 a[3]。', changed: ['p'],
+          apply: m => { const p = get(m, 'p'); p.value = 0x100C; p.target = 'a3'; } },
+        { line: 4, text: '*p 取出 a[3] 的值 40。指针加减的步长永远由"指向的类型"决定。', changed: ['a3'],
+          apply: m => { m.output.push('40'); } },
+      ],
+    },
+    {
+      title: '③ 步长由类型决定',
+      intro: '同样写 ++，char 指针和 int 指针走的字节数不同。',
+      code: ["char c[4] = {'A', 'B', 'C', 'D'};", 'char *q = c;', 'q++;', 'int n[4] = {10, 20, 30, 40};', 'int *p = n;', 'p++;'],
+      init: () => ({ cells: [], output: [] }),
+      steps: [
+        { line: 0, text: 'char 数组：每个元素只占 1 字节，地址依次 +1。', changed: ['c0', 'c1', 'c2', 'c3'],
+          apply: m => { m.cells.push(...arrCells('c', 'char', 0x1000, ['A', 'B', 'C', 'D'])); } },
+        { line: 1, text: 'q 指向 c[0]，地址 0x1000。', changed: ['q'],
+          apply: m => { m.cells.push(mk('q', 'q', 'char *', 0x1004, 0x1000, 'c0')); } },
+        { line: 2, text: 'q++ 只 +1 字节（sizeof(char)=1）：0x1000 → 0x1001，指向 c[1]。', changed: ['q'],
+          apply: m => { const q = get(m, 'q'); q.value = 0x1001; q.target = 'c1'; } },
+        { line: 3, text: 'int 数组：每个元素占 4 字节。', changed: ['n0', 'n1', 'n2', 'n3'],
+          apply: m => { m.cells.push(...arrCells('n', 'int', 0x1008, [10, 20, 30, 40])); } },
+        { line: 4, text: 'p 指向 n[0]，地址 0x1008。', changed: ['p'],
+          apply: m => { m.cells.push(mk('p', 'p', 'int *', 0x1018, 0x1008, 'n0')); } },
+        { line: 5, text: 'p++ 却 +4 字节（sizeof(int)=4）：0x1008 → 0x100C。对比 q++：同样写 ++，步长由指向的类型决定。', changed: ['p', 'q'],
+          apply: m => { const p = get(m, 'p'); p.value = 0x100C; p.target = 'n1'; } },
+      ],
+    },
+    {
+      title: '④ 数组下标的本质',
+      intro: 'a[i] 只是 *(a+i) 的语法糖。',
+      code: ['int a[4] = {10, 20, 30, 40};', 'int *p = a;', 'a[2] = 99;', 'printf("%d %d\\n", *(a+2), *(p+2));'],
+      init: () => ({ cells: arrCells('a', 'int', 0x1000, [10, 20, 30, 40]), output: [] }),
+      steps: [
+        { line: 0, text: '数组连续存放。', changed: ['a0', 'a1', 'a2', 'a3'], apply: () => {} },
+        { line: 1, text: 'p 和数组名 a 都指向 a[0]，值都是 0x1000。', changed: ['p'],
+          apply: m => { m.cells.push(mk('p', 'p', 'int *', 0x1010, 0x1000, 'a0')); } },
+        { line: 2, text: 'a[2] = 99 编译后就是 *(a+2) = 99：首地址 +2 个元素，找到 a[2] 写入。', changed: ['a2'],
+          apply: m => { get(m, 'a2').value = 99; } },
+        { line: 3, text: '*(a+2) 和 *(p+2) 都输出 99。区别：a 是地址常量不能 a++，p 是变量可以 p++。', changed: ['a2'],
+          apply: m => { m.output.push('99 99'); } },
+      ],
+    },
+    {
+      title: '⑤ 野指针（危险示范）',
+      intro: '没初始化的指针里装的是垃圾地址。',
+      code: ['int *p;', '*p = 5;'],
+      init: () => ({ cells: [], output: [] }),
+      steps: [
+        { line: 0, text: '只声明不初始化：p 里是一个随机的垃圾值（???），它指向哪里完全未知。', changed: ['p'],
+          apply: m => { const p = mk('p', 'p', 'int *', 0x1000, null); p.garbage = true; m.cells.push(p); } },
+        { line: 1, text: '顺着垃圾地址写入 5：这块内存可能属于别的变量、属于系统、甚至不可访问——未定义行为，可能崩溃也可能"看似正常"。正确做法：先 int x; 让 p = &x; 再 *p = 5。', changed: ['p'],
+          warn: '未定义行为（UB）：*p 解引用了未初始化的指针。真实程序中这类错误最难排查，因为它不一定立刻崩溃。',
+          apply: () => {} },
+      ],
+    },
+  ];
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="presets" id="scenarios"></div>
+        <div class="rule" id="scIntro"></div>
+      </div>
+      <div class="panel">
+        <div class="ptr-layout">
+          <div class="ptr-code" id="ptrCode"></div>
+          <div class="ptr-side">
+            <div class="ptr-explain" id="ptrExplain"></div>
+            <div id="ptrWarn"></div>
+            <div class="ptr-controls">
+              <button type="button" id="prevStep">上一步</button>
+              <button type="button" id="nextStep" class="next">下一步</button>
+              <button type="button" id="resetStep">重置</button>
+              <span id="stepLabel" style="font-size:13px;color:var(--dim)"></span>
+            </div>
+            <div class="ptr-console" id="ptrConsole"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>内存（地址为示意值，真实地址每次运行都不同）</h2>
+        <div class="memgrid" id="memGrid"><svg id="memSvg"></svg></div>
+        <div class="legend"><span class="sw" style="background:var(--purple)"></span>紫框 = 指针变量，箭头指向它的目标<span class="sw" style="background:#fff;border:1px solid #f59e0b"></span>橙框 = 本步发生变化的格子</div>
+      </div>
+      <div class="panel">
+        <h2>和其他语言对比</h2>
+        <div class="langnote">Python / Java 没有 C 语言意义上的指针：它们的变量是对象的"引用"，不能取地址、不能做指针算术、不能解引用改任意内存。C 的指针直接暴露内存地址——这是 C 强大也危险的地方。Java 的 NullPointerException 和 C 的野指针崩溃是同一类问题在不同抽象层的体现。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    let si = 0, step = 0;
+
+    SCENARIOS.forEach((sc, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = sc.title;
+      btn.addEventListener('click', () => { si = i; step = 0; render(); });
+      $('scenarios').appendChild(btn);
+    });
+
+    function currentState() {
+      const sc = SCENARIOS[si];
+      const m = sc.init();
+      for (let k = 0; k < step; k++) sc.steps[k].apply(m);
+      return m;
+    }
+
+    function drawArrows() {
+      const svg = $('memSvg'), grid = $('memGrid');
+      svg.innerHTML = '<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/></marker></defs>';
+      currentState().cells.filter(c => c.type.includes('*') && c.target).forEach(c => {
+        const from = grid.querySelector('[data-cell="' + c.id + '"]');
+        const to = grid.querySelector('[data-cell="' + c.target + '"]');
+        if (!from || !to) return;
+        const x1 = from.offsetLeft + from.offsetWidth / 2, y1 = from.offsetTop;
+        const x2 = to.offsetLeft + to.offsetWidth / 2, y2 = to.offsetTop;
+        const lift = Math.max(28, Math.abs(x2 - x1) / 4);
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1 - lift}, ${x2} ${y2 - lift}, ${x2} ${y2 - 2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#7c3aed');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('marker-end', 'url(#ah)');
+        svg.appendChild(path);
+      });
+    }
+
+    function render() {
+      const sc = SCENARIOS[si];
+      const m = currentState();
+      const last = step > 0 ? sc.steps[step - 1] : null;
+
+      $('scIntro').textContent = sc.intro;
+      $('scenarios').querySelectorAll('button').forEach((b, i) => {
+        b.style.borderColor = i === si ? 'var(--blue)' : '';
+        b.style.color = i === si ? 'var(--blue)' : '';
+      });
+
+      const codeEl = $('ptrCode');
+      codeEl.innerHTML = '';
+      sc.code.forEach((line, i) => {
+        const div = document.createElement('div');
+        div.className = 'codeline' + (last && last.line === i ? ' cur' : '');
+        const ln = document.createElement('span');
+        ln.className = 'ln'; ln.textContent = i + 1;
+        div.appendChild(ln);
+        div.appendChild(document.createTextNode(line));
+        codeEl.appendChild(div);
+      });
+
+      $('ptrExplain').textContent = last ? last.text : sc.intro;
+      $('ptrWarn').innerHTML = last && last.warn ? `<div class="warn ub">⚠ ${last.warn}</div>` : '';
+      $('prevStep').disabled = step === 0;
+      $('nextStep').disabled = step === sc.steps.length;
+      $('stepLabel').textContent = `第 ${step} / ${sc.steps.length} 步`;
+      $('ptrConsole').textContent = m.output.length ? '输出: ' + m.output.join('\n') : '（还没有输出）';
+
+      const grid = $('memGrid');
+      grid.querySelectorAll('.cell').forEach(c => c.remove());
+      const changed = last ? last.changed : [];
+      m.cells.forEach(c => {
+        const el = document.createElement('div');
+        const isPtr = c.type.includes('*');
+        el.className = 'cell' + (isPtr ? ' ptr' : '') + (c.garbage ? ' garbage' : '') + (changed.includes(c.id) ? ' changed' : '');
+        el.dataset.cell = c.id;
+        const name = document.createElement('div');
+        name.className = 'cname'; name.textContent = c.label + ' (' + c.type + ')';
+        const val = document.createElement('div');
+        val.className = 'cval';
+        val.textContent = isPtr ? (c.value === null ? '???' : ADDR(c.value)) : c.type === 'char' ? "'" + c.value + "'" : c.value;
+        const addr = document.createElement('div');
+        addr.className = 'caddr'; addr.textContent = ADDR(c.addr);
+        el.append(name, val, addr);
+        grid.appendChild(el);
+      });
+      requestAnimationFrame(drawArrows);
+    }
+
+    $('prevStep').addEventListener('click', () => { if (step > 0) { step--; render(); } });
+    $('nextStep').addEventListener('click', () => { if (step < SCENARIOS[si].steps.length) { step++; render(); } });
+    $('resetStep').addEventListener('click', () => { step = 0; render(); });
+    new ResizeObserver(drawArrows).observe($('memGrid'));
+    render();
+  }
+
+  return { id: 'pointer', name: '指针与内存', mount };
+}
+
+function makeComplementTool() {
+  function mount(host) {
+    const state = { width: 8, value: -5, negZero: false, decPattern: 0b11111011 };
+
+    host.innerHTML = `
+      <div class="panel">
+        <div class="controls">
+          <span style="font-size:14px">位宽：</span>
+          <div class="ops" id="widths"></div>
+          <label>十进制 <input type="text" id="decIn" value="-5" style="width:110px;padding:5px;border:1px solid var(--line);border-radius:6px;font-family:Consolas,monospace"></label>
+        </div>
+        <div class="rule">示例：<span class="presets" id="cPresets"></span></div>
+        <div class="rule" id="rangeInfo"></div>
+        <div id="cWarn"></div>
+      </div>
+      <div class="panel" id="rowsPanel"></div>
+      <div class="panel row-a">
+        <div class="operand-head"><span class="name">反向解码</span><span class="legend">点击格子翻转 bit，看这串 bit 代表几</span></div>
+        <div class="bits" id="decBits"></div>
+        <div class="rule" id="decRead"></div>
+      </div>
+      <div class="panel">
+        <h2>和代码的关系</h2>
+        <div class="langnote">C/C++/Java 的有符号整数在内存里存的就是补码，printf("%x", -5) 看到的 0xfffffffb 就是补码的十六进制。Python 整数无限位宽，hex(-5) 给出 '-0x5'（不是补码！），要得到补码需写 -5 &amp; 0xFF（8 位）或 -5 &amp; 0xFFFFFFFF（32 位）——位运算工具里的 Python 代码就是这么做的。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    const fmtBits = (pattern, n) => pattern.toString(2).padStart(n, '0').replace(/(.{4})(?=.)/g, '$1 ');
+
+    [8, 16, 32].forEach(w => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = w + ' 位'; b.dataset.w = w;
+      b.style.width = '60px'; b.style.fontSize = '14px';
+      b.addEventListener('click', () => {
+        state.width = w;
+        state.decPattern = state.decPattern % (2 ** w);
+        render();
+      });
+      $('widths').appendChild(b);
+    });
+
+    const PRESETS = [['+5', 5], ['-5', -5], ['+1', 1], ['-1', -1], ['0', 0], ['-0（负零）', 'negzero'], ['127（最大）', 127], ['-128（最小）', -128], ['128（溢出！）', 128]];
+    PRESETS.forEach(([label, v]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label;
+      b.addEventListener('click', () => {
+        state.width = 8;
+        if (v === 'negzero') { state.negZero = true; state.value = 0; }
+        else { state.negZero = false; state.value = v; }
+        render();
+      });
+      $('cPresets').appendChild(b);
+    });
+
+    $('decIn').addEventListener('input', () => {
+      const t = $('decIn').value.trim();
+      if (!/^[+-]?\d+$/.test(t)) { $('decIn').classList.add('invalid'); return; }
+      $('decIn').classList.remove('invalid');
+      state.value = parseInt(t, 10);
+      state.negZero = false;
+      render($('decIn'));
+    });
+
+    function buildDecBits() {
+      const el = $('decBits');
+      el.innerHTML = '';
+      for (let i = state.width - 1; i >= 0; i--) {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'bit' + (i % 4 === 0 && i !== state.width - 1 ? ' gap' : '') + (i === state.width - 1 ? ' sign' : '');
+        cell.dataset.idx = i;
+        cell.textContent = (state.decPattern / 2 ** i) % 2 >= 1 ? '1' : '0';
+        cell.addEventListener('click', () => {
+          state.decPattern = (state.decPattern ^ (2 ** i)) >>> 0;
+          render();
+        });
+        el.appendChild(cell);
+      }
+    }
+
+    function analyze() {
+      const n = state.width, mod = 2 ** n, signBit = 2 ** (n - 1), magBits = signBit - 1;
+      const overflow = !state.negZero && (state.value < -signBit || state.value > signBit - 1);
+      const stored = state.negZero ? 0 : ((state.value % mod) + mod) % mod;
+      const v = overflow ? (stored >= signBit ? stored - mod : stored) : state.value;
+      let signmag = null, ones = null, twos = stored, note = '';
+      if (state.negZero) {
+        signmag = signBit; ones = mod - 1; twos = 0;
+        note = '负零：原码 1000…000，反码 1111…111，反码 +1 产生进位溢出被丢弃，补码归 0——补码因此只有一个 0，比原码/反码多表示一个最小负数。';
+      } else if (v >= 0) {
+        signmag = ones = twos = v;
+        note = '正数：原码 = 反码 = 补码，三码合一。';
+      } else if (v === -signBit) {
+        note = `${n} 位最小负数 ${v}：绝对值 ${signBit} 需要 ${n} 个 bit，超出数值位容量，所以原码/反码都无法表示它，只有补码 1000…000。`;
+      } else {
+        const mag = -v;
+        signmag = signBit + mag;
+        ones = signBit + (magBits - mag);
+        note = `负数三步：① 原码 = 符号位 1 + 绝对值 ${mag}；② 反码 = 符号位不变、数值位按位取反；③ 补码 = 反码 + 1。`;
+      }
+      return { n, mod, signBit, stored, v, overflow, signmag, ones, twos, note };
+    }
+
+    function rowHtml(label, color, pattern, n, extra) {
+      if (pattern === null) {
+        return `<div style="display:flex;align-items:center;gap:10px;margin:8px 0"><span style="flex:0 0 90px;font-weight:600;color:${color}">${label}</span><span style="border:1px dashed var(--line);border-radius:6px;padding:8px 14px;color:var(--dim);font-size:13px">${n} 位下无法表示</span></div>`;
+      }
+      const bits = pattern.toString(2).padStart(n, '0').split('').map((b, i) => {
+        const idx = n - 1 - i;
+        const isSign = idx === n - 1;
+        return `<span class="bit${idx % 4 === 0 && idx !== n - 1 ? ' gap' : ''}${isSign ? ' sign' : ''}${b === '1' ? ' on' : ''}" style="${b === '1' ? 'background:' + color + ';border-color:' + color : ''}">${b}</span>`;
+      }).join('');
+      return `<div style="display:flex;align-items:center;gap:10px;margin:8px 0"><span style="flex:0 0 90px;font-weight:600;color:${color}">${label}</span><div class="bits" style="padding:4px 0">${bits}</div><span style="font-family:Consolas,monospace;font-size:13px;color:var(--dim)">${extra || ''}</span></div>`;
+    }
+
+    function render(skipEl) {
+      const a = analyze();
+      const { n, mod, signBit } = a;
+
+      host.querySelectorAll('#widths button').forEach(b => b.classList.toggle('active', +b.dataset.w === n));
+      if (skipEl !== $('decIn')) { $('decIn').value = state.negZero ? '-0' : state.value; $('decIn').classList.remove('invalid'); }
+      $('rangeInfo').innerHTML = `${n} 位有符号范围：<code>-${signBit} ~ ${signBit - 1}</code>　无符号范围：<code>0 ~ ${mod - 1}</code>`;
+      $('cWarn').innerHTML = a.overflow
+        ? `<div class="warn ub">⚠ ${state.value} 超出 ${n} 位有符号范围！实际存储被截断为 ${fmtBits(a.stored, n)}，按补码读出来是 ${a.v}。C 中这种转换是实现定义行为（常见编译器直接截断低 ${n} 位）。</div>`
+        : '';
+
+      let html = '';
+      if (a.v >= 0 && !state.negZero) {
+        html += rowHtml('三码合一', 'var(--blue)', a.twos, n, '0x' + a.twos.toString(16).toUpperCase());
+      } else {
+        html += rowHtml('① 原码', 'var(--dim)', a.signmag, n);
+        html += `<div style="margin-left:100px;color:var(--dim);font-size:13px">↓ 符号位不变，数值位取反</div>`;
+        html += rowHtml('② 反码', 'var(--purple)', a.ones, n);
+        html += `<div style="margin-left:100px;color:var(--dim);font-size:13px">↓ 加 1${a.ones !== null ? '：' + fmtBits(a.ones, n) + ' + 1' + (a.ones + 1 === mod ? ' = 1 ' + fmtBits(0, n) + '（进位丢弃）' : ' = ' + fmtBits(a.twos, n)) : ''}</div>`;
+        html += rowHtml('③ 补码', 'var(--green)', a.twos, n, '0x' + a.twos.toString(16).toUpperCase());
+      }
+      html += `<div class="rule" style="margin-top:10px">${a.note}</div>`;
+      html += `<div class="legend">红色下划线 = 符号位（最高位）：0 正 1 负。计算机里有符号整数实际存的就是补码。</div>`;
+      $('rowsPanel').innerHTML = html;
+
+      buildDecBits();
+      host.querySelectorAll('#decBits .bit').forEach(cell => {
+        const i = +cell.dataset.idx;
+        const on = (state.decPattern / 2 ** i) % 2 >= 1;
+        cell.classList.toggle('on', on);
+        cell.textContent = on ? '1' : '0';
+      });
+      const p = state.decPattern;
+      const signedVal = p >= signBit ? p - mod : p;
+      $('decRead').innerHTML = `这串 bit：无符号读 = <code>${p}</code>　按补码（有符号）读 = <code>${signedVal}</code>　十六进制 = <code>0x${p.toString(16).toUpperCase()}</code>${signedVal < 0 ? '　（最高位是 1，所以是负数）' : ''}`;
+    }
+
+    render();
+  }
+
+  return { id: 'complement', name: '补码转换器', mount };
+}
+
+function makePrecedenceTool() {
+  const BINPREC = { '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '<=': 7, '>': 7, '>=': 7, '<<': 8, '>>': 8, '+': 9, '-': 9, '*': 10, '/': 10, '%': 10 };
+  const ASSIGN_OPS = ['=', '+=', '-=', '*=', '/=', '%=', '&=', '^=', '|='];
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function tokenize(src) {
+    const re = /\s*(0[xX][0-9a-fA-F]+|\d+|[A-Za-z_]\w*|<<|>>|\+\+|--|<=|>=|==|!=|&&|\|\||\+=|-=|\*=|\/=|%=|&=|\^=|\|=|[+\-*/%&|^~!<>=?:()])/y;
+    const tokens = [];
+    let off = 0;
+    while (off < src.length) {
+      re.lastIndex = off;
+      const m = re.exec(src);
+      if (!m) {
+        if (/^\s+$/.test(src.slice(off))) break;
+        throw `第 ${off + 1} 个字符处无法识别："${src.slice(off, off + 6)}"（不支持数组下标、成员、sizeof、逗号、强制转换）`;
+      }
+      const text = m[1];
+      const start = off + m[0].length - text.length;
+      tokens.push({ text, pos: start, end: start + text.length, type: /^\d|^0[xX]/.test(text) ? 'num' : /^[A-Za-z_]/.test(text) ? 'id' : 'op' });
+      off = re.lastIndex;
+    }
+    if (!tokens.length) throw '表达式为空';
+    return tokens;
+  }
+
+  function parse(tokens) {
+    let pos = 0, nid = 0;
+    const peek = () => tokens[pos];
+    const next = () => tokens[pos++];
+    const span = (node, s) => { node.start = tokens[s].pos; node.end = tokens[pos - 1].end; return node; };
+    function expect(text) { if (!peek() || peek().text !== text) throw `缺少 "${text}"`; next(); }
+    function parseAssign() {
+      const s = pos;
+      const left = parseTernary();
+      if (peek() && ASSIGN_OPS.includes(peek().text)) {
+        const op = next().text;
+        if (left.kind !== 'var') throw '赋值号左边必须是变量';
+        const right = parseAssign();
+        return span({ id: nid++, kind: 'assign', op, name: left.name, right }, s);
+      }
+      return left;
+    }
+    function parseTernary() {
+      const s = pos;
+      const cond = parseBinary(1);
+      if (peek() && peek().text === '?') {
+        next();
+        const a = parseAssign();
+        expect(':');
+        const b = parseAssign();
+        return span({ id: nid++, kind: 'ternary', cond, a, b }, s);
+      }
+      return cond;
+    }
+    function parseBinary(min) {
+      const s = pos;
+      let left = parseUnary();
+      while (peek() && BINPREC[peek().text] >= min) {
+        const op = next().text;
+        const right = parseBinary(BINPREC[op] + 1);
+        left = span({ id: nid++, kind: 'binary', op, left, right }, s);
+      }
+      return left;
+    }
+    function parseUnary() {
+      const s = pos;
+      if (peek() && ['+', '-', '!', '~', '++', '--'].includes(peek().text)) {
+        const op = next().text;
+        const operand = parseUnary();
+        if ((op === '++' || op === '--') && operand.kind !== 'var') throw '++/-- 只能用于变量';
+        return span({ id: nid++, kind: 'unary', op, operand }, s);
+      }
+      return parsePostfix();
+    }
+    function parsePostfix() {
+      const s = pos;
+      let node = parsePrimary();
+      while (peek() && ['++', '--'].includes(peek().text)) {
+        const op = next().text;
+        if (node.kind !== 'var') throw '++/-- 只能用于变量';
+        node = span({ id: nid++, kind: 'postfix', op, name: node.name }, s);
+      }
+      return node;
+    }
+    function parsePrimary() {
+      const s = pos;
+      const t = next();
+      if (!t) throw '表达式不完整，末尾缺东西';
+      if (t.type === 'num') return span({ id: nid++, kind: 'num', value: Number(t.text) }, s);
+      if (t.type === 'id') return span({ id: nid++, kind: 'var', name: t.text }, s);
+      if (t.text === '(') {
+        const e = parseAssign();
+        expect(')');
+        e.start = t.pos; e.end = tokens[pos - 1].end;
+        return e;
+      }
+      throw `这里不该出现 "${t.text}"`;
+    }
+    const ast = parseAssign();
+    if (pos < tokens.length) throw `"${tokens[pos].text}" 多余或无法理解`;
+    return ast;
+  }
+
+  function walk(node, fn) {
+    fn(node);
+    if (node.kind === 'binary') { walk(node.left, fn); walk(node.right, fn); }
+    else if (node.kind === 'unary') walk(node.operand, fn);
+    else if (node.kind === 'assign') walk(node.right, fn);
+    else if (node.kind === 'ternary') { walk(node.cond, fn); walk(node.a, fn); walk(node.b, fn); }
+  }
+
+  function applyBin(op, l, r) {
+    switch (op) {
+      case '+': return l + r;
+      case '-': return l - r;
+      case '*': return l * r;
+      case '/': if (r === 0) throw '除以 0：C 中是未定义行为'; return Math.trunc(l / r);
+      case '%': if (r === 0) throw '对 0 取余：C 中是未定义行为'; return l % r;
+      case '<<': return (l << r) | 0;
+      case '>>': return (l >> r) | 0;
+      case '<': return l < r ? 1 : 0;
+      case '<=': return l <= r ? 1 : 0;
+      case '>': return l > r ? 1 : 0;
+      case '>=': return l >= r ? 1 : 0;
+      case '==': return l === r ? 1 : 0;
+      case '!=': return l !== r ? 1 : 0;
+      case '&': return (l & r) | 0;
+      case '^': return (l ^ r) | 0;
+      case '|': return (l | r) | 0;
+      case '&&': return (l && r) ? 1 : 0;
+      case '||': return (l || r) ? 1 : 0;
+    }
+    throw '未知运算符 ' + op;
+  }
+
+  function evaluate(ast, env, src) {
+    const steps = [];
+    const sub = node => src.slice(node.start, node.end);
+    function push(node, value, text, skips) { steps.push({ node, value, text, skips: skips || null, vars: { ...env } }); }
+    function ev(node, parent) {
+      switch (node.kind) {
+        case 'num': return node.value;
+        case 'var': return env[node.name] ?? 0;
+        case 'unary': {
+          if (node.op === '++' || node.op === '--') {
+            const name = node.operand.name;
+            const old = env[name] ?? 0;
+            env[name] = old + (node.op === '++' ? 1 : -1);
+            push(node, env[name], `前置 ${node.op}：先改后用。${name} 从 ${old} 变成 ${env[name]}，表达式取新值。`);
+            return env[name];
+          }
+          const v = ev(node.operand, node);
+          const r = node.op === '+' ? v : node.op === '-' ? -v : node.op === '!' ? (v ? 0 : 1) : (~v) | 0;
+          push(node, r, `单目 ${node.op}：${node.op}${v} = ${r}。单目运算符优先级最高，先算它。`);
+          return r;
+        }
+        case 'postfix': {
+          const old = env[node.name] ?? 0;
+          env[node.name] = old + (node.op === '++' ? 1 : -1);
+          push(node, old, `后置 ${node.op}：先用后改。表达式取旧值 ${old}，随后 ${node.name} 变成 ${env[node.name]}。`);
+          return old;
+        }
+        case 'binary': {
+          const l = ev(node.left, node);
+          if (node.op === '&&' && !l) {
+            push(node, 0, `&& 短路：左边 ${sub(node.left)} = 0，整个式子必为 0，右边 ${sub(node.right)} 不再求值。`, [sub(node.right)]);
+            return 0;
+          }
+          if (node.op === '||' && l) {
+            push(node, 1, `|| 短路：左边 ${sub(node.left)} 非 0，整个式子必为 1，右边 ${sub(node.right)} 不再求值。`, [sub(node.right)]);
+            return 1;
+          }
+          const r = ev(node.right, node);
+          const v = applyBin(node.op, l, r);
+          let reason = '';
+          if (parent && parent.kind === 'binary' && BINPREC[parent.op] !== undefined) {
+            reason = BINPREC[node.op] > BINPREC[parent.op] ? `（${node.op} 优先级高于 ${parent.op}，先算）` : `（与 ${parent.op} 同级，从左往右算）`;
+          } else if (parent && parent.kind === 'assign') {
+            reason = '（赋值优先级最低，先算右边）';
+          }
+          push(node, v, `${sub(node)}：${l} ${node.op} ${r} = ${v}${reason}${node.op === '/' && l % r !== 0 ? '（C 的 int 除法向 0 截断，不留小数）' : ''}${node.op === '&&' || node.op === '||' ? '（C 的逻辑运算只产出 0 或 1；Python 的 and/or 返回操作数本身）' : ''}`);
+          return v;
+        }
+        case 'assign': {
+          const r = ev(node.right, node);
+          const old = env[node.name] ?? 0;
+          const v = node.op === '=' ? r : applyBin(node.op.slice(0, -1), old, r);
+          env[node.name] = v;
+          push(node, v, `赋值 ${node.name} ${node.op} ${r}：${node.name} 存入 ${v}。赋值是右结合，从最右边算起。`);
+          return v;
+        }
+        case 'ternary': {
+          const c = ev(node.cond, node);
+          const v = ev(c ? node.a : node.b, node);
+          push(node, v, `三目 ?:：条件 ${sub(node.cond)} = ${c}（${c ? '真' : '假'}），只算${c ? '左' : '右'}边，得 ${v}，另一边不求值。`, [sub(c ? node.b : node.a)]);
+          return v;
+        }
+      }
+    }
+    const value = ev(ast, null);
+    return { steps, value };
+  }
+
+  function ubCheck(ast) {
+    const accesses = [];
+    (function collect(n, path) {
+      const p = [...path, n];
+      if (n.kind === 'postfix') { accesses.push({ name: n.name, mod: true, path: p }); return; }
+      if (n.kind === 'unary' && (n.op === '++' || n.op === '--')) { accesses.push({ name: n.operand.name, mod: true, path: p }); return; }
+      if (n.kind === 'var') accesses.push({ name: n.name, mod: false, path: p });
+      if (n.kind === 'binary') { collect(n.left, p); collect(n.right, p); }
+      else if (n.kind === 'unary') collect(n.operand, p);
+      else if (n.kind === 'assign') collect(n.right, p);
+      else if (n.kind === 'ternary') { collect(n.cond, p); collect(n.a, p); collect(n.b, p); }
+    })(ast, []);
+
+    // && || ?: 会定序：左 operand 先于右 operand，三目条件先于分支；同一子树内部不算定序
+    function sequenced(x, y) {
+      let i = 0;
+      while (i < x.path.length && i < y.path.length && x.path[i] === y.path[i]) i++;
+      const lca = x.path[i - 1], cx = x.path[i], cy = y.path[i];
+      if (!lca) return false;
+      if (lca.kind === 'binary' && (lca.op === '&&' || lca.op === '||'))
+        return (cx === lca.left && cy === lca.right) || (cx === lca.right && cy === lca.left);
+      if (lca.kind === 'ternary') return cx === lca.cond || cy === lca.cond || cx !== cy;
+      return false;
+    }
+
+    const byVar = {}, warns = [];
+    accesses.forEach(a => { (byVar[a.name] = byVar[a.name] || []).push(a); });
+    Object.keys(byVar).forEach(v => {
+      const list = byVar[v];
+      let modMod = false, modRead = false;
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+        const x = list[i], y = list[j];
+        if ((!x.mod && !y.mod) || sequenced(x, y)) continue;
+        if (x.mod && y.mod) modMod = true; else modRead = true;
+      }
+      if (modMod) warns.push(`${v} 在同一表达式里被 ++/-- 改了多次，且中间没有 && / || / ?: 定序：C 中是未定义行为（如 a++ + a++）。`);
+      else if (modRead) warns.push(`${v} 既被 ++/-- 修改又被单独读取，且中间没有 && / || / ?: 定序：C 中是未定义行为（如 a++ + a），应避免。`);
+    });
+    walk(ast, n => {
+      if (n.kind === 'assign') {
+        let hit = false;
+        walk(n.right, m => {
+          if ((m.kind === 'postfix' && m.name === n.name) || (m.kind === 'unary' && (m.op === '++' || m.op === '--') && m.operand.name === n.name)) hit = true;
+        });
+        if (hit) warns.push(`${n.name} = ...${n.name}++ 这类"赋值目标在右边又被自增"的写法在 C 中是未定义行为（如 a = a++）。`);
+      }
+    });
+    return warns;
+  }
+
+  const PREC_ROWS = [
+    ['1', '() [] -> . 后缀++ 后缀--', '左 → 右', ['(', '++p']],
+    ['2', '前置++ 前置-- 单目+ - ! ~ *解引用 &取地址 sizeof', '右 → 左', ['++', '--', '!', '~', 'u+', 'u-']],
+    ['3', '* / %', '左 → 右', ['*', '/', '%']],
+    ['4', '+ -', '左 → 右', ['+', '-']],
+    ['5', '<< >>', '左 → 右', ['<<', '>>']],
+    ['6', '< <= > >=', '左 → 右', ['<', '<=', '>', '>=']],
+    ['7', '== !=', '左 → 右', ['==', '!=']],
+    ['8', '&', '左 → 右', ['&']],
+    ['9', '^', '左 → 右', ['^']],
+    ['10', '|', '左 → 右', ['|']],
+    ['11', '&&（短路）', '左 → 右', ['&&']],
+    ['12', '||（短路）', '左 → 右', ['||']],
+    ['13', '?:', '右 → 左', ['?']],
+    ['14', '= += -= *= /= %= &= ^= |=', '右 → 左', ['=', '+=', '-=', '*=', '/=', '%=', '&=', '^=', '|=']],
+  ];
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="controls">
+          <label style="flex:1;min-width:260px">C 表达式 <input type="text" id="exprIn" value="a + b * c" spellcheck="false" style="width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;font-family:Consolas,monospace;font-size:15px"></label>
+        </div>
+        <div class="rule">示例：<span class="presets" id="ePresets"></span></div>
+        <div id="parseErr"></div>
+        <div id="ubWarns"></div>
+      </div>
+      <div class="panel">
+        <div class="operand-head"><span class="name">变量（可改值，改后从头重新拆解）</span></div>
+        <div class="values" id="varTable"></div>
+      </div>
+      <div class="panel">
+        <div id="stepExpr" style="font-family:Consolas,monospace;font-size:19px;padding:10px 4px;min-height:44px;flex-wrap:wrap"></div>
+        <div class="ptr-explain" id="stepText"></div>
+        <div class="ptr-controls">
+          <button type="button" id="pPrev">上一步</button>
+          <button type="button" id="pNext" class="next">下一步</button>
+          <button type="button" id="pReset">重置</button>
+          <span id="pLabel" style="font-size:13px;color:var(--dim)"></span>
+        </div>
+        <div class="ptr-console" id="pResult"></div>
+      </div>
+      <div class="panel">
+        <h2>C 运算符优先级（数字越小越先算，蓝行 = 本表达式用到的）</h2>
+        <table id="precTable" style="width:100%;border-collapse:collapse;font-size:13px"></table>
+        <div class="langnote">Python 用 and / or / not 关键字且优先级细节不同；Java 多一个 >>>。本工具严格按 C 规则拆解。不支持的写法：数组下标、成员访问、sizeof、逗号表达式、强制转换。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    const DEFAULTS = { a: 3, b: 2, c: 1 };
+    let src = 'a + b * c', ast = null, tokens = [], result = null, vars = {}, step = 0, error = null, warns = [];
+
+    const PRESETS = [
+      ['a + b * c', 'a + b * c'],
+      ['a - b - c（左结合）', 'a - b - c'],
+      ['(a + b) * c', '(a + b) * c'],
+      ['a+++b（如何拆词）', 'a+++b'],
+      ['a++ + a（危险！）', 'a++ + a'],
+      ['a << 1 + 1', 'a << 1 + 1'],
+      ['a & b == c', 'a & b == c'],
+      ['a < b && b++（短路）', 'a < b && b++'],
+      ['a < b ? a : b', 'a < b ? a : b'],
+      ['a = b = c（右结合）', 'a = b = c'],
+      ['~a + 1', '~a + 1'],
+      ['a / b * b', 'a / b * b'],
+    ];
+    PRESETS.forEach(([label, expr]) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label;
+      b.addEventListener('click', () => { $('exprIn').value = expr; load(expr); });
+      $('ePresets').appendChild(b);
+    });
+
+    function load(expr) {
+      src = expr; step = 0; error = null;
+      try {
+        tokens = tokenize(src);
+        ast = parse(tokens);
+        const names = new Set();
+        walk(ast, n => { if (n.kind === 'var') names.add(n.name); if (n.kind === 'postfix') names.add(n.name); if (n.kind === 'assign') names.add(n.name); if (n.kind === 'unary' && (n.op === '++' || n.op === '--')) names.add(n.operand.name); });
+        const old = vars;
+        vars = {};
+        [...names].sort().forEach(n => { vars[n] = old[n] !== undefined ? old[n] : (DEFAULTS[n] !== undefined ? DEFAULTS[n] : 0); });
+        warns = ubCheck(ast);
+        result = evaluate(ast, { ...vars }, src);
+      } catch (e) {
+        error = String(e);
+        ast = null; result = null; warns = [];
+      }
+      render();
+    }
+
+    $('exprIn').addEventListener('input', () => load($('exprIn').value));
+
+    function exprHtml() {
+      if (!ast || !result) return esc(src);
+      const events = [];
+      for (let k = 0; k < step; k++) {
+        const s = result.steps[k];
+        let html = `<span class="${k === step - 1 ? 'evhl' : 'ev'}">${s.value}</span>`;
+        if (k === step - 1 && s.skips) html += ` <span class="skip">（跳过 ${esc(s.skips.join('、'))}）</span>`;
+        events.push({ start: s.node.start, end: s.node.end, html });
+      }
+      events.sort((a, b) => a.start - b.start || b.end - a.end);
+      const top = [];
+      events.forEach(e => { if (!top.some(t => e.start >= t.start && e.end <= t.end)) top.push(e); });
+      let html = '', cur = 0;
+      top.forEach(e => { html += esc(src.slice(cur, e.start)) + e.html; cur = e.end; });
+      html += esc(src.slice(cur));
+      return html;
+    }
+
+    function render() {
+      $('parseErr').innerHTML = error ? `<div class="warn ub">⚠ ${esc(error)}</div>` : '';
+      $('ubWarns').innerHTML = warns.map(w => `<div class="warn ub">⚠ ${esc(w)}</div>`).join('');
+
+      const vt = $('varTable');
+      vt.innerHTML = '';
+      const snap = result && step > 0 ? result.steps[step - 1].vars : vars;
+      Object.keys(vars).forEach(name => {
+        const lab = document.createElement('label');
+        lab.textContent = name;
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.style.width = '70px';
+        inp.value = snap[name] !== undefined ? snap[name] : vars[name];
+        if (snap[name] !== vars[name]) inp.style.borderColor = 'var(--orange)';
+        inp.addEventListener('input', () => {
+          const t = inp.value.trim();
+          if (!/^[+-]?\d+$/.test(t)) { inp.classList.add('invalid'); return; }
+          vars[name] = parseInt(t, 10);
+          step = 0;
+          try { result = evaluate(ast, { ...vars }, src); error = null; } catch (e) { error = String(e); result = null; }
+          render();
+        });
+        lab.appendChild(inp);
+        vt.appendChild(lab);
+      });
+      if (!Object.keys(vars).length) vt.innerHTML = '<span style="font-size:13px;color:var(--dim)">（表达式里没有变量）</span>';
+
+      $('stepExpr').innerHTML = exprHtml();
+      const n = result ? result.steps.length : 0;
+      $('stepText').textContent = error ? '表达式有错误，先修正。' : !result ? '' : step === 0 ? '优先级和结合性决定求值顺序。点"下一步"看每一步算的是哪一块。' : result.steps[step - 1].text;
+      $('pPrev').disabled = step === 0;
+      $('pNext').disabled = !result || step >= n;
+      $('pLabel').textContent = result ? `第 ${step} / ${n} 步` : '';
+      $('pResult').textContent = result ? (step >= n ? `最终结果 = ${result.value}` : '（还没算完）') : '—';
+
+      const used = new Set();
+      tokens.forEach(t => { if (t.text === '(') used.add('('); });
+      if (ast) walk(ast, nd => {
+        if (nd.kind === 'binary') used.add(nd.op);
+        if (nd.kind === 'assign') used.add(nd.op);
+        if (nd.kind === 'unary') used.add(nd.op === '++' || nd.op === '--' ? nd.op : nd.op === '+' ? 'u+' : nd.op === '-' ? 'u-' : nd.op);
+        if (nd.kind === 'postfix') used.add('++p');
+        if (nd.kind === 'ternary') used.add('?');
+      });
+      const tbl = $('precTable');
+      tbl.innerHTML = '<tr style="text-align:left;color:var(--dim)"><th style="padding:4px 8px">级</th><th>运算符</th><th>结合性</th></tr>' + PREC_ROWS.map(([lv, ops, assoc, keys]) => {
+        const hit = keys.some(k => used.has(k));
+        return `<tr style="${hit ? 'background:#dbeafe;font-weight:600' : ''}"><td style="padding:4px 8px">${lv}</td><td style="font-family:Consolas,monospace">${esc(ops)}</td><td>${assoc}</td></tr>`;
+      }).join('');
+    }
+
+    $('pPrev').addEventListener('click', () => { if (step > 0) { step--; render(); } });
+    $('pNext').addEventListener('click', () => { if (result && step < result.steps.length) { step++; render(); } });
+    $('pReset').addEventListener('click', () => { step = 0; render(); });
+
+    load(src);
+  }
+
+  return { id: 'precedence', name: '优先级拆解', mount };
+}
+
+function makeRecursionTool() {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 插桩执行真实递归，记录事件流；每事件带完整栈快照，上一步/下一步只是回放
+  function trace(build, finalText) {
+    const events = [], output = [], stack = [];
+    let nextId = 1, calls = 0;
+    const snap = () => stack.map(f => ({ id: f.id, name: f.name, args: { ...f.args }, ret: f.ret, returned: !!f.returned, note: f.note }));
+    const emit = (line, text) => events.push({ line, text, stack: snap(), output: [...output], calls });
+    const api = {
+      call(name, args, line, text) {
+        const f = { id: nextId++, name, args, ret: undefined, returned: false, note: '' };
+        stack.push(f); calls++;
+        emit(line, text);
+        return f;
+      },
+      at(f, line, text, note) { f.note = note || ''; emit(line, text); },
+      ret(f, value, line, text) { f.ret = value; f.returned = true; emit(line, text); stack.pop(); return value; },
+      print(s, line, text) { output.push(s); emit(line, text); },
+    };
+    const result = build(api);
+    events.push({ line: -1, text: finalText(result, calls, output), stack: [], output: [...output], calls, done: true, value: result });
+    return events;
+  }
+
+  const SCENARIOS = [
+    {
+      title: '① 阶乘 fact(n)',
+      intro: '最经典的单路递归：n! = n × (n-1)!。看栈帧怎么一层层压进去，又怎么带着返回值一层层弹回来。',
+      params: [{ key: 'n', label: 'n', min: 1, max: 8, def: 5 }],
+      values: { n: 5 },
+      code: v => ['int fact(int n) {', '    if (n <= 1) return 1;     // 基准情形：出口', '    return n * fact(n - 1);   // 递归调用', '}', '// main 中：', `printf("%d\\n", fact(${v.n}));`],
+      mainLine: 5,
+      mainLabel: v => `fact(${v.n})`,
+      note: '递归两要素：基准情形（出口）+ 每次调用都向出口逼近。缺了出口就是无限递归，栈帧只进不出，最终栈溢出崩溃。',
+      run(api, v) {
+        function fact(n) {
+          const f = api.call('fact', { n }, 0, `调用 fact(${n})：新栈帧入栈。每个栈帧都有自己独立的 n，互不干扰。`);
+          if (n <= 1) {
+            api.at(f, 1, `n = ${n} ≤ 1，命中基准情形：递归到此为止，不再往下调。`);
+            return api.ret(f, 1, 1, `fact(${n}) 返回 1，本帧弹出销毁。`);
+          }
+          api.at(f, 1, `n = ${n} > 1，不是基准情形，走递归分支。`);
+          api.at(f, 2, `要算 ${n} × fact(${n - 1})，但 fact(${n - 1}) 还不知道。先调用它——本帧暂停在这一行，等新帧返回。`, `暂停，等待 fact(${n - 1}) 返回`);
+          const sub = fact(n - 1);
+          api.at(f, 2, `fact(${n - 1}) 回来了，带回 ${sub}！本帧从暂停处恢复：${n} × ${sub} = ${n * sub}。`);
+          return api.ret(f, n * sub, 2, `fact(${n}) 返回 ${n * sub}，本帧弹出，返回值交给上一层。`);
+        }
+        return fact(v.n);
+      },
+      final: (r, c, o, v) => `fact(${v.n}) = ${r}。共调用 ${c} 次，最大深度 ${v.n}。注意回归阶段：每一帧都"欠着一个乘法"，栈替它们记着账，弹一层算一层。`,
+    },
+    {
+      title: '② 斐波那契 fib(n)',
+      intro: '树形递归：一帧生两帧。栈深度只有 n，总调用次数却爆炸——深度和次数是两回事。',
+      params: [{ key: 'n', label: 'n', min: 1, max: 7, def: 5 }],
+      values: { n: 5 },
+      code: v => ['int fib(int n) {', '    if (n <= 1) return n;            // 基准情形', '    return fib(n - 1) + fib(n - 2);  // 两个递归调用', '}', '// main 中：', `printf("%d\\n", fib(${v.n}));`],
+      mainLine: 5,
+      mainLabel: v => `fib(${v.n})`,
+      note: 'fib(3)、fib(2) 被反复重算。加"记忆化"（算过的存起来）能把指数级降到 O(n)——这是动态规划的入门动机。',
+      run(api, v) {
+        function fib(n) {
+          const f = api.call('fib', { n }, 0, `调用 fib(${n})：新栈帧入栈，本帧 n = ${n}。`);
+          if (n <= 1) {
+            api.at(f, 1, `n = ${n} ≤ 1，基准情形：直接返回 ${n}。`);
+            return api.ret(f, n, 1, `fib(${n}) 返回 ${n}，本帧弹出。`);
+          }
+          api.at(f, 1, `n = ${n} > 1，要算 fib(${n - 1}) + fib(${n - 2})，两个递归调用。`);
+          api.at(f, 2, `先算左边 fib(${n - 1})，本帧暂停等待。（C 不保证 + 两边的求值顺序，这里按从左到右演示。）`, `暂停，等待 fib(${n - 1}) 返回`);
+          const a = fib(n - 1);
+          api.at(f, 2, `左边 fib(${n - 1}) = ${a} 回来了。再算右边 fib(${n - 2})，本帧再次暂停。`, `暂停，等待 fib(${n - 2}) 返回`);
+          const b = fib(n - 2);
+          api.at(f, 2, `右边 fib(${n - 2}) = ${b} 也回来了：${a} + ${b} = ${a + b}。`);
+          return api.ret(f, a + b, 2, `fib(${n}) 返回 ${a + b}，本帧弹出。`);
+        }
+        return fib(v.n);
+      },
+      final: (r, c, o, v) => `fib(${v.n}) = ${r}，但共调用了 ${c} 次！大量 fib 被重复计算，次数随 n 指数增长——这就是朴素递归斐波那契慢的原因。`,
+    },
+    {
+      title: '③ 汉诺塔 hanoi(n)',
+      intro: '把 n 个盘从 A 搬到 C：先借 C 把上面 n-1 个搬到 B，搬最大的到 C，再借 A 把 n-1 个搬回来。递归把大问题拆成同样的小问题。',
+      params: [{ key: 'n', label: '盘数 n', min: 1, max: 4, def: 3 }],
+      values: { n: 3 },
+      hasOutput: true,
+      code: v => ['void hanoi(int n, char from, char to, char via) {', '    if (n == 0) return;             // 基准：没盘子', '    hanoi(n - 1, from, via, to);    // ① n-1 个 from→via', '    printf("%c → %c\\n", from, to);  // ② 搬第 n 个', '    hanoi(n - 1, via, to, from);    // ③ n-1 个 via→to', '}', '// main 中：', `hanoi(${v.n}, 'A', 'C', 'B');`],
+      mainLine: 7,
+      mainLabel: v => `hanoi(${v.n}, 'A', 'C', 'B')`,
+      note: '写递归的关键心态：相信"搬 n-1 个"这个子问题递归自己会搞定，你只需安排好①②③三步的顺序。',
+      run(api, v) {
+        function hanoi(n, from, to, via) {
+          const f = api.call('hanoi', { n, from, to, via }, 0, `调用 hanoi(${n}, ${from}→${to}, 借${via})：任务"把 ${n} 个盘从 ${from} 搬到 ${to}"，新帧入栈。`);
+          if (n === 0) {
+            api.at(f, 1, `n = 0，没有盘子要搬，基准情形，直接返回。`);
+            return api.ret(f, undefined, 1, `hanoi(0) 返回（void 无返回值），本帧弹出。`);
+          }
+          api.at(f, 1, `n = ${n} > 0，分三步：挪开上面 ${n - 1} 个 → 搬最大的 → 把 ${n - 1} 个搬回来。`);
+          api.at(f, 2, `第①步：把上面 ${n - 1} 个盘从 ${from} 借 ${to} 搬到 ${via}。递归调用，本帧暂停。`, `暂停，等待 hanoi(${n - 1}, ${from}→${via})`);
+          hanoi(n - 1, from, via, to);
+          api.at(f, 3, `第②步：上面 ${n - 1} 个已挪到 ${via}，把最大的第 ${n} 号盘从 ${from} 直接搬到 ${to}。`);
+          api.print(`${from} → ${to}`, 3, `移动第 ${n} 号盘：${from} → ${to}，打印到控制台。`);
+          api.at(f, 4, `第③步：把 ${n - 1} 个盘从 ${via} 借 ${from} 搬到 ${to}。递归调用，本帧暂停。`, `暂停，等待 hanoi(${n - 1}, ${via}→${to})`);
+          hanoi(n - 1, via, to, from);
+          api.at(f, 5, `三步完成，${n} 个盘全部从 ${from} 到了 ${to}。`);
+          return api.ret(f, undefined, 5, `hanoi(${n}, ${from}→${to}) 任务完成，返回，本帧弹出。`);
+        }
+        hanoi(v.n, 'A', 'C', 'B');
+        return undefined;
+      },
+      final: (r, c, o, v) => `完成！共移动 ${o.length} 步 = 2ⁿ − 1（n=${v.n}）。64 个盘就是约 1.8×10¹⁹ 步——代码只有几行，工作量却是天文数字。`,
+    },
+    {
+      title: '④ 最大公约数 gcd（尾递归）',
+      intro: '辗转相除：gcd(a, b) = gcd(b, a%b)。注意和阶乘的区别——回归时没有任何积压的计算，返回值原样透传。',
+      params: [{ key: 'a', label: 'a', min: 1, max: 999, def: 48 }, { key: 'b', label: 'b', min: 0, max: 999, def: 18 }],
+      values: { a: 48, b: 18 },
+      code: v => ['int gcd(int a, int b) {', '    if (b == 0) return a;      // 基准情形', '    return gcd(b, a % b);      // 尾递归：回来无事可做', '}', '// main 中：', `printf("%d\\n", gcd(${v.a}, ${v.b}));`],
+      mainLine: 5,
+      mainLabel: v => `gcd(${v.a}, ${v.b})`,
+      note: '尾递归 = 递归调用是函数最后做的唯一一件事。阶乘的 return n * fact(n-1) 回来还要乘，就不是尾递归。尾递归可被编译器优化成循环，不占栈。',
+      run(api, v) {
+        function gcd(a, b) {
+          const f = api.call('gcd', { a, b }, 0, `调用 gcd(${a}, ${b})：新帧入栈。`);
+          if (b === 0) {
+            api.at(f, 1, `b = 0，基准情形：最大公约数就是 a = ${a}。`);
+            return api.ret(f, a, 1, `gcd(${a}, 0) 返回 ${a}，本帧弹出。`);
+          }
+          api.at(f, 1, `b = ${b} ≠ 0，继续辗转相除。`);
+          api.at(f, 2, `gcd(${a}, ${b}) = gcd(${b}, ${a} % ${b} = ${a % b})。本帧没有"等回来还要算"的事，返回值将原样透传——这就是尾递归。`, `暂停，等待 gcd(${b}, ${a % b}) 返回`);
+          const r = gcd(b, a % b);
+          api.at(f, 2, `下层返回 ${r}，本帧没什么要算的，直接把 ${r} 原样交上去。`);
+          return api.ret(f, r, 2, `gcd(${a}, ${b}) 返回 ${r}，本帧弹出。`);
+        }
+        return gcd(v.a, v.b);
+      },
+      final: (r, c, o, v) => `gcd(${v.a}, ${v.b}) = ${r}，共调用 ${c} 次。每帧都只是透传返回值，没有积压计算——尾递归可以优化成 while 循环，一层栈都不多用。`,
+    },
+  ];
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="presets" id="recScenarios"></div>
+        <div class="rule" id="recIntro"></div>
+        <div class="values" id="recParams" style="margin-top:10px"></div>
+      </div>
+      <div class="panel">
+        <div class="ptr-layout">
+          <div class="ptr-code" id="recCode"></div>
+          <div class="ptr-side">
+            <div class="stackcap">调用栈（栈顶在上，蓝框 = 正在执行，绿框 = 正在返回）</div>
+            <div class="stack" id="recStack"></div>
+          </div>
+        </div>
+        <div class="ptr-explain" id="recExplain" style="margin-top:10px"></div>
+        <div class="ptr-controls">
+          <button type="button" id="recPrev">上一步</button>
+          <button type="button" id="recNext" class="next">下一步</button>
+          <button type="button" id="recAuto">自动播放</button>
+          <button type="button" id="recReset">重置</button>
+          <span id="recLabel" style="font-size:13px;color:var(--dim)"></span>
+        </div>
+        <div class="rule" id="recStats" style="margin-top:0"></div>
+        <div class="ptr-console" id="recConsole" style="margin-top:8px;display:none"></div>
+      </div>
+      <div class="panel">
+        <h2>要点</h2>
+        <div class="ptr-explain" id="recNote" style="min-height:0"></div>
+        <div class="langnote">和其他语言对比：Python 默认递归深度限制约 1000（超了抛 RecursionError）；Java 超了抛 StackOverflowError；C 没有保护，栈溢出是未定义行为，通常直接崩溃。Python / Java 明确不做尾递归优化；C / C++ 编译器在优化档位（如 -O2）下常能把尾递归变成循环。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    const nextBtn = $('recNext'), autoBtn = $('recAuto');
+    let si = 0, step = 0, events = [], timer = null;
+
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      autoBtn.textContent = '自动播放';
+    }
+    function regen() {
+      const sc = SCENARIOS[si];
+      events = trace(api => sc.run(api, sc.values), (r, c, o) => sc.final(r, c, o, sc.values));
+      step = 0;
+    }
+    function frameHtml(f, isTop) {
+      const label = f.name + '(' + Object.values(f.args).join(', ') + ')';
+      const args = Object.entries(f.args).map(([k, v]) => `${k}=${v}`).join('  ');
+      const cls = f.returned ? 'frame returned' : isTop ? 'frame top' : 'frame';
+      return `<div class="${cls}"><div class="fname">${esc(label)}</div><div class="fargs">${esc(args)}</div>${f.note ? `<div class="fnote">${esc(f.note)}</div>` : ''}${f.returned ? `<div class="fret">返回 ${f.ret === undefined ? '（void）' : esc(f.ret)}</div>` : ''}</div>`;
+    }
+    function render() {
+      const sc = SCENARIOS[si];
+      $('recIntro').textContent = sc.intro;
+      $('recNote').textContent = sc.note;
+      [...$('recScenarios').children].forEach((b, i) => b.classList.toggle('active', i === si));
+
+      const ev = step > 0 ? events[step - 1] : null;
+      const curLine = ev ? (ev.done ? sc.mainLine : ev.line) : -1;
+      $('recCode').innerHTML = sc.code(sc.values).map((l, i) => `<div class="codeline${i === curLine ? ' cur' : ''}"><span class="ln">${i + 1}</span>${esc(l)}</div>`).join('');
+
+      const stack = ev ? ev.stack : [];
+      let sh = stack.map((f, i) => frameHtml(f, i === stack.length - 1)).reverse().join('');
+      const mainText = ev && ev.done ? (ev.value === undefined ? 'main() — 执行完毕' : `main() — 拿到结果 ${ev.value}`) : step === 0 ? `main() — 准备调用 ${sc.mainLabel(sc.values)}` : `main() — 等待 ${sc.mainLabel(sc.values)} 返回`;
+      sh += `<div class="frame main"><div class="fname">${esc(mainText)}</div></div>`;
+      $('recStack').innerHTML = sh;
+
+      $('recExplain').textContent = ev ? ev.text : '点"下一步"开始执行：每一次函数调用都会压入一个新栈帧，帧里装着这次调用自己的参数。';
+      $('recPrev').disabled = step === 0;
+      $('recNext').disabled = step >= events.length;
+      $('recLabel').textContent = `第 ${step} / ${events.length} 步`;
+      $('recStats').textContent = `栈深度 ${stack.length}（不含 main）· 累计调用 ${ev ? ev.calls : 0} 次${sc.hasOutput ? ` · 已移动 ${ev ? ev.output.length : 0} 步` : ''}`;
+      const con = $('recConsole');
+      con.style.display = sc.hasOutput ? '' : 'none';
+      if (sc.hasOutput) con.textContent = ev && ev.output.length ? ev.output.join('\n') : '（printf 输出会出现在这里）';
+    }
+
+    SCENARIOS.forEach((sc, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = sc.title;
+      b.addEventListener('click', () => { stop(); si = i; regen(); renderParams(); render(); });
+      $('recScenarios').appendChild(b);
+    });
+    function renderParams() {
+      const sc = SCENARIOS[si];
+      const box = $('recParams');
+      box.innerHTML = '';
+      sc.params.forEach(p => {
+        const lab = document.createElement('label');
+        lab.textContent = `${p.label}（${p.min}~${p.max}）`;
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.style.width = '70px'; inp.value = sc.values[p.key];
+        inp.addEventListener('input', () => {
+          const t = inp.value.trim();
+          const ok = /^\d+$/.test(t) && +t >= p.min && +t <= p.max;
+          inp.classList.toggle('invalid', !ok);
+          if (!ok) return;
+          stop(); sc.values[p.key] = +t; regen(); render();
+        });
+        lab.appendChild(inp);
+        box.appendChild(lab);
+      });
+    }
+    $('recPrev').addEventListener('click', () => { stop(); if (step > 0) { step--; render(); } });
+    $('recNext').addEventListener('click', () => { stop(); if (step < events.length) { step++; render(); } });
+    $('recReset').addEventListener('click', () => { stop(); step = 0; render(); });
+    $('recAuto').addEventListener('click', () => {
+      if (timer) { stop(); return; }
+      if (step >= events.length) { step = 0; render(); }
+      $('recAuto').textContent = '停止';
+      timer = setInterval(() => {
+        if (!document.contains(nextBtn)) { stop(); return; }
+        if (step >= events.length) { stop(); render(); return; }
+        step++; render();
+      }, 900);
+    });
+
+    renderParams();
+    regen();
+    render();
+  }
+
+  return { id: 'recursion', name: '递归调用栈', mount };
+}
+
+function makeSortTool() {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 插桩执行真实排序，记录事件流；每事件带数组+标记快照，回放即动画
+  function trace(input, build, finalText) {
+    const events = [];
+    const a = [...input];
+    const marks = { sorted: [] };
+    let compares = 0, swaps = 0, writes = 0;
+    const emit = (line, text) => events.push({ arr: [...a], line, text, marks: JSON.parse(JSON.stringify(marks)), compares, swaps, writes });
+    const api = {
+      a, marks,
+      compare(i, j, line, text) { compares++; marks.cmp = j === null ? [i] : [i, j]; marks.swap = null; marks.write = null; emit(line, text); },
+      swap(i, j, line, text) { const t = a[i]; a[i] = a[j]; a[j] = t; swaps++; marks.swap = [i, j]; marks.cmp = null; marks.write = null; emit(line, text); },
+      write(i, v, line, text) { a[i] = v; writes++; marks.write = [i]; marks.cmp = null; emit(line, text); },
+      note(line, text) { marks.cmp = null; marks.swap = null; marks.write = null; emit(line, text); },
+    };
+    build(api);
+    events.push({ arr: [...a], line: -1, text: finalText(compares, swaps, writes), marks: { sorted: a.map((_, i) => i) }, compares, swaps, writes, done: true });
+    return events;
+  }
+
+  const ALGOS = [
+    {
+      title: '① 冒泡排序',
+      intro: '相邻两个比较，逆序就交换。每一轮把最大的"泡"沉到末尾。最直观，也最慢。',
+      stat: 'swaps',
+      code: ['void bubble(int a[], int n) {', '    for (int i = 0; i < n - 1; i++) {      // 第 i 轮', '        for (int j = 0; j < n - 1 - i; j++) {', '            if (a[j] > a[j + 1])          // 相邻比较', '                swap(&a[j], &a[j + 1]);   // 逆序就交换', '        }', '    }                                     // 一轮完：最大值就位', '}'],
+      note: '可优化：某轮一次交换都没发生，说明已经有序，提前结束。绿色部分每轮多一个，因为最大值已永久就位，下一轮不用再看它。',
+      run(api) {
+        const a = api.a, n = a.length, m = api.marks;
+        for (let i = 0; i < n - 1; i++) {
+          api.note(1, `第 ${i + 1} 轮开始：把剩余部分的最大值冒泡到位置 ${n - 1 - i}。`);
+          for (let j = 0; j < n - 1 - i; j++) {
+            api.compare(j, j + 1, 3, `比较 a[${j}]=${a[j]} 和 a[${j + 1}]=${a[j + 1]}：${a[j] > a[j + 1] ? '逆序！' : '顺序正确，不动。'}`);
+            if (a[j] > a[j + 1]) api.swap(j, j + 1, 4, `交换 a[${j}] 和 a[${j + 1}]：大的往后走一步。`);
+          }
+          m.sorted.push(n - 1 - i);
+          api.note(6, `第 ${i + 1} 轮结束：最大值 ${a[n - 1 - i]} 沉到位置 ${n - 1 - i}，永久就位（绿色）。`);
+        }
+        m.sorted.push(0);
+      },
+      final: (c, s) => `排序完成！共比较 ${c} 次、交换 ${s} 次。冒泡每轮锁定一个最大值，n-1 轮收工，雷打不动 O(n²)。`,
+    },
+    {
+      title: '② 选择排序',
+      intro: '每轮扫一遍找最小值的位置（紫色），一轮只交换一次，把它换到前面。比较次数和冒泡一样多，但交换少得多。',
+      stat: 'swaps',
+      code: ['void selection(int a[], int n) {', '    for (int i = 0; i < n - 1; i++) {', '        int min = i;                      // 先假设 i 最小', '        for (int j = i + 1; j < n; j++)', '            if (a[j] < a[min]) min = j;   // 记下更小的位置', '        swap(&a[i], &a[min]);             // 最小值换到 i', '    }', '}'],
+      note: '比较次数固定 n(n-1)/2，但交换最多 n-1 次——"写内存少"是它的优点。注意它不稳定：相等元素可能被换得改变相对顺序。',
+      run(api) {
+        const a = api.a, n = a.length, m = api.marks;
+        for (let i = 0; i < n - 1; i++) {
+          let min = i;
+          m.min = i;
+          api.note(2, `第 ${i + 1} 轮：先假设位置 ${i}（值 ${a[i]}）最小（紫色），向后扫描找更小的。`);
+          for (let j = i + 1; j < n; j++) {
+            const smaller = a[j] < a[min];
+            api.compare(j, null, 4, `a[${j}]=${a[j]} 和当前最小 a[${min}]=${a[min]} 比：${smaller ? '更小！' : '不够小，min 不变。'}`);
+            if (smaller) { min = j; m.min = j; api.note(4, `min 更新为 ${j}（值 ${a[j]}），紫色标记移过去。`); }
+          }
+          m.min = null;
+          if (min !== i) api.swap(i, min, 5, `扫描完：最小值 a[${min}]=${a[min]}，和位置 ${i} 交换，一轮只换这一次。`);
+          else api.note(5, `最小值本来就在位置 ${i}，不用换。`);
+          m.sorted.push(i);
+          api.note(6, `位置 ${i} 永久就位（绿色），前 ${i + 1} 个已有序。`);
+        }
+        m.sorted.push(n - 1);
+      },
+      final: (c, s) => `排序完成！比较 ${c} 次、交换 ${s} 次。选择排序比较次数固定，但交换最多 n-1 次——比冒泡"写得少"。`,
+    },
+    {
+      title: '③ 插入排序',
+      intro: '像摸扑克牌：左手已有序，右手摸一张新牌（key），从右往左找位置，大的往后挪，把牌插进空位。',
+      stat: 'writes',
+      code: ['void insertion(int a[], int n) {', '    for (int i = 1; i < n; i++) {', '        int key = a[i];            // 拿起这张"牌"', '        int j = i - 1;', '        while (j >= 0 && a[j] > key) {', '            a[j + 1] = a[j];       // 比 key 大的往后挪', '            j--;', '        }', '        a[j + 1] = key;            // 插入空位', '    }', '}'],
+      note: '近乎有序的数据它接近 O(n)——每张新牌几乎不用挪。小规模数据（几十个以内）很多标准库排序会切换成插入排序。它是稳定的。',
+      run(api) {
+        const a = api.a, n = a.length, m = api.marks;
+        for (let i = 1; i < n; i++) {
+          const key = a[i];
+          m.held = key; m.hole = i;
+          m.sorted = Array.from({ length: i }, (_, k) => k);
+          api.note(2, `拿起位置 ${i} 的牌 key=${key}（统计栏可见），位置 ${i} 成了空位（虚线）。前面 0~${i - 1} 已有序。`);
+          let j = i - 1;
+          while (j >= 0) {
+            const bigger = a[j] > key;
+            api.compare(j, null, 4, `a[${j}]=${a[j]} ${bigger ? '>' : '≤'} key=${key}：${bigger ? '比 key 大，往后挪。' : '不大于 key，空位就是它右边。'}`);
+            if (!bigger) break;
+            m.hole = j;
+            api.write(j + 1, a[j], 5, `a[${j}]=${a[j]} 往后挪到位置 ${j + 1}，空位左移到 ${j}。`);
+            j--;
+          }
+          m.hole = null; m.held = null;
+          if (j + 1 === i) api.note(8, `key 比前面都大，放回原位 ${i}，一张都不用挪。`);
+          else api.write(j + 1, key, 8, `把 key=${key} 插进空位 ${j + 1}。${j < 0 ? '前面都比它大，插到最前。' : ''}`);
+          m.sorted = Array.from({ length: i + 1 }, (_, k) => k);
+        }
+      },
+      final: (c, s, w) => `排序完成！比较 ${c} 次、挪动 ${w} 次。插入排序像摸牌：已有序部分越长，新牌要挪的越少；近乎有序时接近 O(n)。`,
+    },
+    {
+      title: '④ 快速排序',
+      intro: '选一个基准（紫色），比它小的甩左边、大的留右边，基准归位后永久就位（绿色），再递归两半。和递归调用栈工具联动理解。',
+      stat: 'swaps',
+      code: ['void quick(int a[], int lo, int hi) {', '    if (lo >= hi) return;           // 0/1 个元素天然有序', '    int pivot = a[hi], i = lo;      // 基准=末尾，i 左边都 < pivot', '    for (int j = lo; j < hi; j++) {', '        if (a[j] < pivot) {         // 比基准小？', '            swap(&a[i], &a[j]); i++; // 甩到左边', '        }', '    }', '    swap(&a[i], &a[hi]);            // 基准归位 i', '    quick(a, lo, i - 1);            // 递归左半', '    quick(a, i + 1, hi);            // 递归右半', '}'],
+      note: '基准每次归位就把问题切成两半，平均 O(n log n)。但基准选得差（如对已有序数组选末尾）会退化成 O(n²)。淡色 = 当前递归区间外的元素。',
+      run(api) {
+        const a = api.a, m = api.marks;
+        function quick(lo, hi) {
+          m.range = [lo, hi];
+          if (lo >= hi) {
+            if (lo === hi && lo >= 0 && lo < a.length) m.sorted.push(lo);
+            api.note(1, lo === hi ? `区间 [${lo}, ${hi}] 只剩 1 个元素，天然有序，直接返回。` : `区间 [${lo}, ${hi}] 为空，直接返回。`);
+            return;
+          }
+          const pivot = a[hi];
+          m.pivot = hi;
+          let i = lo;
+          api.note(2, `处理区间 [${lo}, ${hi}]：选末尾 a[${hi}]=${pivot} 当基准（紫色）。i 从 ${lo} 开始，i 的左边都将小于 ${pivot}。`);
+          for (let j = lo; j < hi; j++) {
+            const smaller = a[j] < pivot;
+            api.compare(j, null, 4, `a[${j}]=${a[j]} ${smaller ? '<' : '≥'} 基准 ${pivot}：${smaller ? `小的，甩到左边位置 ${i}。` : '不动。'}`);
+            if (smaller) {
+              if (i !== j) api.swap(i, j, 5, `交换 a[${i}] 和 a[${j}]，"小于区"扩大一格，i 前进到 ${i + 1}。`);
+              else api.note(5, `i 和 j 都在 ${i}，自己不用换，i 前进到 ${i + 1}。`);
+              i++;
+            }
+          }
+          m.pivot = null;
+          if (i !== hi) api.swap(i, hi, 8, `扫描完：把基准 ${pivot} 换到位置 ${i}——左边都 < ${pivot}，右边都 ≥ ${pivot}。基准永久就位（绿色）！`);
+          else api.note(8, `基准 ${pivot} 本来就在位置 ${i}（区间最大值），不用换，直接永久就位（绿色）。`);
+          m.sorted.push(i);
+          const pi = i;
+          api.note(9, `递归左半 [${lo}, ${pi - 1}]。`);
+          quick(lo, pi - 1);
+          api.note(10, `左半完成，递归右半 [${pi + 1}, ${hi}]。`);
+          quick(pi + 1, hi);
+          m.range = [lo, hi];
+        }
+        quick(0, a.length - 1);
+      },
+      final: (c, s) => `排序完成！比较 ${c} 次、交换 ${s} 次。基准每次永久就位、问题减半——平均 O(n log n)，比 O(n²) 三兄弟快一个量级。`,
+    },
+  ];
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="presets" id="sortAlgos"></div>
+        <div class="rule" id="sortIntro"></div>
+        <div class="controls" style="margin-top:10px">
+          <label style="flex:1;min-width:220px;align-items:flex-start;flex-direction:column">数组（2~12 个 1~99 的整数，空格或逗号分隔）<input type="text" id="sortData" value="5 2 8 1 9 3 7 4" spellcheck="false" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-family:Consolas,monospace"></label>
+          <button type="button" id="sortRandom" style="border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer">随机 8 个</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="bars" id="sortBars"></div>
+        <div class="legend"><span class="sw" style="background:var(--orange)"></span>比较中<span class="sw" style="background:var(--red)"></span>交换<span class="sw" style="background:var(--purple)"></span>基准 / 当前最小<span class="sw" style="background:var(--green)"></span>已就位<span class="sw" style="background:#e2e8f0;border:1px dashed var(--purple)"></span>空位</div>
+        <div class="ptr-explain" id="sortExplain" style="margin-top:8px"></div>
+        <div class="ptr-controls">
+          <button type="button" id="sortPrev">上一步</button>
+          <button type="button" id="sortNext" class="next">下一步</button>
+          <button type="button" id="sortAuto">自动播放</button>
+          <button type="button" id="sortReset">重置</button>
+          <span id="sortLabel" style="font-size:13px;color:var(--dim)"></span>
+        </div>
+        <div class="rule" id="sortStats" style="margin-top:0"></div>
+      </div>
+      <div class="panel">
+        <div class="ptr-layout">
+          <div class="ptr-code" id="sortCode"></div>
+          <div class="ptr-side">
+            <h2 style="margin:0 0 8px;font-size:15px">要点</h2>
+            <div class="ptr-explain" id="sortNote" style="min-height:0"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>四种排序对比</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <tr style="text-align:left;color:var(--dim)"><th style="padding:4px 8px">算法</th><th>平均时间</th><th>最坏</th><th>稳定性</th><th>额外空间</th></tr>
+          <tr><td style="padding:4px 8px">冒泡</td><td>O(n²)</td><td>O(n²)</td><td>稳定</td><td>O(1)</td></tr>
+          <tr><td style="padding:4px 8px">选择</td><td>O(n²)</td><td>O(n²)</td><td>不稳定</td><td>O(1)</td></tr>
+          <tr><td style="padding:4px 8px">插入</td><td>O(n²)</td><td>O(n²)，近乎有序时 O(n)</td><td>稳定</td><td>O(1)</td></tr>
+          <tr><td style="padding:4px 8px">快速</td><td>O(n log n)</td><td>O(n²)（基准选得差）</td><td>不稳定</td><td>O(log n) 递归栈</td></tr>
+        </table>
+        <div class="langnote">稳定 = 相等元素的相对顺序不变。Python 的 sorted()、Java 的 Arrays.sort()（对象数组）用稳定的 TimSort；C 标准库的 qsort() 不保证稳定。换算法时数组不变，方便对比同一组数据下的比较/交换次数。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    const nextBtn = $('sortNext'), autoBtn = $('sortAuto');
+    let ai = 0, step = 0, events = [], timer = null;
+    let data = [5, 2, 8, 1, 9, 3, 7, 4];
+
+    function stop() {
+      if (timer) { clearInterval(timer); timer = null; }
+      autoBtn.textContent = '自动播放';
+    }
+    function regen() {
+      const al = ALGOS[ai];
+      events = trace(data, api => al.run(api), (c, s, w) => al.final(c, s, w));
+      step = 0;
+    }
+    function render() {
+      const al = ALGOS[ai];
+      $('sortIntro').textContent = al.intro;
+      $('sortNote').textContent = al.note;
+      [...$('sortAlgos').children].forEach((b, i) => b.classList.toggle('active', i === ai));
+
+      const ev = step > 0 ? events[step - 1] : null;
+      const arr = ev ? ev.arr : data;
+      const m = ev ? ev.marks : { sorted: [] };
+      const max = Math.max(...arr, 1);
+      $('sortBars').innerHTML = arr.map((v, i) => {
+        const cls = [];
+        if (m.swap && m.swap.includes(i)) cls.push('swap');
+        else if (m.cmp && m.cmp.includes(i)) cls.push('cmp');
+        else if (m.pivot === i || m.min === i) cls.push('pivot');
+        else if (m.hole === i) cls.push('hole');
+        else if (m.sorted && m.sorted.includes(i)) cls.push('sorted');
+        if (m.range && (i < m.range[0] || i > m.range[1]) && !(m.sorted && m.sorted.includes(i))) cls.push('dim');
+        if (m.write && m.write.includes(i)) cls.push('write');
+        return `<div class="bar ${cls.join(' ')}" style="height:${Math.round(v / max * 150) + 8}px"><span class="bval">${v}</span><span class="bidx">${i}</span></div>`;
+      }).join('');
+
+      const curLine = ev ? ev.line : -1;
+      $('sortCode').innerHTML = al.code.map((l, i) => `<div class="codeline${i === curLine ? ' cur' : ''}"><span class="ln">${i + 1}</span>${esc(l)}</div>`).join('');
+      $('sortExplain').textContent = ev ? ev.text : '点"下一步"开始：橙色 = 正在比较，红色 = 正在交换，绿色 = 已永久就位。';
+      $('sortPrev').disabled = step === 0;
+      $('sortNext').disabled = step >= events.length;
+      $('sortLabel').textContent = `第 ${step} / ${events.length} 步`;
+      const c = ev ? ev.compares : 0, s = ev ? ev.swaps : 0, w = ev ? ev.writes : 0;
+      $('sortStats').textContent = `比较 ${c} 次 · ${al.stat === 'writes' ? `挪动 ${w} 次` : `交换 ${s} 次`}${m.held !== undefined && m.held !== null ? ` · 手中 key=${m.held}` : ''}${m.range ? ` · 当前区间 [${m.range[0]}, ${m.range[1]}]` : ''}`;
+    }
+
+    ALGOS.forEach((al, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = al.title;
+      b.addEventListener('click', () => { stop(); ai = i; regen(); render(); });
+      $('sortAlgos').appendChild(b);
+    });
+    $('sortData').addEventListener('input', () => {
+      const inp = $('sortData');
+      const parts = inp.value.trim().split(/[\s,，、]+/).filter(Boolean);
+      const ok = parts.length >= 2 && parts.length <= 12 && parts.every(t => /^\d{1,2}$/.test(t) && +t >= 1 && +t <= 99);
+      inp.classList.toggle('invalid', !ok);
+      if (!ok) return;
+      stop(); data = parts.map(Number); regen(); render();
+    });
+    $('sortRandom').addEventListener('click', () => {
+      stop();
+      data = Array.from({ length: 8 }, () => 1 + Math.floor(Math.random() * 99));
+      $('sortData').value = data.join(' ');
+      $('sortData').classList.remove('invalid');
+      regen(); render();
+    });
+    $('sortPrev').addEventListener('click', () => { stop(); if (step > 0) { step--; render(); } });
+    $('sortNext').addEventListener('click', () => { stop(); if (step < events.length) { step++; render(); } });
+    $('sortReset').addEventListener('click', () => { stop(); step = 0; render(); });
+    $('sortAuto').addEventListener('click', () => {
+      if (timer) { stop(); return; }
+      if (step >= events.length) { step = 0; render(); }
+      autoBtn.textContent = '停止';
+      timer = setInterval(() => {
+        if (!document.contains(nextBtn)) { stop(); return; }
+        if (step >= events.length) { stop(); render(); return; }
+        step++; render();
+      }, 700);
+    });
+
+    regen();
+    render();
+  }
+
+  return { id: 'sort', name: '排序动画', mount };
+}
+
+function makeStructTool() {
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const TYPES = {
+    'char': { size: 1, align: 1 },
+    'short': { size: 2, align: 2 },
+    'int': { size: 4, align: 4 },
+    'float': { size: 4, align: 4 },
+    'double': { size: 8, align: 8 },
+    'long long': { size: 8, align: 8 },
+  };
+  const PALETTE = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2', '#be185d', '#65a30d'];
+  const PRESETS = [
+    { title: '① 经典浪费 char-int-char', members: [{ name: 'a', type: 'char' }, { name: 'b', type: 'int' }, { name: 'c', type: 'char' }] },
+    { title: '② 重排后省 4 字节', members: [{ name: 'b', type: 'int' }, { name: 'a', type: 'char' }, { name: 'c', type: 'char' }] },
+    { title: '③ 含 double', members: [{ name: 'a', type: 'char' }, { name: 'b', type: 'double' }, { name: 'c', type: 'int' }] },
+    { title: '④ short-char-int-short', members: [{ name: 'a', type: 'short' }, { name: 'b', type: 'char' }, { name: 'c', type: 'int' }, { name: 'd', type: 'short' }] },
+    { title: '⑤ double-char', members: [{ name: 'x', type: 'double' }, { name: 'y', type: 'char' }] },
+  ];
+
+  function layout(members) {
+    const align = Math.max(...members.map(m => TYPES[m.type].align), 1);
+    let offset = 0, sum = 0;
+    const placed = members.map((m, idx) => {
+      const t = TYPES[m.type];
+      const pad = (t.align - (offset % t.align)) % t.align;
+      const start = offset + pad;
+      offset = start + t.size;
+      sum += t.size;
+      return { name: m.name || ('m' + (idx + 1)), type: m.type, size: t.size, align: t.align, offset: start, padBefore: pad, idx };
+    });
+    const trailing = (align - (offset % align)) % align;
+    return { placed, align, trailing, total: offset + trailing, sum };
+  }
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="presets" id="stPresets"></div>
+        <div class="rule">逐个放置成员，看填充字节（斜纹）从哪来。规则：成员偏移必须是自身对齐的倍数；sizeof 必须是结构体对齐（= 成员最大对齐）的倍数。</div>
+        <div id="stRows" style="margin-top:10px"></div>
+        <div class="presets" style="margin-top:4px">
+          <button type="button" id="stAdd">＋ 加成员</button>
+          <button type="button" id="stOpt">按对齐从大到小重排（最省）</button>
+        </div>
+        <div class="rule" id="stOptMsg"></div>
+      </div>
+      <div class="panel">
+        <div class="operand-head"><span class="name">内存布局（每格 1 字节，数字 = 偏移）</span><span class="expr" id="stSizeof"></span></div>
+        <div class="bytes" id="stBytes"></div>
+        <div class="legend" id="stLegend"></div>
+        <div class="rule" id="stWaste" style="margin-top:8px"></div>
+        <div class="ptr-explain" id="stExplain" style="margin-top:8px"></div>
+        <div class="ptr-controls">
+          <button type="button" id="stPrev">上一步</button>
+          <button type="button" id="stNext" class="next">下一步</button>
+          <button type="button" id="stReset">重置</button>
+          <span id="stLabel" style="font-size:13px;color:var(--dim)"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ptr-layout">
+          <div class="ptr-code" id="stCode"></div>
+          <div class="ptr-side">
+            <table style="width:100%;border-collapse:collapse;font-size:13px" id="stTable"></table>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>要点</h2>
+        <div class="ptr-explain" style="min-height:0">对齐不是浪费癖：CPU 按对齐边界访问内存最快，未对齐访问在某些架构上会直接崩溃。三条规则——① 首个成员偏移 0；② 每个成员偏移 = 向上取整到自身对齐的倍数；③ sizeof = 向上取整到结构体对齐（成员最大对齐）的倍数。把对齐大的成员放前面，通常能减少填充。</div>
+        <div class="langnote">这里的大小/对齐以常见 64 位平台为例，实际随平台与编译器变化，用 sizeof 和 offsetof（&lt;stddef.h&gt;）实测为准。#pragma pack(1) 可取消填充（省空间但访问慢、可能崩溃，常用于协议/文件格式）。Python 的 struct 模块用格式串显式控制对齐（如 '&lt;' 小端无对齐），Java 对象布局由 JVM 决定、不直接暴露。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    let members = PRESETS[0].members.map(m => ({ ...m }));
+    let step = 0, L = null, steps = [];
+
+    function buildSteps() {
+      L = layout(members);
+      steps = [{ kind: 'intro', text: `这个结构体有 ${L.placed.length} 个成员，sizeof = ${L.total} 字节。结构体对齐 = 成员最大对齐 = ${L.align}。点"下一步"看每个成员怎么放、填充怎么来。` }];
+      L.placed.forEach(p => {
+        const padText = p.padBefore > 0
+          ? `轮到它时偏移是 ${p.offset - p.padBefore}，不是 ${p.align} 的倍数，先填 ${p.padBefore} 字节补到 ${p.offset}。`
+          : `轮到它时偏移是 ${p.offset}，已是 ${p.align} 的倍数，不用填充。`;
+        steps.push({ kind: 'member', p, text: `${p.name}（${p.type}，大小 ${p.size}，对齐 ${p.align}）：${padText}放在偏移 ${p.offset}，占 ${p.offset}~${p.offset + p.size - 1}。` });
+      });
+      steps.push({ kind: 'end', text: `最后一个成员到偏移 ${L.total - L.trailing - 1} 结束（共 ${L.total - L.trailing} 字节）。sizeof 必须是结构体对齐 ${L.align} 的倍数，向上取整到 ${L.total}${L.trailing ? `，尾部再填 ${L.trailing} 字节` : '，恰好整除不用填'}。所以 sizeof = ${L.total}，不是成员大小之和 ${L.sum}。` });
+    }
+
+    function byteMap() {
+      const bytes = new Array(L.total).fill(null);
+      L.placed.forEach(p => { for (let i = p.offset; i < p.offset + p.size; i++) bytes[i] = p; });
+      return bytes;
+    }
+
+    function renderLayout() {
+      buildSteps();
+      if (step >= steps.length) step = 0;
+      const st = steps[step];
+      const bytes = byteMap();
+      let hl = null;
+      if (st.kind === 'member') hl = [st.p.offset - st.p.padBefore, st.p.offset + st.p.size - 1];
+      if (st.kind === 'end') hl = L.trailing ? [L.total - L.trailing, L.total - 1] : null;
+      $('stBytes').innerHTML = bytes.map((b, i) => {
+        const inHl = hl && i >= hl[0] && i <= hl[1];
+        const cls = 'byte' + (b ? '' : ' pad') + (hl ? (inHl ? ' hl' : ' dim') : '');
+        const style = b ? `background:${PALETTE[b.idx % PALETTE.length]}` : '';
+        return `<div class="${cls}" style="${style}">${b ? esc(b.name.slice(0, 2)) : '·'}<span class="boff">${i}</span></div>`;
+      }).join('');
+      $('stLegend').innerHTML = L.placed.map(p => `<span class="sw" style="background:${PALETTE[p.idx % PALETTE.length]}"></span>${esc(p.name)}（${p.type}）`).join('') + '<span class="sw" style="background:repeating-linear-gradient(45deg,#e2e8f0,#e2e8f0 4px,#cbd5e1 4px,#cbd5e1 8px)"></span>填充';
+      $('stSizeof').textContent = `sizeof = ${L.total}`;
+      const waste = L.total - L.sum;
+      $('stWaste').textContent = `成员实际数据 ${L.sum} 字节 + 填充 ${waste} 字节 = ${L.total} 字节${waste ? `（浪费了 ${Math.round(waste / L.total * 100)}%）` : '（没有浪费）'}`;
+      $('stExplain').textContent = st.text;
+      $('stPrev').disabled = step === 0;
+      $('stNext').disabled = step >= steps.length - 1;
+      $('stLabel').textContent = `第 ${step} / ${steps.length - 1} 步`;
+
+      const codeLines = ['struct Example {', ...L.placed.map(p => `    ${p.type} ${p.name};${' '.repeat(Math.max(1, 12 - p.type.length - p.name.length))}// 偏移 ${p.offset}`), '};', `// sizeof(struct Example) = ${L.total}`];
+      const curLine = st.kind === 'member' ? st.p.idx + 1 : st.kind === 'end' ? codeLines.length - 1 : -1;
+      $('stCode').innerHTML = codeLines.map((l, i) => `<div class="codeline${i === curLine ? ' cur' : ''}"><span class="ln">${i + 1}</span>${esc(l)}</div>`).join('');
+
+      let rows = '<tr style="text-align:left;color:var(--dim)"><th style="padding:4px 8px">成员</th><th>类型</th><th>大小</th><th>对齐</th><th>偏移</th></tr>';
+      L.placed.forEach(p => {
+        if (p.padBefore) rows += `<tr style="color:#94a3b8"><td style="padding:4px 8px">填充</td><td>—</td><td>${p.padBefore}</td><td>—</td><td>${p.offset - p.padBefore}~${p.offset - 1}</td></tr>`;
+        rows += `<tr${st.kind === 'member' && st.p === p ? ' style="background:#fef3c7;font-weight:600"' : ''}><td style="padding:4px 8px">${esc(p.name)}</td><td>${p.type}</td><td>${p.size}</td><td>${p.align}</td><td>${p.offset}</td></tr>`;
+      });
+      if (L.trailing) rows += `<tr style="color:#94a3b8"><td style="padding:4px 8px">尾部填充</td><td>—</td><td>${L.trailing}</td><td>—</td><td>${L.total - L.trailing}~${L.total - 1}</td></tr>`;
+      $('stTable').innerHTML = rows;
+    }
+
+    function renderRows() {
+      const box = $('stRows');
+      box.innerHTML = '';
+      members.forEach((m, i) => {
+        const row = document.createElement('div');
+        row.className = 'mrow';
+        const sw = document.createElement('span');
+        sw.className = 'swatch';
+        sw.style.background = PALETTE[i % PALETTE.length];
+        const name = document.createElement('input');
+        name.type = 'text'; name.value = m.name; name.maxLength = 12;
+        name.addEventListener('input', () => { members[i].name = name.value.trim(); renderLayout(); });
+        const sel = document.createElement('select');
+        Object.keys(TYPES).forEach(t => {
+          const o = document.createElement('option');
+          o.value = t; o.textContent = `${t}（${TYPES[t].size} 字节）`;
+          if (t === m.type) o.selected = true;
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', () => { members[i].type = sel.value; step = 0; renderLayout(); });
+        const up = document.createElement('button'); up.type = 'button'; up.textContent = '↑'; up.disabled = i === 0;
+        up.addEventListener('click', () => { [members[i - 1], members[i]] = [members[i], members[i - 1]]; step = 0; renderRows(); renderLayout(); });
+        const down = document.createElement('button'); down.type = 'button'; down.textContent = '↓'; down.disabled = i === members.length - 1;
+        down.addEventListener('click', () => { [members[i + 1], members[i]] = [members[i], members[i + 1]]; step = 0; renderRows(); renderLayout(); });
+        const del = document.createElement('button'); del.type = 'button'; del.textContent = '删'; del.disabled = members.length <= 1;
+        del.addEventListener('click', () => { members.splice(i, 1); step = 0; renderRows(); renderLayout(); });
+        row.append(sw, name, sel, up, down, del);
+        box.appendChild(row);
+      });
+    }
+
+    PRESETS.forEach(pr => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = pr.title;
+      b.addEventListener('click', () => { members = pr.members.map(m => ({ ...m })); step = 0; $('stOptMsg').textContent = ''; renderRows(); renderLayout(); });
+      $('stPresets').appendChild(b);
+    });
+    $('stAdd').addEventListener('click', () => {
+      if (members.length >= 8) { $('stOptMsg').textContent = '最多 8 个成员（演示够用）。'; return; }
+      members.push({ name: 'm' + (members.length + 1), type: 'int' });
+      step = 0; renderRows(); renderLayout();
+    });
+    $('stOpt').addEventListener('click', () => {
+      const before = layout(members).total;
+      members = members.map((m, i) => ({ m, i })).sort((x, y) => TYPES[y.m.type].align - TYPES[x.m.type].align || x.i - y.i).map(x => x.m);
+      const after = layout(members).total;
+      step = 0; renderRows(); renderLayout();
+      $('stOptMsg').textContent = after < before ? `重排后 sizeof ${before} → ${after}，省了 ${before - after} 字节！` : `重排后 sizeof 仍是 ${after}，这个顺序已经很省了。`;
+    });
+    $('stPrev').addEventListener('click', () => { if (step > 0) { step--; renderLayout(); } });
+    $('stNext').addEventListener('click', () => { if (step < steps.length - 1) { step++; renderLayout(); } });
+    $('stReset').addEventListener('click', () => { step = 0; renderLayout(); });
+
+    renderRows();
+    renderLayout();
+  }
+
+  return { id: 'struct', name: '结构体对齐', mount };
+}
+
+function makeMemoryTool() {
+  const ADDR = n => '0x' + n.toString(16).toUpperCase().padStart(4, '0');
+  const ptr = (id, label, addr, value, target) => ({ id, label, addr, value, target: target || null, garbage: false, isNull: false });
+  const block = (id, addr, count, values) => ({ id, addr, count, elemSize: 4, values: values.slice(), status: 'live' });
+  const P = (m, id) => m.stack.find(c => c.id === id);
+  const B = (m, id) => m.heap.find(b => b.id === id);
+
+  const SCENARIOS = [
+    {
+      title: '① malloc / free 基础',
+      intro: '堆内存由你手动管理：malloc 申请、free 归还。点"下一步"逐行执行，看栈上的指针和堆上的块如何变化。',
+      code: ['int *p = malloc(4 * sizeof(int));', 'if (p == NULL) return 1;', 'p[0] = 10; p[3] = 40;', 'printf("%d\\n", p[0]);', 'free(p);', 'p = NULL;'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 0, changed: ['p', 'H1'], text: 'malloc 在堆上申请 4×4=16 字节（块 H1，示意地址 0x2000），返回首地址存进栈上的指针 p。堆块内容是未初始化的垃圾值（???）。注意：p 自己在栈上，它指向的数据在堆上。',
+          apply: m => { m.heap.push(block('H1', 0x2000, 4, [null, null, null, null])); m.stack.push(ptr('p', 'p', 0x1000, 0x2000, 'H1')); } },
+        { line: 1, changed: ['p'], text: 'malloc 可能因内存不足失败、返回 NULL。用之前必须检查，否则对 NULL 解引用会崩溃。这里 p 非空，继续。', apply: () => {} },
+        { line: 2, changed: ['H1'], text: 'p[0]=10、p[3]=40：通过指针写堆内存，用法和数组完全一样（p[i] 就是 *(p+i)）。',
+          apply: m => { const b = B(m, 'H1'); b.values[0] = 10; b.values[3] = 40; } },
+        { line: 3, changed: ['H1'], text: '读出 p[0] = 10。', apply: m => { m.output.push('10'); } },
+        { line: 4, changed: ['H1', 'p'], text: 'free(p) 把 H1 还给堆管理器，块标记为"已释放"。但 p 里存的地址 0x2000 没变——此刻 p 是悬空指针（dangling pointer），指向的地盘已不属于你。',
+          apply: m => { B(m, 'H1').status = 'freed'; } },
+        { line: 5, changed: ['p'], text: 'p = NULL：良好习惯。free 后立刻置空，之后万一误写 *p 会对 NULL 解引用、立刻崩溃，而不是静默写坏别人的内存。free(NULL) 本身是标准保证的安全空操作。',
+          apply: m => { const p = P(m, 'p'); p.value = null; p.target = null; p.isNull = true; } },
+      ],
+    },
+    {
+      title: '② calloc vs malloc',
+      intro: '两者都申请堆内存，区别在于要不要清零。',
+      code: ['int *a = malloc(3 * sizeof(int));', 'int *b = calloc(3, sizeof(int));', 'printf("%d %d\\n", a[0], b[0]);', 'free(a); free(b);'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 0, changed: ['a', 'H1'], text: 'malloc 申请 12 字节（H1），内容是垃圾值（???）——malloc 只负责给地盘，不负责打扫。',
+          apply: m => { m.heap.push(block('H1', 0x2000, 3, [null, null, null])); m.stack.push(ptr('a', 'a', 0x1000, 0x2000, 'H1')); } },
+        { line: 1, changed: ['b', 'H2'], text: 'calloc(3, sizeof(int)) 同样申请 12 字节（H2），但会把每一位都清零——三个元素保证是 0。参数是"个数 × 单个大小"，还会检查乘法溢出。',
+          apply: m => { m.heap.push(block('H2', 0x2010, 3, [0, 0, 0])); m.stack.push(ptr('b', 'b', 0x1004, 0x2010, 'H2')); } },
+        { line: 2, changed: ['H1', 'H2'], text: '读 a[0]：未初始化的 malloc 内存，值随机、读它本身是未定义行为；读 b[0]：calloc 保证是 0。需要"干净"内存时用 calloc（或 malloc 后 memset 清零）。',
+          apply: m => { m.output.push('(垃圾值) 0'); } },
+        { line: 3, changed: ['H1', 'H2', 'a', 'b'], text: '两块都 free。注意 a、b 释放后仍是悬空指针，真实代码应再写 a = NULL; b = NULL;。',
+          apply: m => { B(m, 'H1').status = 'freed'; B(m, 'H2').status = 'freed'; } },
+      ],
+    },
+    {
+      title: '③ realloc 扩容',
+      intro: 'realloc 可能原地扩展，也可能"搬家"。关键是永远用临时指针接返回值。',
+      code: ['int *p = malloc(2 * sizeof(int));', 'p[0] = 1; p[1] = 2;', 'int *q = realloc(p, 4 * sizeof(int));', 'if (q == NULL) { free(p); return 1; }', 'p = q;', 'p[3] = 4;', 'free(p);'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 0, changed: ['p', 'H1'], text: '先 malloc 8 字节（H1，2 个 int）。',
+          apply: m => { m.heap.push(block('H1', 0x2000, 2, [null, null])); m.stack.push(ptr('p', 'p', 0x1000, 0x2000, 'H1')); } },
+        { line: 1, changed: ['H1'], text: '写入 1、2。', apply: m => { const b = B(m, 'H1'); b.values[0] = 1; b.values[1] = 2; } },
+        { line: 2, changed: ['q', 'H1', 'H2'], text: 'realloc 想扩到 16 字节。这里演示"搬家"：H1 旁边没有连续空位，于是另开新块 H2（0x2010），把旧数据 1、2 复制过去，新增的 2 个 int 是垃圾值，再释放旧块 H1。返回值是新地址，用 q 接收。此刻 p 仍指向已释放的 H1——悬空！',
+          apply: m => { B(m, 'H1').status = 'freed'; m.heap.push(block('H2', 0x2010, 4, [1, 2, null, null])); m.stack.push(ptr('q', 'q', 0x1004, 0x2010, 'H2')); } },
+        { line: 3, changed: ['q'], text: '检查 q 是否为 NULL。关键：不能写 p = realloc(p, ...)——万一 realloc 失败返回 NULL，p 被覆盖成 NULL，原来 H1 的地址就丢了，造成泄漏。所以先用临时指针 q 接，确认成功再赋值；失败时还能 free(p) 兜底。', apply: () => {} },
+        { line: 4, changed: ['p'], text: '确认 q 非空，p = q：p 更新为新地址 0x2010，重新指向有效的 H2。',
+          apply: m => { const p = P(m, 'p'); p.value = 0x2010; p.target = 'H2'; } },
+        { line: 5, changed: ['H2'], text: 'p[3] = 4：现在可以安全使用扩容后的 4 个元素。',
+          apply: m => { B(m, 'H2').values[3] = 4; } },
+        { line: 6, changed: ['H2', 'p'], text: 'free(p) 释放最终的有效块 H2。（演示结束，实际代码记得再写 p = NULL。）',
+          apply: m => { B(m, 'H2').status = 'freed'; } },
+      ],
+    },
+    {
+      title: '④ 内存泄漏（危险示范）',
+      intro: 'malloc 了却不 free，指针又先一步消失——堆块就再也找不回来了。',
+      code: ['void leak(void) {', '    int *p = malloc(100 * sizeof(int));', '    p[0] = 42;', '    return;   /* 没有 free！ */', '}'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 1, changed: ['p', 'H1'], text: '在函数里 malloc 400 字节（H1，100 个 int，图上只画前 3 个示意）。p 在栈上，指向堆块 H1。',
+          apply: m => { const b = block('H1', 0x2000, 100, [null, null, null]); m.heap.push(b); m.stack.push(ptr('p', 'p', 0x1000, 0x2000, 'H1')); } },
+        { line: 2, changed: ['H1'], text: 'p[0] = 42，用了一下这块内存。',
+          apply: m => { B(m, 'H1').values[0] = 42; } },
+        { line: 3, changed: ['p', 'H1'], warn: '内存泄漏：H1（400 字节）仍被堆管理器记为"已分配"，但唯一的指针 p 随函数返回被销毁，再也没人能找到它、free 它。',
+          text: '函数返回：栈上的 p 被自动销毁，但堆上的 H1 不会自动回收！没有任何指针再指向 H1，它永远无法被 free——这就是内存泄漏。每调用一次 leak() 就漏 400 字节，程序跑久了内存耗尽。正确做法：return 前 free(p)。',
+          apply: m => { m.stack = m.stack.filter(c => c.id !== 'p'); B(m, 'H1').status = 'leaked'; } },
+      ],
+    },
+    {
+      title: '⑤ 悬空指针 / use-after-free',
+      intro: 'free 之后指针还指着旧地址，继续读写就是未定义行为。',
+      code: ['int *p = malloc(sizeof(int));', '*p = 7;', 'free(p);', '*p = 99;      /* 危险！ */', 'printf("%d\\n", *p);'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 0, changed: ['p', 'H1'], text: 'malloc 4 字节（H1），p 指向它。',
+          apply: m => { m.heap.push(block('H1', 0x2000, 1, [null])); m.stack.push(ptr('p', 'p', 0x1000, 0x2000, 'H1')); } },
+        { line: 1, changed: ['H1'], text: '*p = 7，正常写入。', apply: m => { B(m, 'H1').values[0] = 7; } },
+        { line: 2, changed: ['H1', 'p'], text: 'free(p)：H1 已释放。p 没置 NULL，仍指向 0x2000——悬空指针。',
+          apply: m => { B(m, 'H1').status = 'freed'; } },
+        { line: 3, changed: ['H1'], warn: '未定义行为（use-after-free）：写入已释放的内存。这块地可能已被重新分配给别的 malloc，你在篡改别人的数据；也可能触发堆损坏、延迟崩溃。',
+          text: '*p = 99：顺着悬空指针写进已释放的 H1。值"看起来"写进去了，但这块内存已不属于你——这是未定义行为，错误往往在很久以后才暴露，极难排查。',
+          apply: m => { B(m, 'H1').values[0] = 99; } },
+        { line: 4, changed: ['H1'], warn: '未定义行为：读取已释放的内存，结果不可预测。',
+          text: '读 *p：同样是对已释放内存的访问，结果不可预测。正确做法：free 后 p = NULL，需要新内存就重新 malloc。',
+          apply: m => { m.output.push('(不可预测)'); } },
+      ],
+    },
+    {
+      title: '⑥ 重复释放 double free',
+      intro: '同一块内存 free 两次，会破坏堆管理器的内部结构。',
+      code: ['int *p = malloc(sizeof(int));', 'free(p);', 'free(p);      /* 危险！ */'],
+      init: () => ({ stack: [], heap: [], output: [] }),
+      steps: [
+        { line: 0, changed: ['p', 'H1'], text: 'malloc 4 字节（H1），p 指向它。',
+          apply: m => { m.heap.push(block('H1', 0x2000, 1, [null])); m.stack.push(ptr('p', 'p', 0x1000, 0x2000, 'H1')); } },
+        { line: 1, changed: ['H1', 'p'], text: '第一次 free(p)：H1 正常释放，归还给堆管理器。p 仍是悬空指针。',
+          apply: m => { B(m, 'H1').status = 'freed'; } },
+        { line: 2, changed: ['H1'], warn: '未定义行为（double free）：同一块内存释放两次，堆管理器的空闲链表被破坏。glibc 通常立刻 abort 并报 "double free or corruption"，这类漏洞也可能被攻击者利用。',
+          text: '第二次 free(p)：H1 已经在空闲链表里了，再释放一次会把堆管理器的内部结构搞坏。防范：free 后立刻 p = NULL——free(NULL) 是标准保证的安全空操作，第二次 free 就什么都不会发生。', apply: () => {} },
+      ],
+    },
+  ];
+
+  function mount(host) {
+    host.innerHTML = `
+      <div class="panel">
+        <div class="presets" id="mmScenarios"></div>
+        <div class="rule" id="mmIntro"></div>
+      </div>
+      <div class="panel">
+        <div class="ptr-layout">
+          <div class="ptr-code" id="mmCode"></div>
+          <div class="ptr-side">
+            <div class="ptr-explain" id="mmExplain"></div>
+            <div id="mmWarn"></div>
+            <div class="ptr-controls">
+              <button type="button" id="mmPrev">上一步</button>
+              <button type="button" id="mmNext" class="next">下一步</button>
+              <button type="button" id="mmReset">重置</button>
+              <span id="mmStep" style="font-size:13px;color:var(--dim)"></span>
+            </div>
+            <div class="ptr-console" id="mmConsole"></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>内存布局（地址为示意值，真实地址每次运行都不同）</h2>
+        <div class="memzones" id="mmZones">
+          <svg id="mmSvg"></svg>
+          <div class="zonelabel">栈 stack —— 指针变量住这里，函数返回自动销毁</div>
+          <div class="zonerow" id="mmStack"></div>
+          <div class="zonegap"></div>
+          <div class="zonelabel">堆 heap —— malloc / calloc / realloc 的块住这里，必须手动 free</div>
+          <div class="zonerow" id="mmHeap"></div>
+        </div>
+        <div class="heapstats" id="mmStats"></div>
+        <div class="legend"><span class="sw" style="background:var(--purple)"></span>紫框 = 指针变量<span class="sw" style="background:#f0fdf4;border:1px solid var(--green)"></span>绿块 = 使用中<span class="sw" style="background:#f8fafc;border:1px dashed #94a3b8"></span>灰虚线 = 已释放<span class="sw" style="background:#fef2f2;border:1px dashed var(--red)"></span>红虚线 = 泄漏<span class="sw" style="background:#fff;border:1px solid #f59e0b"></span>橙框 = 本步变化</div>
+      </div>
+      <div class="panel">
+        <h2>要点</h2>
+        <div class="langnote">① 谁 malloc 谁 free，一一对应；② malloc/calloc/realloc 返回值先判 NULL 再用；③ realloc 用临时指针接，成功后再赋回原指针；④ free 后立刻置 NULL，杜绝悬空指针和 double free（free(NULL) 安全）；⑤ 栈变量函数返回自动销毁，堆块必须手动释放，否则泄漏。工具推荐：Valgrind、AddressSanitizer（-fsanitize=address）能自动揪出泄漏和 use-after-free。</div>
+        <h2 style="margin-top:12px">和其他语言对比</h2>
+        <div class="langnote">Python / Java 有垃圾回收（GC）：对象没人引用时自动回收，程序员不写 free，也因此很少遇到泄漏和悬空指针（但循环引用仍可能让 GC 回收不掉）。C 把内存管理权完全交给你——灵活、零运行时开销，代价是必须自己保证每块内存恰好释放一次。Rust 则用所有权机制在编译期杜绝这类错误。</div>
+      </div>`;
+
+    const $ = id => host.querySelector('#' + id);
+    let si = 0, step = 0;
+
+    SCENARIOS.forEach((sc, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = sc.title;
+      btn.addEventListener('click', () => { si = i; step = 0; render(); });
+      $('mmScenarios').appendChild(btn);
+    });
+
+    function currentState() {
+      const sc = SCENARIOS[si];
+      const m = sc.init();
+      for (let k = 0; k < step; k++) sc.steps[k].apply(m);
+      return m;
+    }
+
+    function drawArrows() {
+      const svg = $('mmSvg'), zones = $('mmZones');
+      svg.innerHTML = '<defs><marker id="mmah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/></marker></defs>';
+      const gr = zones.getBoundingClientRect();
+      currentState().stack.filter(c => c.target).forEach(c => {
+        const from = zones.querySelector('[data-cell="' + c.id + '"]');
+        const to = zones.querySelector('[data-cell="' + c.target + '"]');
+        if (!from || !to) return;
+        const fr = from.getBoundingClientRect(), tr = to.getBoundingClientRect();
+        const x1 = fr.left + fr.width / 2 - gr.left, y1 = fr.bottom - gr.top;
+        const x2 = tr.left + tr.width / 2 - gr.left, y2 = tr.top - gr.top;
+        const lift = Math.max(20, (y2 - y1) / 2);
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${x1} ${y1 + lift}, ${x2} ${y2 - lift}, ${x2} ${y2 - 2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#7c3aed');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('marker-end', 'url(#mmah)');
+        svg.appendChild(path);
+      });
+    }
+
+    function render() {
+      const sc = SCENARIOS[si];
+      const m = currentState();
+      const last = step > 0 ? sc.steps[step - 1] : null;
+      const changed = last ? last.changed : [];
+
+      $('mmIntro').textContent = sc.intro;
+      $('mmScenarios').querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === si));
+
+      const codeEl = $('mmCode');
+      codeEl.innerHTML = '';
+      sc.code.forEach((line, i) => {
+        const div = document.createElement('div');
+        div.className = 'codeline' + (last && last.line === i ? ' cur' : '');
+        const ln = document.createElement('span');
+        ln.className = 'ln'; ln.textContent = i + 1;
+        div.appendChild(ln);
+        div.appendChild(document.createTextNode(line));
+        codeEl.appendChild(div);
+      });
+
+      $('mmExplain').textContent = last ? last.text : sc.intro;
+      $('mmWarn').innerHTML = last && last.warn ? `<div class="warn ub">⚠ ${last.warn}</div>` : '';
+      $('mmPrev').disabled = step === 0;
+      $('mmNext').disabled = step === sc.steps.length;
+      $('mmStep').textContent = `第 ${step} / ${sc.steps.length} 步`;
+      $('mmConsole').textContent = m.output.length ? '输出: ' + m.output.join('\n') : '（还没有输出）';
+
+      const stackEl = $('mmStack');
+      stackEl.innerHTML = '';
+      m.stack.forEach(c => {
+        const el = document.createElement('div');
+        el.className = 'cell ptr' + (c.garbage ? ' garbage' : '') + (c.isNull ? ' nullval' : '') + (changed.includes(c.id) ? ' changed' : '');
+        el.dataset.cell = c.id;
+        const name = document.createElement('div');
+        name.className = 'cname'; name.textContent = c.label + ' (int *)';
+        const val = document.createElement('div');
+        val.className = 'cval';
+        val.textContent = c.isNull ? 'NULL' : c.value === null ? '???' : ADDR(c.value);
+        const addr = document.createElement('div');
+        addr.className = 'caddr'; addr.textContent = ADDR(c.addr);
+        el.append(name, val, addr);
+        stackEl.appendChild(el);
+      });
+      if (!m.stack.length) stackEl.innerHTML = '<span style="font-size:13px;color:#94a3b8">（栈上已无指针变量）</span>';
+
+      const heapEl = $('mmHeap');
+      heapEl.innerHTML = '';
+      m.heap.forEach(b => {
+        const wrap = document.createElement('div');
+        wrap.className = 'heapblock' + (b.status === 'freed' ? ' freed' : '') + (b.status === 'leaked' ? ' leaked' : '') + (changed.includes(b.id) ? ' changed' : '');
+        wrap.dataset.cell = b.id;
+        const head = document.createElement('div');
+        head.className = 'blockhead';
+        const statusText = b.status === 'live' ? '使用中' : b.status === 'freed' ? '已释放' : '泄漏！';
+        head.textContent = `${b.id} · ${ADDR(b.addr)} · ${b.count}×int = ${b.count * b.elemSize}B `;
+        const badge = document.createElement('span');
+        badge.className = 'bstatus'; badge.textContent = statusText;
+        head.appendChild(badge);
+        const elems = document.createElement('div');
+        elems.className = 'blockelems';
+        b.values.forEach((v, i) => {
+          const cell = document.createElement('div');
+          cell.className = 'cell elem';
+          const idx = document.createElement('div');
+          idx.className = 'cname'; idx.textContent = '[' + i + ']';
+          const val = document.createElement('div');
+          val.className = 'cval'; val.textContent = v === null ? '???' : v;
+          const addr = document.createElement('div');
+          addr.className = 'caddr'; addr.textContent = ADDR(b.addr + i * b.elemSize);
+          cell.append(idx, val, addr);
+          elems.appendChild(cell);
+        });
+        if (b.count > b.values.length) {
+          const more = document.createElement('div');
+          more.className = 'elemore'; more.textContent = '… 共 ' + b.count + ' 个';
+          elems.appendChild(more);
+        }
+        wrap.append(head, elems);
+        heapEl.appendChild(wrap);
+      });
+      if (!m.heap.length) heapEl.innerHTML = '<span style="font-size:13px;color:#94a3b8">（堆上还没有分配任何块）</span>';
+
+      const live = m.heap.filter(b => b.status === 'live').length;
+      const freed = m.heap.filter(b => b.status === 'freed').length;
+      const leaked = m.heap.filter(b => b.status === 'leaked').length;
+      $('mmStats').textContent = `堆块统计：使用中 ${live} · 已释放 ${freed} · 泄漏 ${leaked}`;
+
+      requestAnimationFrame(drawArrows);
+    }
+
+    $('mmPrev').addEventListener('click', () => { if (step > 0) { step--; render(); } });
+    $('mmNext').addEventListener('click', () => { if (step < SCENARIOS[si].steps.length) { step++; render(); } });
+    $('mmReset').addEventListener('click', () => { step = 0; render(); });
+    new ResizeObserver(drawArrows).observe($('mmZones'));
+    render();
+  }
+
+  return { id: 'memory', name: '动态内存管理', mount };
+}
+
+// 新工具在这里注册：{ id, name, mount(host) }，导航会自动出现对应入口
+const TOOLS = [makeBitwiseTool(), makePointerTool(), makeComplementTool(), makePrecedenceTool(), makeRecursionTool(), makeSortTool(), makeStructTool(), makeMemoryTool()];
+
+const nav = document.getElementById('toolNav');
+const hostEl = document.getElementById('toolHost');
+TOOLS.forEach(tool => {
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.textContent = tool.name; btn.dataset.tool = tool.id;
+  btn.addEventListener('click', () => {
+    nav.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+    hostEl.innerHTML = '';
+    tool.mount(hostEl);
+  });
+  nav.appendChild(btn);
+});
+const more = document.createElement('button');
+more.type = 'button'; more.disabled = true; more.textContent = '更多工具敬请期待';
+nav.appendChild(more);
+nav.querySelector('button').click();
+</script>
+</body>
+</html>

@@ -1,6 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import MainLayout from "../layout/MainLayout";
-import AuthLayout from "../layout/AuthLayout";
 
 import FamilyHome from "../pages/Home/FamilyHome";
 import Guestbook from "../pages/Guestbook";
@@ -8,85 +6,23 @@ import GuestbookAdmin from "../pages/GuestbookAdmin";
 import Education from "../pages/Education";
 import Tech from "../pages/Tech";
 import Business from "../pages/Business";
-import Cover from "../pages/Cover";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
-import Customize from "../pages/Customize";
-import BridgePage from "../pages/BridgePage";
-import OrderDetail from "../pages/OrderDetail";
-import Profile from "../pages/Profile";
-
-import Collection from "../pages/collection";
-import Tableware from "../pages/collection/Tableware";
-import Coffeeware from "../pages/collection/Coffeeware";
-import TeaWare from "../pages/collection/Teaware";
-import HomeDecor from "../pages/collection/Homedecor";
-
-import { AuthProvider } from "../context/AuthContext";
-import ForgotPassword from "../pages/auth/ForgotPassword";
-import ResetPassword from "../pages/auth/ResetPassword";
-import VerifyEmail from "../pages/VerifyEmail";
 
 export default function AppRouter() {
   return (
-    <AuthProvider>
     <BrowserRouter>
       <Routes>
-
-        {/* ================= ichessgeek 新首页（独立布局） ================= */}
         <Route path="/" element={<FamilyHome />} />
-        <Route path="/guestbook" element={<Guestbook />} />
-        {/* 留言板管理页：不进导航，仅直接访问 */}
-        <Route path="/guestbook-admin" element={<GuestbookAdmin />} />
         <Route path="/education" element={<Education />} />
         <Route path="/tech" element={<Tech />} />
         <Route path="/business" element={<Business />} />
+        <Route path="/guestbook" element={<Guestbook />} />
+        {/* 留言板管理页：不进导航，仅直接访问 */}
+        <Route path="/guestbook-admin" element={<GuestbookAdmin />} />
 
-        {/* ================= Main Layout ================= */}
-        <Route element={<MainLayout />}>
-
-          <Route path="/home" element={<Navigate to="/" replace />} />
-          <Route path="/story" element={<Cover />} />
-          <Route path="/collection" element={<Collection />} />
-
-          {/* 分类页面 */}
-          <Route path="/collection/tableware" element={<Tableware />} />
-          <Route path="/collection/coffeeware" element={<Coffeeware />} />
-          <Route path="/collection/teaware" element={<TeaWare />} />
-          <Route path="/collection/homedecor" element={<HomeDecor />} />
-
-          {/* 桥梁页面 */}
-          <Route
-            path="/bridge/:productId/:craftTypeId"
-            element={<BridgePage />}
-          />
-
-          {/* 时间轴页面 */}
-          <Route
-            path="/customize"
-            element={<Customize />}
-          />
-
-          {/* 单个订单详情页面 */}
-          <Route
-            path="/order/:id"
-            element={<OrderDetail />}
-          />
-          <Route path="/profile" element={<Profile />} />
-
-        </Route>
-
-        {/* ================= Auth Layout ================= */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Route>
-
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        </Routes>
+        {/* The Hearth Studio pages moved to hs.ichessgeek.com; old inbound links
+            and bookmarks land on the real home instead of a blank shell. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
-    </AuthProvider>
   );
 }
