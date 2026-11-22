@@ -3,34 +3,50 @@
 
   <url>
     <loc>https://www.ichessgeek.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
   </url>
 
   <url>
-  <loc>https://www.ichessgeek.com/story</loc>
+    <loc>https://www.ichessgeek.com/education</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.ichessgeek.com/tech</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.ichessgeek.com/business</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://www.ichessgeek.com/guestbook</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://www.ichessgeek.com/story</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 
   <url>
     <loc>https://www.ichessgeek.com/collection</loc>
-  </url>
-
-  <url>
-    <loc>https://www.ichessgeek.com/collection/tableware</loc>
-  </url>
-
-  <url>
-    <loc>https://www.ichessgeek.com/collection/coffeeware</loc>
-  </url>
-
-  <url>
-    <loc>https://www.ichessgeek.com/collection/teaware</loc>
-  </url>
-
-  <url>
-    <loc>https://www.ichessgeek.com/collection/homedecor</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 
   <url>
     <loc>https://www.ichessgeek.com/customize</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 
 </urlset>

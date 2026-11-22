@@ -1,7 +1,8 @@
 ﻿<!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <meta name="google" content="notranslate" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/pwa-192.png" />
@@ -23,39 +24,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- SEO Title -->
-    <title>Hearth Studio | Custom Hand-Carved Ceramics</title>
+    <title>iChessGeek | 普通家庭的技术之路</title>
 
     <!-- SEO Description -->
     <meta
       name="description"
-      content="Hearth Studio creates custom hand-carved ceramics through a collaborative studio process, from concept to kiln-fired final piece."
+      content="iChessGeek 记录一个普通家庭在 AI 时代的技术探索之路。从国际象棋到编程，从陶瓷定制到 AI 工具开发，分享自学经验与实战项目。"
     />
     <link rel="canonical" href="https://www.ichessgeek.com/" />
 
     <!-- Keywords -->
     <meta
       name="keywords"
-      content="Chinese artisans, handmade crafts, handmade marketplace, artisan crafts, independent craft store"
+      content="iChessGeek, 普通家庭, 技术之路, AI教育, 自学编程, 独立开发, 陶瓷定制, 终身学习"
     />
 
     <!-- Author -->
-    <meta name="author" content="Hearth Studio" />
+    <meta name="author" content="iChessGeek" />
 
     <!-- Open Graph (LinkedIn / Facebook / X preview) -->
-    <meta property="og:title" content="Hearth Studio | Custom Hand-Carved Ceramics" />
+    <meta property="og:title" content="iChessGeek | 普通家庭的技术之路" />
     <meta
       property="og:description"
-      content="Custom hand-carved ceramics made through a collaborative studio process."
+      content="记录一个普通家庭在 AI 时代的技术探索之路，分享自学经验与实战项目。"
     />
     <meta property="og:image" content="/pwa-512.png" />
     <meta property="og:type" content="website" />
 
     <!-- Twitter Preview -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Hearth Studio" />
+    <meta name="twitter:title" content="iChessGeek | 普通家庭的技术之路" />
     <meta
       name="twitter:description"
-      content="Helping Chinese artisans sell handmade crafts worldwide."
+      content="记录一个普通家庭在 AI 时代的技术探索之路，分享自学经验与实战项目。"
     />
     <meta name="twitter:image" content="/pwa-512.png" />
 
@@ -63,10 +64,10 @@
       {
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": "Hearth Studio",
-        "url": "https://hearthstudio.com",
-        "logo": "https://hearthstudio.com/pwa-512.png",
-        "description": "Hearth Studio helps Chinese artisans build independent online stores and sell handmade crafts worldwide.",
+        "name": "iChessGeek",
+        "url": "https://www.ichessgeek.com",
+        "logo": "https://www.ichessgeek.com/pwa-512.png",
+        "description": "iChessGeek 记录一个普通家庭在 AI 时代的技术探索之路，分享自学经验与实战项目。",
         "sameAs": [
           "https://www.youtube.com/",
           "https://www.linkedin.com/",
@@ -80,19 +81,38 @@
   <body>
     <noscript>
       <main>
-        <h1>Hearth Studio - Custom Ceramics</h1>
+        <h1>iChessGeek - 普通家庭的技术之路</h1>
         <p>
-          Hearth Studio creates hand-engraved ceramic pieces with a collaborative
-          custom-order process.
+          记录一个普通家庭在 AI 时代的技术探索之路。
         </p>
         <p>
-          <a href="/collection">View Collection</a> |
-          <a href="/customize">Start Your Custom Piece</a> |
-          <a href="/story">Read Studio Story</a>
+          <a href="/education">教育</a> |
+          <a href="/tech">技术</a> |
+          <a href="/business">小生意</a> |
+          <a href="/guestbook">留言板</a>
         </p>
       </main>
     </noscript>
     <div id="root"></div>
+
+    <!-- Force Service Worker Update -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+          }
+          // Clear all caches
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            for (const name of cacheNames) {
+              await caches.delete(name);
+            }
+          }
+        });
+      }
+    </script>
 
     <!-- React Entry -->
     <script type="module" src="/src/main.jsx"></script>

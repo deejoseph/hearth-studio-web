@@ -2,7 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import AuthLayout from "../layout/AuthLayout";
 
-import Home from "../pages/Home";
+import FamilyHome from "../pages/Home/FamilyHome";
+import Guestbook from "../pages/Guestbook";
+import GuestbookAdmin from "../pages/GuestbookAdmin";
+import Education from "../pages/Education";
+import Tech from "../pages/Tech";
+import Business from "../pages/Business";
 import Cover from "../pages/Cover";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
@@ -28,10 +33,18 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
 
+        {/* ================= ichessgeek 新首页（独立布局） ================= */}
+        <Route path="/" element={<FamilyHome />} />
+        <Route path="/guestbook" element={<Guestbook />} />
+        {/* 留言板管理页：不进导航，仅直接访问 */}
+        <Route path="/guestbook-admin" element={<GuestbookAdmin />} />
+        <Route path="/education" element={<Education />} />
+        <Route path="/tech" element={<Tech />} />
+        <Route path="/business" element={<Business />} />
+
         {/* ================= Main Layout ================= */}
         <Route element={<MainLayout />}>
 
-          <Route path="/" element={<Home />} />
           <Route path="/home" element={<Navigate to="/" replace />} />
           <Route path="/story" element={<Cover />} />
           <Route path="/collection" element={<Collection />} />

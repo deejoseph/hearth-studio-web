@@ -11,6 +11,11 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       workbox: {
   globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
+  maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+  // Without this every navigation the precache doesn't recognise is answered
+  // from the cached root index.html, which swallows /chess/ (a separate static
+  // build that lives outside this dist).
+  navigateFallbackDenylist: [/^\/chess(\/|$)/],
   runtimeCaching: [
     {
       urlPattern: ({ request }) => request.destination === 'image',
@@ -25,9 +30,9 @@ export default defineConfig({
   ],
 },
       manifest: {
-        name: "Hearth Studio",
-        short_name: "Hearth",
-        description: "Handcrafted Ceramic Studio",
+        name: "iChessGeek",
+        short_name: "iChessGeek",
+        description: "普通家庭的技术之路",
         theme_color: "#000000",
         background_color: "#ffffff",
         display: "standalone",
@@ -54,8 +59,10 @@ export default defineConfig({
     },
   },
 
-  // 👇 保留你的代理
   server: {
+    host: '0.0.0.0',
+    port: 5173,
+    allowedHosts: ['hs.ichessgeek.com'],
     proxy: {
       "/api": {
         target: "https://ichessgeek.com",

@@ -1,0 +1,408 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap");
+
+:root {
+  --bg: #0a0b0f;
+  --bg-card: #12141c;
+  --bg-card-hover: #181b26;
+  --accent: #4fd1c5;
+  --accent-warm: #f6ad55;
+  --accent-purple: #9f7aea;
+  --text-primary: #e8ecf1;
+  --text-secondary: #8b95a5;
+  --text-dim: #5a6577;
+  --border: rgba(255, 255, 255, 0.06);
+}
+
+.biz-page {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Inter", "Noto Serif SC", sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Navigation (shared) ── */
+.fh-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(10, 11, 15, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  z-index: 1000;
+  padding: 16px 0;
+}
+
+.fh-nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  padding: 0 8vw;
+}
+
+.fh-nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+  padding: 8px 0;
+}
+
+.fh-nav-link:hover,
+.fh-nav-link.active {
+  color: var(--accent-warm);
+}
+
+.fh-nav-back {
+  margin-right: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.fh-nav-back:hover {
+  color: var(--accent-warm);
+}
+
+/* ── Main ── */
+.biz-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 120px 8vw 80px;
+}
+
+/* ── Hero ── */
+.biz-hero {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.biz-hero-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent-warm);
+  background: rgba(246, 173, 85, 0.1);
+  padding: 6px 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.biz-hero h1 {
+  font-family: "Fraunces", "Noto Serif SC", serif;
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, var(--text-primary), var(--accent-warm));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.biz-hero-subtitle {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* ── Philosophy ── */
+.biz-philosophy {
+  margin-bottom: 60px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.biz-philosophy p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.biz-philosophy p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Business Areas ── */
+.biz-areas {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-bottom: 60px;
+}
+
+.biz-area-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px;
+  transition: all 0.3s ease;
+}
+
+.biz-area-card:hover {
+  border-color: rgba(246, 173, 85, 0.2);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+}
+
+.biz-area-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.biz-area-icon {
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.biz-area-header h2 {
+  font-family: "Fraunces", "Noto Serif SC", serif;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+}
+
+.biz-area-tagline {
+  font-size: 13px;
+  color: var(--accent-warm);
+  font-weight: 500;
+}
+
+.biz-area-desc {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.biz-area-examples h4 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 16px;
+}
+
+.biz-examples-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.biz-example-item {
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+}
+
+.biz-example-item:hover {
+  border-color: rgba(246, 173, 85, 0.2);
+}
+
+.biz-example-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.biz-example-desc {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ── CTA ── */
+.biz-cta {
+  text-align: center;
+  padding: 48px 32px;
+  background: linear-gradient(135deg, rgba(246, 173, 85, 0.05), rgba(159, 122, 234, 0.05));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 60px;
+}
+
+.biz-cta h3 {
+  font-family: "Fraunces", "Noto Serif SC", serif;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.biz-cta p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto 28px;
+}
+
+.biz-cta-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.biz-cta-btn {
+  display: inline-block;
+  padding: 12px 28px;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.biz-cta-primary {
+  background: var(--accent-warm);
+  color: var(--bg);
+}
+
+.biz-cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(246, 173, 85, 0.3);
+}
+
+.biz-cta-secondary {
+  background: transparent;
+  color: var(--accent-warm);
+  border: 1px solid rgba(246, 173, 85, 0.3);
+}
+
+.biz-cta-secondary:hover {
+  background: rgba(246, 173, 85, 0.1);
+  border-color: var(--accent-warm);
+  transform: translateY(-2px);
+}
+
+/* ── Footer ── */
+.biz-footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 8vw;
+  text-align: center;
+}
+
+.biz-footer-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.biz-footer-copy {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.biz-footer-contact {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+
+.biz-footer-email {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.biz-footer-email:hover {
+  color: var(--accent-warm);
+}
+
+.biz-footer-email-sep {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .biz-main {
+    padding: 100px 6vw 60px;
+  }
+
+  .biz-hero h1 {
+    font-size: 36px;
+  }
+
+  .biz-hero-subtitle {
+    font-size: 15px;
+  }
+
+  .biz-area-card {
+    padding: 24px;
+  }
+
+  .biz-area-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .biz-area-header h2 {
+    font-size: 20px;
+  }
+
+  .biz-examples-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .biz-cta {
+    padding: 32px 20px;
+  }
+
+  .biz-cta h3 {
+    font-size: 20px;
+  }
+
+  .biz-cta-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .fh-nav-inner {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .biz-hero h1 {
+    font-size: 30px;
+  }
+
+  .biz-philosophy {
+    padding: 20px;
+  }
+
+  .biz-area-card {
+    padding: 20px;
+  }
+
+  .fh-nav-inner {
+    gap: 14px;
+    padding: 0 5vw;
+  }
+
+  .fh-nav-link {
+    font-size: 13px;
+  }
+}
