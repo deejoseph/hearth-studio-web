@@ -129,7 +129,7 @@ export default function FamilyHome() {
 
       {/* ── Hero ── */}
       <section className="fh-hero" ref={heroRef}>
-        <img src="/hero-family.png" alt="" className="fh-hero-image" />
+        <img src="/hero-family-560.webp" alt="" className="fh-hero-image" width="560" height="320" />
         <div className="fh-hero-badge">ichessgeek.com</div>
         <div className="fh-typewriter-container">
           <div className="fh-typewriter-text">
@@ -148,7 +148,7 @@ export default function FamilyHome() {
       {/* ─ Eddie ── */}
       <section className="fh-member fh-member--eddie">
         <div className="fh-member-image">
-          <img src="/eddie.png" alt="艾迪" />
+          <img src="/eddie-840.webp" alt="艾迪" width="840" height="840" loading="lazy" decoding="async" />
         </div>
         <div className="fh-member-content">
           <span className="fh-section-label">DAD</span>
@@ -201,7 +201,7 @@ export default function FamilyHome() {
       {/* ── Scarlett ── */}
       <section className="fh-member fh-member--scarlett reverse">
         <div className="fh-member-image">
-          <img src="/scarlett.png" alt="斯嘉丽" />
+          <img src="/scarlett-840.webp" alt="斯嘉丽" width="840" height="840" loading="lazy" decoding="async" />
         </div>
         <div className="fh-member-content">
           <span className="fh-section-label">MOM</span>
@@ -249,7 +249,7 @@ export default function FamilyHome() {
       {/* ── HearthStudio (Joint Project) ── */}
       <section className="fh-member fh-member--joint">
         <div className="fh-member-image">
-          <img src="/hearthstudio.png" alt="HearthStudio" />
+          <img src="/hearthstudio-840.webp" alt="HearthStudio" width="840" height="840" loading="lazy" decoding="async" />
         </div>
         <div className="fh-member-content">
           <span className="fh-section-label">JOINT PROJECT</span>
@@ -271,7 +271,7 @@ export default function FamilyHome() {
       {/* ── Qiao ── */}
       <section className="fh-member fh-member--qiao reverse">
         <div className="fh-member-image">
-          <img src="/qiao.png" alt="乔" />
+          <img src="/qiao-840.webp" alt="乔" width="840" height="840" loading="lazy" decoding="async" />
         </div>
         <div className="fh-member-content">
           <span className="fh-section-label">KID</span>

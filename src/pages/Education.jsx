@@ -167,43 +167,43 @@ function TabContent({ tab, setActiveTab }) {
               <div className="edu-timeline-line"></div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-baby.png" alt="婴儿期" className="edu-timeline-img" />
+                  <img src="/timeline-baby-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="婴儿期" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">满地爬的婴儿</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-preschooler.png" alt="学龄前" className="edu-timeline-img" />
+                  <img src="/timeline-preschooler-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="学龄前" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">玩电脑的娃娃</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-chess.png" alt="下棋的儿童" className="edu-timeline-img" />
+                  <img src="/timeline-chess-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="下棋的儿童" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">下棋的儿童</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-coding.png" alt="编程少年" className="edu-timeline-img" />
+                  <img src="/timeline-coding-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="编程少年" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">钻研编程的少年</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-product.png" alt="开发产品" className="edu-timeline-img" />
+                  <img src="/timeline-product-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="开发产品" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">开发产品的青少年</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-startup.png" alt="创业青年" className="edu-timeline-img" />
+                  <img src="/timeline-startup-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="创业青年" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">开始创业的准青年</span>
               </div>
               <div className="edu-timeline-item">
                 <div className="edu-timeline-img-wrap">
-                  <img src="/timeline-learner.png" alt="终身学习" className="edu-timeline-img" />
+                  <img src="/timeline-learner-240.webp" width="240" height="240" loading="lazy" decoding="async" alt="终身学习" className="edu-timeline-img" />
                 </div>
                 <span className="edu-timeline-label">终身学习者</span>
               </div>
@@ -427,7 +427,7 @@ function TabContent({ tab, setActiveTab }) {
               让 AI 真正理解你的学习内容。
             </p>
             <div className="edu-ai-tool-img">
-              <img src="/edurag-home.png" alt="EduRAG 界面截图" />
+              <img src="/edurag-home-900.webp" width="900" height="8620" loading="lazy" decoding="async" alt="EduRAG 界面截图" />
             </div>
             <div className="edu-ai-tool-links">
               <a href="https://github.com/deejoseph/EduRAG" target="_blank" rel="noopener noreferrer" className="edu-ai-tool-link">

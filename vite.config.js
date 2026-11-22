@@ -8,10 +8,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-192.png', 'pwa-512.png'],
       workbox: {
-  globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
-  maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+  // Shell only. Pictures the visitor never scrolls to must not be forced down
+  // on install — they come from the CacheFirst image rule below instead.
+  globPatterns: ['**/*.{js,css,html,ico}'],
+  // Left at the plugin default on purpose: a re-added multi-megabyte image now
+  // fails the build instead of silently inflating the precache.
+  maximumFileSizeToCacheInBytes: 2 * 1024 * 1024,
   // Without this every navigation the precache doesn't recognise is answered
   // from the cached root index.html, which swallows /chess/ (a separate static
   // build that lives outside this dist).
