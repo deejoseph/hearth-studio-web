@@ -1,0 +1,64 @@
+# BEGIN cPanel-generated php ini directives, do not edit
+<IfModule php8_module>
+   php_flag display_errors Off
+   php_value max_execution_time 60
+   php_value max_input_time 60
+   php_value max_input_vars 1000
+   php_value memory_limit 128M
+   php_value post_max_size 10M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php82"
+   php_value upload_max_filesize 10M
+   php_flag zlib.output_compression On
+</IfModule>
+<IfModule lsapi_module>
+   php_flag display_errors Off
+   php_value max_execution_time 60
+   php_value max_input_time 60
+   php_value max_input_vars 1000
+   php_value memory_limit 128M
+   php_value post_max_size 10M
+   php_value session.gc_maxlifetime 1440
+   php_value session.save_path "/var/cpanel/php/sessions/ea-php82"
+   php_value upload_max_filesize 10M
+   php_flag zlib.output_compression On
+</IfModule>
+# END cPanel-generated php ini directives
+
+RewriteEngine On
+
+# ✅ 1. /home → /（必须放最前面）
+RewriteRule ^home/?$ https://www.ichessgeek.com/ [R=301,L]
+
+# ✅ 2. HTTP → HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^(.*)$ https://www.ichessgeek.com/$1 [R=301,L]
+
+# ✅ 3. 防止 index.html 死循环 + 禁止缓存
+<FilesMatch "^index\.html$">
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>
+RewriteRule ^index\.html$ - [L]
+
+# ✅ 3b. SW 脚本必须不缓存，否则主站更新会被 Cloudflare 边缘按 7 天 TTL 卡住
+<FilesMatch "^(sw|registerSW)\.js$|^workbox-.*\.js$">
+  Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+</FilesMatch>
+
+# ✅ 4. 静态资源直接返回，不走 SPA 路由
+RewriteRule ^assets/ - [L]
+RewriteRule ^api/ - [L]
+RewriteRule ^registerSW\.js$ - [L]
+RewriteRule ^sw\.js$ - [L]
+RewriteRule ^workbox-.*\.js$ - [L]
+RewriteRule ^manifest\.webmanifest$ - [L]
+RewriteRule ^.*\.(js|css|jpg|jpeg|png|gif|svg|webp|ico|woff|woff2|ttf|eot)$ - [L]
+
+# ✅ 5. SPA 路由
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.html [L]
