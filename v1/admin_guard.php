@@ -5,11 +5,13 @@
  * 本文件禁止直接 URL 访问（同目录 .htaccess 已 FilesMatch 拒绝）。
  */
 
-// 非浏览器客户端（Android 后台）使用的接口密钥。
+// 接口密钥：青瓷（岁时礼序）项目的 Android 订单后台用它，那是唯一的非浏览器客户端。
 // 值不在这里：它住在服务器侧的 gb_secret_config.php，那个文件不入库、
 // 也被同目录 .htaccess 挡着不让直接访问。
 // 用法：请求体带 admin_token=<密钥>，或先调 admin_login.php 拿到 gbadmin 会话 Cookie。
 // 换密钥改那个文件即可；不要把值写进任何前端代码或 URL（会进日志）。
+// 这条通道没被正式启用，但 2026-11-23 Eddie 用手机实测仍能进后台，所以原样保留；
+// 真要停用它之前，先确认那个 App 不会再被打开——删掉这里和 gb_secret_config.php 即可。
 
 // 登录失败限流：15 分钟内同一 IP 满 5 次即拒绝
 const GB_FAIL_WINDOW = 900;
