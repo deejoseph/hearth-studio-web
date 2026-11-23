@@ -19,6 +19,14 @@ const CHESS_VERIFY_TTL = 172800;    // 验证链接 48 小时有效
 const CHESS_MIN_PASSWORD = 8;
 const CHESS_MAX_PASSWORD = 72;      // bcrypt 在这之后静默丢弃
 
+// 开房和进房各自限一个数。进别人房间的唯一正当途径是对方把 6 位码给你，
+// 所以"猜码"要么是根本不成立、要么就是有人在扫 —— 扫就得限，
+// 顺带也挡住一个人拿账号批量占房。
+const CHESS_ROOM_WINDOW = 3600;
+const CHESS_ROOM_CREATE_LIMIT = 8;  // 同一 IP 每小时真开出来的房间
+const CHESS_JOIN_WINDOW = 900;
+const CHESS_JOIN_LIMIT = 20;        // 同一 IP 15 分钟内"查无此房"的次数
+
 /**
  * 每个错误一个稳定 code，中文提示留在这里当兜底。
  * 棋盘（/chess）的界面是英文的，它按 code 出英文句子；加新错误时两边都要动，
@@ -44,6 +52,23 @@ const CHESS_ERRORS = [
     'long_password' => ['密码太长了', 400],
     'weak_password' => ['这个密码太常见了，换一个', 400],
     'verify_failed' => ['验证暂时不可用，请稍后再试', 500],
+
+    // 房间（P2）。这些 code 是棋盘的契约：界面按 code 出句子，中文只当兜底。
+    'verify_required' => ['请先点邮件里的链接验证邮箱，验证后才能和人下', 403],
+    'bad_room_code' => ['房间码格式不对', 400],
+    'no_such_room' => ['找不到这个房间，检查下房间码', 404],
+    'room_full' => ['这个房间已经两个人了', 409],
+    'room_not_active' => ['这局现在不能走子', 409],
+    'room_over' => ['这局已经结束了', 409],
+    'not_room_member' => ['你不是这个房间的棋手', 403],
+    'not_your_turn' => ['还没轮到你走', 409],
+    'illegal_move' => ['这一步不合法', 400],
+    'flagged' => ['时间已经走完，这步不算', 409],
+    'stale_move' => ['局面已经变了，这一步没记下（对手可能刚走完）', 409],
+    'bad_room_time' => ['每方时间要在 10 秒到 1 小时之间', 400],
+    'bad_room_color' => ['颜色只能是白、黑或随机', 400],
+    'too_many_rooms' => ['这个网络开房间的次数太多了，稍后再试', 429],
+    'too_many_joins' => ['房间码试的次数太多，请核对之后再试', 429],
 ];
 
 function chess_err($code, $extra = []) {
@@ -270,4 +295,297 @@ function chess_public_row($row) {
 function chess_fail(Throwable $e, $context) {
     error_log('chess ' . $context . ': ' . $e->getMessage());
     chess_err('server');
+}
+
+/* --------------------------------------------------------------------------
+ * 房间（P2）。规则的判定全在 chess_room_core.php，这里只管进出数据库：
+ * 建表、按房间码取行、把行还原成规则层要的数组、写回。
+ * ------------------------------------------------------------------------ */
+
+/** 毫秒时刻。DATETIME 只到秒，"剩 0.4 秒"和"剩 1.4 秒"会被存成同一个值。 */
+function chess_now_ms() {
+    return (int) floor(microtime(true) * 1000);
+}
+
+/**
+ * 房间表在首次用到时建，和账号表一个路子：共享主机上不方便跑迁移脚本。
+ *
+ * seq 同时是两样东西：poll 的游标（客户端只取 seq > since 的事件），
+ * 和写回的乐观锁（UPDATE ... WHERE seq = 期望值，0 行受影响就是有人先走了）。
+ * 事件表上那个 UNIQUE (room_id, seq) 是第二层网：真撞上了说明同一手被记了两次。
+ */
+function chess_room_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_rooms (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code CHAR(6) NOT NULL,
+        white_player_id INT NULL,
+        black_player_id INT NULL,
+        fen VARCHAR(90) NOT NULL,
+        status VARCHAR(16) NOT NULL,
+        result VARCHAR(24) NULL,
+        winner CHAR(1) NULL,
+        time_ms INT NOT NULL,
+        white_ms INT NOT NULL,
+        black_ms INT NOT NULL,
+        turn_started_ms BIGINT NULL,
+        seq INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        UNIQUE KEY uq_room_code (code),
+        INDEX idx_room_white (white_player_id, status),
+        INDEX idx_room_black (black_player_id, status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_room_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        room_id INT NOT NULL,
+        seq INT NOT NULL,
+        san VARCHAR(16) NOT NULL,
+        fen_after VARCHAR(90) NOT NULL,
+        played_by INT NOT NULL,
+        played_at DATETIME NOT NULL,
+        UNIQUE KEY uq_room_seq (room_id, seq)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ready = true;
+}
+
+/** 没验证过邮箱的人只能下 AI —— 这是他定的门禁，进房和开房都要过。 */
+function chess_require_verified() {
+    $id = chess_require_player();
+    $conn = chess_db();
+    chess_schema($conn);
+    $stmt = $conn->prepare("SELECT verified_at FROM chess_players WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) {
+        chess_err('no_such_player');
+    }
+    if ($row['verified_at'] === null) {
+        chess_err('verify_required');
+    }
+    return $id;
+}
+
+/** 按房间码取一行（不含昵称，昵称由端点另查）。 */
+function chess_find_room($conn, $code) {
+    chess_room_schema($conn);
+    $stmt = $conn->prepare("SELECT id, code, white_player_id, black_player_id, fen, status,
+            result, winner, time_ms, white_ms, black_ms, turn_started_ms, seq
+        FROM chess_rooms WHERE code = ? LIMIT 1");
+    $stmt->bind_param("s", $code);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+/**
+ * mysqli 取回来的行全是字符串，规则层拿到的却是 int/null 混着写的数组
+ * （'white_player_id' 为 null 表示空位）。不做这层还原，规则层里
+ * $room['seq'] + 1 之类的比较会按字符串走，边界上出错还看不出来。
+ */
+function chess_room_from_row($row) {
+    $intOrNull = static function ($value) {
+        return $value === null ? null : (int) $value;
+    };
+    return [
+        'id' => (int) $row['id'],
+        'code' => $row['code'],
+        'white_player_id' => $intOrNull($row['white_player_id']),
+        'black_player_id' => $intOrNull($row['black_player_id']),
+        'fen' => $row['fen'],
+        'status' => $row['status'],
+        'result' => $row['result'],
+        'winner' => $row['winner'],
+        'time_ms' => (int) $row['time_ms'],
+        'white_ms' => (int) $row['white_ms'],
+        'black_ms' => (int) $row['black_ms'],
+        'turn_started_ms' => $intOrNull($row['turn_started_ms']),
+        'seq' => (int) $row['seq'],
+    ];
+}
+
+/** 新建房间；房间码撞了就换一个新的再来一次（唯一索引会挡住并发的那一个）。 */
+function chess_insert_room($conn, array $room) {
+    chess_room_schema($conn);
+    for ($try = 0; $try < 5; $try++) {
+        $code = $try === 0 ? $room['code'] : chess_room_code();
+        $white = $room['white_player_id'];
+        $black = $room['black_player_id'];
+        $time = $room['time_ms'];
+        $fen = $room['fen'];
+        $status = $room['status'];
+        $stmt = $conn->prepare("INSERT INTO chess_rooms
+            (code, white_player_id, black_player_id, fen, status, result, winner,
+             time_ms, white_ms, black_ms, turn_started_ms, seq, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, NULL, 0, NOW(), NOW())");
+        $stmt->bind_param(
+            "siissiii",
+            $code,
+            $white,
+            $black,
+            $fen,
+            $status,
+            $time,
+            $time,
+            $time
+        );
+        if ($stmt->execute()) {
+            $room['code'] = $code;
+            $room['id'] = (int) $conn->insert_id;
+            $stmt->close();
+            return $room;
+        }
+        $stmt->close();
+        error_log('chess room insert try ' . ($try + 1) . ': ' . $conn->error);
+        // 只有"房间码已存在"值得重试，别的错重试也一样
+        if (stripos((string) $conn->error, 'uq_room_code') === false) {
+            return null;
+        }
+    }
+    return null;
+}
+
+/**
+ * 写回房间。$expectSeq 是取到那一行时的 seq：0 行受影响 = 这行在我们读它之后
+ * 被人改过（同一手双击、或对手已经走完），调用方回 stale_move，绝不能覆盖。
+ *
+ * $expectStatus 是给"不涨 seq 的改动"准备的（认输、超时结案）。这两类只改状态不改 seq，
+ * 于是 WHERE seq = 0 对两个同时认输的人都会命中，后写的会把前一个人的
+ * resign-white 改成 resign-black —— 比分就错了。加上状态预期就没这个问题：
+ * 谁先把 active 改成 over，另一个人的 WHERE 就落空。走子不需要它（seq 一定变），
+ * 但走子同样只在 active 时成立，所以一并传。
+ */
+function chess_write_room($conn, array $room, $expectSeq, $expectStatus = null) {
+    $white = $room['white_player_id'];
+    $black = $room['black_player_id'];
+    $result = $room['result'];
+    $winner = $room['winner'];
+    $started = $room['turn_started_ms'];
+    $sql = "UPDATE chess_rooms SET white_player_id = ?, black_player_id = ?,
+            fen = ?, status = ?, result = ?, winner = ?, white_ms = ?, black_ms = ?,
+            turn_started_ms = ?, seq = ?, updated_at = NOW()
+        WHERE id = ? AND seq = ?" . ($expectStatus === null ? '' : ' AND status = ?');
+    $params = [
+        $white,
+        $black,
+        $room['fen'],
+        $room['status'],
+        $result,
+        $winner,
+        $room['white_ms'],
+        $room['black_ms'],
+        $started,
+        $room['seq'],
+        $room['id'],
+        $expectSeq,
+    ];
+    // 顺序必须和上面 SQL 里的 ? 一一对应：i = 整数，s = 字符串/NULL。
+    //  mysqli 只认 i/d/s/b 这四个字符，写进去别的（11-23 线上就是误写了 'a'）
+    //  不是"类型宽松一点"，是整条 UPDATE 直接失败。
+    $types = 'iissssiiiiii';
+    if ($expectStatus !== null) {
+        $params[] = $expectStatus;
+        $types .= 's';
+    }
+    // 数错一个 ?、或者写了 mysqli 不认的类型字符，结果都是"房间停在旧状态不动"，
+    // 两边各看一份局面。这种错必须当场报出来，所以这里自检一次。
+    if (count($params) !== strlen($types) || strlen($types) !== substr_count($sql, '?')
+        || preg_match('/[^idbs]/', $types)) {
+        error_log('chess write room: bind mismatch (' . strlen($types) . ' types "' . $types
+            . '", ' . count($params) . ' params, ' . substr_count($sql, '?') . ' placeholders)');
+        return false;
+    }
+    $stmt = $conn->prepare($sql);
+    if ($stmt === false) {
+        error_log('chess write room: prepare failed: ' . $conn->error);
+        return false;
+    }
+    $stmt->bind_param($types, ...$params);
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess write room: execute failed: ' . $stmt->error);
+    }
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $ok && $affected === 1;
+}
+
+/**
+ * 抢一个空位。座位是被这条语句本身抢下来的，不能靠 chess_write_room：
+ * 进房不涨 seq，两个人同时进同一个房间时两个 WHERE seq = 0 都会命中，
+ * 后写的会把前一个人顶出座位。所以按"这个座位还是空的"来卡，
+ * 座位名只能取这两个字面值（不能绑定，所以白名单而不是拼接输入）。
+ * $seat 由 chess_room_join 的返回值给出，不是用户输入。
+ */
+function chess_room_claim_seat($conn, $roomId, $seat, $playerId, $nowMs) {
+    if ($seat !== 'white_player_id' && $seat !== 'black_player_id') {
+        error_log('chess claim seat: unexpected seat ' . var_export($seat, true));
+        return false;
+    }
+    $stmt = $conn->prepare("UPDATE chess_rooms SET {$seat} = ?, status = 'active',
+            turn_started_ms = ?, updated_at = NOW()
+        WHERE id = ? AND {$seat} IS NULL AND status = 'waiting'");
+    $stmt->bind_param("iii", $playerId, $nowMs, $roomId);
+    $ok = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $ok && $affected === 1;
+}
+
+/** 记一手棋。和 chess_write_room 在同一个请求里，两个都成功才算走完这一步。 */
+function chess_insert_event($conn, $roomId, array $event) {
+    $seq = $event['seq'];
+    $by = $event['played_by'];
+    $stmt = $conn->prepare("INSERT INTO chess_room_events (room_id, seq, san, fen_after, played_by, played_at)
+        VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("iissi", $roomId, $seq, $event['san'], $event['fen_after'], $by);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+/**
+ * seq > $since 的事件，给轮询和掉线重进用。
+ * 上限取 200 是因为重进（since=0）要一次把整份棋谱拿回去：一局少儿对弈常见的
+ * 是 60–100 手，卡到 60 就会让重进来的人看到半份棋谱。200 条约 24KB，一次性的。
+ */
+function chess_room_events($conn, $roomId, $since, $cap = 200) {
+    $stmt = $conn->prepare("SELECT seq, san, fen_after, played_by, played_at
+        FROM chess_room_events WHERE room_id = ? AND seq > ? ORDER BY seq ASC LIMIT " . (int) $cap);
+    $stmt->bind_param("ii", $roomId, $since);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = [
+            'seq' => (int) $row['seq'],
+            'san' => $row['san'],
+            'fen_after' => $row['fen_after'],
+            'played_by' => (int) $row['played_by'],
+            'played_at' => $row['played_at'],
+        ];
+    }
+    $stmt->close();
+    return $rows;
+}
+
+/** 房间里两个人的昵称；规则层不该知道昵称，所以由端点查了传进去。 */
+function chess_room_names($conn, array $room) {
+    $ids = array_filter([$room['white_player_id'], $room['black_player_id']]);
+    if (!$ids) {
+        return [];
+    }
+    $in = implode(',', array_map('intval', $ids));
+    $names = [];
+    $result = $conn->query("SELECT id, nickname FROM chess_players WHERE id IN ({$in})");
+    while ($row = $result->fetch_assoc()) {
+        $names[(int) $row['id']] = $row['nickname'];
+    }
+    return $names;
 }
