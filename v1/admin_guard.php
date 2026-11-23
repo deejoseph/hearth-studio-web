@@ -6,9 +6,10 @@
  */
 
 // 非浏览器客户端（Android 后台）使用的接口密钥。
-// 用法：请求体带 admin_token=<本值>，或先调 admin_login.php 拿到 gbadmin 会话 Cookie。
-// 修改这里即可全局换密钥；不要把它写进任何前端代码或 URL（会进日志）。
-const GB_API_SECRET = 'REDACTED-GB-API-SECRET';
+// 值不在这里：它住在服务器侧的 gb_secret_config.php，那个文件不入库、
+// 也被同目录 .htaccess 挡着不让直接访问。
+// 用法：请求体带 admin_token=<密钥>，或先调 admin_login.php 拿到 gbadmin 会话 Cookie。
+// 换密钥改那个文件即可；不要把值写进任何前端代码或 URL（会进日志）。
 
 // 登录失败限流：15 分钟内同一 IP 满 5 次即拒绝
 const GB_FAIL_WINDOW = 900;
@@ -32,8 +33,34 @@ function gb_start_admin_session() {
     return isset($_SESSION['gb_admin_id']);
 }
 
+/**
+ * 接口密钥，只在第一次用到时读一次服务器侧的配置文件。
+ * 读回来空字符串就是「没有密钥」，调用方按这个失败关闭。
+ */
+function gb_api_secret() {
+    static $secret = null;
+    if ($secret !== null) {
+        return $secret;
+    }
+    $path = __DIR__ . '/gb_secret_config.php';
+    if (!is_readable($path)) {
+        error_log('admin guard: missing ' . $path);
+        return $secret = '';
+    }
+    $loaded = require $path;
+    if (!is_string($loaded) || $loaded === '') {
+        error_log('admin guard: gb_secret_config.php did not return a secret');
+        return $secret = '';
+    }
+    return $secret = $loaded;
+}
+
 function gb_secret_ok($provided) {
-    return is_string($provided) && $provided !== '' && hash_equals(GB_API_SECRET, $provided);
+    if (gb_api_secret() === '') {
+        return false; // 配置文件不在，就只剩会话 Cookie 能进门
+    }
+    return is_string($provided) && $provided !== ''
+        && hash_equals(gb_api_secret(), $provided);
 }
 
 /**

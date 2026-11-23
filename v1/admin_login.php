@@ -48,7 +48,7 @@ echo json_encode([
         'email' => $user['email'],
         'name' => $user['name'],
         'role' => strtoupper((string) $user['role']),
-        // 仅作展示用；服务端鉴权认的是 gbadmin 会话 Cookie 或 GB_API_SECRET
+        // 仅作展示用；服务端鉴权认的是 gbadmin 会话 Cookie 或 gb_api_secret()
         'token' => bin2hex(random_bytes(16)),
     ],
     'message' => '登录成功',
