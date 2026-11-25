@@ -8,6 +8,9 @@
  * 这份管下棋的人（cookie 要作用到 /chess，所以 path=/）。两者互不相认。
  */
 
+// 教练偏好的选项白名单在 chess_coach_core.php，下面那句"缩到多少个字"要引用同一个数
+require_once __DIR__ . '/chess_coach_core.php';
+
 const CHESS_FAIL_WINDOW = 900;      // 15 分钟
 const CHESS_FAIL_LIMIT = 5;         // 同一 IP 的登录失败次数
 const CHESS_REGISTER_WINDOW = 3600; // 同一 IP 每小时最多注册
@@ -69,6 +72,11 @@ const CHESS_ERRORS = [
     'bad_room_color' => ['颜色只能是白、黑或随机', 400],
     'too_many_rooms' => ['这个网络开房间的次数太多了，稍后再试', 429],
     'too_many_joins' => ['房间码试的次数太多，请核对之后再试', 429],
+
+    // 教练偏好（P3）。界面按 code + field 出句子，中文只当兜底。
+    'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
+    'long_note' => ['说明太长了，请缩到 ' . COACH_NOTE_MAX . ' 个字以内', 400],
+    'bad_note' => ['说明里有打不出来的字符，重写一遍就好', 400],
 ];
 
 function chess_err($code, $extra = []) {
@@ -124,6 +132,26 @@ function chess_schema($conn) {
         ip VARCHAR(45) NOT NULL,
         tried_at DATETIME NOT NULL,
         INDEX idx_caa (scope, ip, tried_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // 棋谱库：存每个棋手的对局历史，从 localStorage 搬到服务端
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_library (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        player_id INT NOT NULL,
+        game_id VARCHAR(40) NOT NULL,
+        finished_at BIGINT NOT NULL COMMENT '对局结束时间戳（毫秒）',
+        mode ENUM('computer', 'local', 'online') NOT NULL,
+        level VARCHAR(12) NULL COMMENT '电脑难度，仅 mode=computer 时有',
+        sans JSON NOT NULL COMMENT '走法列表',
+        result ENUM('1-0', '0-1', '1/2-1/2', '*') NOT NULL,
+        white_name VARCHAR(120) NOT NULL,
+        black_name VARCHAR(120) NOT NULL,
+        control_initial INT NULL COMMENT '初始时间（毫秒）',
+        control_increment INT NULL COMMENT '增量（秒）',
+        termination VARCHAR(24) NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_player_game (player_id, game_id),
+        INDEX idx_player_finished (player_id, finished_at DESC),
+        FOREIGN KEY (player_id) REFERENCES chess_players(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     $ready = true;
 }
@@ -588,4 +616,300 @@ function chess_room_names($conn, array $room) {
         $names[(int) $row['id']] = $row['nickname'];
     }
     return $names;
+}
+
+/* --------------------------------------------------------------------------
+ * 课堂（P3）。和房间分开：课堂没有计时器、成员是 1 老师 + N 学生、
+ * 事件类型不只是走子（还有标注、举手、批准）。
+ * ------------------------------------------------------------------------ */
+
+function chess_class_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_classes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        code CHAR(4) NOT NULL,
+        teacher_id INT NOT NULL,
+        fen VARCHAR(90) NOT NULL,
+        status VARCHAR(16) NOT NULL,
+        seq INT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        UNIQUE KEY uq_class_code (code),
+        INDEX idx_class_teacher (teacher_id, status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_class_members (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_id INT NOT NULL,
+        player_id INT NOT NULL,
+        role VARCHAR(16) NOT NULL,
+        hand_status VARCHAR(16) NOT NULL DEFAULT 'none',
+        joined_at DATETIME NOT NULL,
+        UNIQUE KEY uq_class_player (class_id, player_id),
+        INDEX idx_class_hand (class_id, hand_status)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_class_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_id INT NOT NULL,
+        seq INT NOT NULL,
+        type VARCHAR(16) NOT NULL,
+        data TEXT NOT NULL,
+        actor_id INT NOT NULL,
+        created_at DATETIME NOT NULL,
+        UNIQUE KEY uq_class_seq (class_id, seq),
+        INDEX idx_class_events (class_id, seq)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ready = true;
+}
+
+function chess_find_class($conn, $code) {
+    chess_class_schema($conn);
+    $stmt = $conn->prepare("SELECT id, code, teacher_id, fen, status, seq
+        FROM chess_classes WHERE code = ? LIMIT 1");
+    $stmt->bind_param("s", $code);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_class_from_row($row) {
+    return [
+        'id' => (int) $row['id'],
+        'code' => $row['code'],
+        'teacher_id' => (int) $row['teacher_id'],
+        'fen' => $row['fen'],
+        'status' => $row['status'],
+        'seq' => (int) $row['seq'],
+    ];
+}
+
+function chess_insert_class($conn, array $class) {
+    chess_class_schema($conn);
+    for ($try = 0; $try < 5; $try++) {
+        $code = $try === 0 ? $class['code'] : chess_class_code();
+        $teacher = $class['teacher_id'];
+        $fen = $class['fen'];
+        $status = $class['status'];
+        $stmt = $conn->prepare("INSERT INTO chess_classes
+            (code, teacher_id, fen, status, seq, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 0, NOW(), NOW())");
+        $stmt->bind_param("siss", $code, $teacher, $fen, $status);
+        if ($stmt->execute()) {
+            $class['code'] = $code;
+            $class['id'] = (int) $conn->insert_id;
+            $stmt->close();
+            return $class;
+        }
+        $stmt->close();
+        if (stripos((string) $conn->error, 'uq_class_code') === false) {
+            return null;
+        }
+    }
+    return null;
+}
+
+function chess_write_class($conn, array $class, $expectSeq) {
+    $stmt = $conn->prepare("UPDATE chess_classes SET fen = ?, status = ?, seq = ?, updated_at = NOW()
+        WHERE id = ? AND seq = ?");
+    $stmt->bind_param("ssiii", $class['fen'], $class['status'], $class['seq'], $class['id'], $expectSeq);
+    $ok = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $ok && $affected === 1;
+}
+
+function chess_class_members($conn, $classId) {
+    chess_class_schema($conn);
+    $result = $conn->query(
+        "SELECT cm.player_id, cm.role, cm.hand_status, p.nickname
+        FROM chess_class_members cm
+        JOIN chess_players p ON p.id = cm.player_id
+        WHERE cm.class_id = {$classId}
+        ORDER BY cm.joined_at ASC"
+    );
+    $rows = [];
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = [
+            'player_id' => (int) $row['player_id'],
+            'role' => $row['role'],
+            'hand_status' => $row['hand_status'],
+            'nickname' => $row['nickname'],
+        ];
+    }
+    return $rows;
+}
+
+function chess_class_member($conn, $classId, $playerId) {
+    $stmt = $conn->prepare("SELECT role, hand_status FROM chess_class_members
+        WHERE class_id = ? AND player_id = ? LIMIT 1");
+    $stmt->bind_param("ii", $classId, $playerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_class_add_member($conn, $classId, $playerId, $role) {
+    chess_class_schema($conn);
+    $stmt = $conn->prepare("INSERT IGNORE INTO chess_class_members
+        (class_id, player_id, role, hand_status, joined_at) VALUES (?, ?, ?, 'none', NOW())");
+    $stmt->bind_param("iis", $classId, $playerId, $role);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function chess_class_remove_member($conn, $classId, $playerId) {
+    $stmt = $conn->prepare("DELETE FROM chess_class_members WHERE class_id = ? AND player_id = ?");
+    $stmt->bind_param("ii", $classId, $playerId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function chess_class_set_hand($conn, $classId, $playerId, $status) {
+    $stmt = $conn->prepare("UPDATE chess_class_members SET hand_status = ?
+        WHERE class_id = ? AND player_id = ?");
+    $stmt->bind_param("sii", $status, $classId, $playerId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function chess_class_insert_event($conn, $classId, array $event) {
+    // 规则层给的是数组，库里存 TEXT，所以在这里编码一次。端点回给客户端的仍是
+    // 数组——两边形状一样，客户端不必分「刚发出去的」和「轮询回来的」两种事件。
+    $data = is_string($event['data']) ? $event['data'] : json_encode($event['data'], JSON_UNESCAPED_UNICODE);
+    $stmt = $conn->prepare("INSERT INTO chess_class_events (class_id, seq, type, data, actor_id, created_at)
+        VALUES (?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("iissi", $classId, $event['seq'], $event['type'], $data, $event['actor_id']);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function chess_class_events($conn, $classId, $since, $cap = 200) {
+    $stmt = $conn->prepare("SELECT seq, type, data, actor_id, created_at
+        FROM chess_class_events WHERE class_id = ? AND seq > ? ORDER BY seq ASC LIMIT " . (int) $cap);
+    $stmt->bind_param("ii", $classId, $since);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = [
+            'seq' => (int) $row['seq'],
+            'type' => $row['type'],
+            // 写进去时是 json_encode 的字符串，读出来还原成对象：客户端不该再解一次，
+            // 解错的地方也就不存在了。
+            'data' => json_decode((string) $row['data'], true) ?? [],
+            'actor_id' => (int) $row['actor_id'],
+            'created_at' => $row['created_at'],
+        ];
+    }
+    $stmt->close();
+    return $rows;
+}
+
+function chess_class_close($conn, $classId, $expectSeq) {
+    $stmt = $conn->prepare("UPDATE chess_classes SET status = 'closed', seq = seq + 1, updated_at = NOW()
+        WHERE id = ? AND seq = ?");
+    $stmt->bind_param("ii", $classId, $expectSeq);
+    $ok = $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return $ok && $affected === 1;
+}
+
+/* --------------------------------------------------------------------------
+ * 教练偏好（P3）。什么算一个合法的偏好，全在 chess_coach_core.php；
+ * 这里只管建表、取那一行、把一行还原成规则层的形状。
+ * ------------------------------------------------------------------------ */
+
+/**
+ * 一人一行，player_id 就是主键 —— 这个表没有"多份偏好"可言，
+ * 存第二次是改而不是加，所以端点用 ON DUPLICATE KEY UPDATE。
+ *
+ * 多选存逗号串而不是 JSON：这一列只被"取出自己那一行"用（教练那边的匹配
+ * 之后按 FIND_IN_SET 数人），而共享主机的 MySQL 版本没法在这儿验，
+ * chess_library 那张表用 JSON 建没建成我此刻也无从查起。逗号串在任何
+ * 一个还活着的版本上都是一列 VARCHAR —— 少一个能静默失败的地方。
+ */
+function chess_coach_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_prefs (
+        player_id INT PRIMARY KEY,
+        level VARCHAR(16) NOT NULL,
+        goals VARCHAR(64) NOT NULL,
+        formats VARCHAR(32) NOT NULL,
+        slots VARCHAR(64) NOT NULL,
+        timezone VARCHAR(40) NOT NULL,
+        language VARCHAR(8) NOT NULL,
+        note VARCHAR(240) NOT NULL DEFAULT '',
+        contact_ok TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        INDEX idx_coach_level (level),
+        FOREIGN KEY (player_id) REFERENCES chess_players(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ready = true;
+}
+
+/** 这个人的偏好；没填过返回 null（"没填"是正常状态，不是错误）。 */
+function chess_coach_pref_read($conn, $playerId) {
+    chess_coach_schema($conn);
+    $stmt = $conn->prepare("SELECT level, goals, formats, slots, timezone, language,
+            note, contact_ok, updated_at
+        FROM chess_coach_prefs WHERE player_id = ? LIMIT 1");
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+/**
+ * 存（或改）这个人的偏好。$pref 是 coach_pref_normalize() 通过后的那一份，
+ * 所以这里的字段顺序就是规则层的字段顺序，端点不参与判断合不合法。
+ *
+ * created_at 只在第一次插入时写：ON DUPLICATE KEY UPDATE 那一段里不碰它，
+ * 于是"什么时候开始想找教练"和"最后一次改是什么时候"两个时刻都留得住。
+ */
+function chess_coach_pref_write($conn, $playerId, array $pref) {
+    chess_coach_schema($conn);
+    $stmt = $conn->prepare("INSERT INTO chess_coach_prefs
+        (player_id, level, goals, formats, slots, timezone, language, note, contact_ok,
+         created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE level = VALUES(level), goals = VALUES(goals),
+            formats = VALUES(formats), slots = VALUES(slots), timezone = VALUES(timezone),
+            language = VALUES(language), note = VALUES(note),
+            contact_ok = VALUES(contact_ok), updated_at = NOW()");
+    if ($stmt === false) {
+        error_log('chess coach pref: prepare failed: ' . $conn->error);
+        return false;
+    }
+    $stmt->bind_param(
+        "isssssssi",
+        $playerId,
+        $pref['level'],
+        $pref['goals'],
+        $pref['formats'],
+        $pref['slots'],
+        $pref['timezone'],
+        $pref['language'],
+        $pref['note'],
+        $pref['contact_ok']
+    );
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess coach pref: execute failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    return $ok;
 }

@@ -1,6 +1,6 @@
 # 后端内部文件禁止直接 URL 访问：PHP 解析失败时不会把源码（含数据库凭据）当纯文本吐出来
 <IfModule mod_authz_core.c>
-    <FilesMatch "^(db_config|admin_guard|chess_guard|chess_mail|chess_mail_config|chess_engine|chess_room_core|gb_secret_config)\.php$">
+    <FilesMatch "^(db_config|admin_guard|chess_guard|chess_mail|chess_mail_config|chess_engine|chess_room_core|chess_class_core|chess_coach_core|gb_secret_config)\.php$">
         Require all denied
     </FilesMatch>
 
