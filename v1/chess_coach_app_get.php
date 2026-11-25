@@ -21,10 +21,14 @@ $conn = chess_db();
 
 try {
     $row = chess_app_read($conn, $playerId);
+    // 管理员（邮箱在 admin_users）不用申请就是教练；admin 这个标记单独带出去，
+    // 是因为界面上"管理员"和"批准过的教练"要说两句不同的话。
+    $admin = chess_player_is_admin($conn, $playerId);
     chess_json([
         'ok' => true,
         'app' => $row === null ? null : coach_app_public($row),
-        'can_teach' => coach_can_teach($row['status'] ?? null),
+        'admin' => $admin,
+        'can_teach' => $admin || coach_can_teach($row['status'] ?? null),
     ]);
 } catch (Throwable $e) {
     chess_fail($e, 'coach app get');

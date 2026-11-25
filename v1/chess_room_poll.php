@@ -40,9 +40,13 @@ try {
         chess_err('not_room_member');
     }
 
+    // 提和也在 poll 里一起回来：它不涨 seq，不能指望事件表把它带给客户端。
+    $draw = chess_draw_read($conn, (int) $room['id']);
     chess_json([
         'ok' => true,
-        'room' => chess_room_public($room, chess_now_ms(), chess_room_names($conn, $room), $id),
+        'room' => chess_room_public(
+            $room, chess_now_ms(), chess_room_names($conn, $room), $id, $draw['by'] ?? null
+        ),
         'events' => chess_room_events($conn, (int) $room['id'], $since),
     ]);
 } catch (Throwable $e) {

@@ -349,7 +349,74 @@ foreach (array_keys(CHESS_ROOM_RESULTS) as $key) {
 }
 
 /* ==========================================================================
- * 9. 主线：真棋谱逐手重放
+ * 9. 提和：谁都能提、一房一条、只有对面能答复、超时优先于和棋
+ * ======================================================================== */
+$drawRoom = $roomAt(CHESS_ENGINE_START_FEN, 1, 2);
+$offer = chess_room_draw_offer($drawRoom, 1, 1000);
+$assert($offer['err'] === null, 'white can offer a draw');
+$assert($offer['offer']['by'] === CHESS_ENGINE_WHITE, 'the offer records who made it');
+$assert($offer['offer']['at_ms'] === 1000, 'the offer stamps the moment it was made');
+$assert($offer['room']['seq'] === 0 && $offer['room']['fen'] === CHESS_ENGINE_START_FEN,
+    'offering changes neither seq nor position');
+$assert($offer['room']['white_ms'] === CHESS_ROOM_TIME_MS - 1000, 'offering still settles the clock');
+$assert(chess_room_draw_offer($drawRoom, 3, 1000)['err'] === 'not_room_member',
+    'a stranger cannot offer a draw in someone else’s room');
+$assert(chess_room_draw_offer($drawRoom, 1, 1000, ['by' => CHESS_ENGINE_BLACK])['err'] === 'draw_pending',
+    'a second offer waits for an answer instead of stacking');
+$assert(chess_room_draw_offer($drawRoom, 1, 1000, ['by' => CHESS_ENGINE_WHITE])['err'] === 'draw_pending',
+    'even the same side cannot offer twice');
+$assert(chess_room_draw_offer($asWhite, 1, 1000)['err'] === 'room_not_active',
+    'a waiting room has nothing to agree to');
+$overRoom = $roomAt(CHESS_ENGINE_START_FEN);
+$overRoom['status'] = CHESS_ROOM_OVER;
+$assert(chess_room_draw_offer($overRoom, 1, 1000)['err'] === 'room_over', 'a finished game takes no offers');
+
+$answered = chess_room_draw_answer($drawRoom, 2, true, 2000, ['by' => CHESS_ENGINE_WHITE]);
+$assert($answered['err'] === null && $answered['accepted'] === true, 'the opponent can accept');
+$assert($answered['room']['status'] === CHESS_ROOM_OVER, 'accepting ends the game');
+$assert($answered['room']['result'] === 'agreement', 'the result is agreement');
+$assert($answered['room']['winner'] === null, 'agreement has no winner');
+$assert($answered['room']['seq'] === 0, 'accepting does not advance seq');
+$assert($answered['room']['white_ms'] === CHESS_ROOM_TIME_MS - 2000,
+    'accepting settles the clock of the side to move, not the one answering');
+
+$declined = chess_room_draw_answer($drawRoom, 2, false, 2000, ['by' => CHESS_ENGINE_WHITE]);
+$assert($declined['err'] === null && $declined['accepted'] === false, 'the opponent can decline');
+$assert($declined['room']['status'] === CHESS_ROOM_ACTIVE && $declined['room']['result'] === null,
+    'declining leaves the game running');
+$assert($declined['room']['fen'] === CHESS_ENGINE_START_FEN && $declined['room']['seq'] === 0,
+    'declining changes no chess at all');
+
+$assert(chess_room_draw_answer($drawRoom, 1, true, 2000, ['by' => CHESS_ENGINE_WHITE])['err'] === 'not_your_offer',
+    'the offerer cannot accept their own offer');
+$assert(chess_room_draw_answer($drawRoom, 2, true, 2000, null)['err'] === 'no_draw_offer',
+    'answering nothing is refused');
+$assert(chess_room_draw_answer($drawRoom, 3, true, 2000, ['by' => CHESS_ENGINE_WHITE])['err'] === 'not_room_member',
+    'a stranger cannot answer for somebody else');
+$assert(chess_room_draw_answer($overRoom, 2, true, 2000, ['by' => CHESS_ENGINE_WHITE])['err'] === 'room_over',
+    'a finished game takes no answers');
+
+// 黑该走、黑只剩 1 秒：到第 7 秒，提和的和答复的都该先读到"黑超时"。
+$flagDraw = $roomAt('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1', 1, 2, 1000);
+$lateOffer = chess_room_draw_offer($flagDraw, 2, 7000);
+$assert($lateOffer['err'] === 'flagged', 'a draw offer after the clock ran out is not an offer');
+$assert($lateOffer['room']['result'] === 'timeout-black', 'the flag decides the game, not the offer');
+$lateAnswer = chess_room_draw_answer($flagDraw, 1, true, 7000, ['by' => CHESS_ENGINE_BLACK]);
+$assert($lateAnswer['err'] === 'flagged', 'accepting after the opponent’s flag fell does not save them');
+$assert($lateAnswer['room']['result'] === 'timeout-black', 'the flag still decides the game');
+
+$drawView = chess_room_public($drawRoom, 1000, [], 2, CHESS_ENGINE_WHITE);
+$assert($drawView['draw_offer'] === ['by' => 'w', 'mine' => false],
+    'the other side sees the pending offer as theirs to answer');
+$assert(chess_room_public($drawRoom, 1000, [], 1, CHESS_ENGINE_WHITE)['draw_offer']['mine'] === true,
+    'the offering side sees it as its own');
+$assert(chess_room_public($drawRoom, 1000, [], 2)['draw_offer'] === null,
+    'no offer is null, not an empty object');
+$assert(chess_room_public($answered['room'], 1000, [], 2, CHESS_ENGINE_WHITE)['draw_offer'] === null,
+    'a finished game does not carry an offer');
+
+/* ==========================================================================
+ * 10. 主线：真棋谱逐手重放
  * ======================================================================== */
 $lines = [];
 $handle = fopen($gamesPath, 'r');

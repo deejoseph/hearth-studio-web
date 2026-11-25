@@ -36,6 +36,7 @@ try {
     }
     $room = chess_room_from_row($row);
     $names = chess_room_names($conn, $room);
+    $draw = chess_draw_read($conn, (int) $room['id']);
     $now = chess_now_ms();
 
     $played = chess_room_move($room, $id, $san, $now);
@@ -57,13 +58,19 @@ try {
         if (!chess_write_room($conn, $next, (int) $room['seq'], CHESS_ROOM_ACTIVE)) {
             $conn->rollback();
             chess_err('stale_move', ['room' => chess_room_public(
-                chess_room_from_row(chess_find_room($conn, $code)), chess_now_ms(), $names, $id
+                chess_room_from_row(chess_find_room($conn, $code)),
+                chess_now_ms(), $names, $id, $draw['by'] ?? null
             )]);
         }
         if (!chess_insert_event($conn, (int) $room['id'], $played['event'])) {
             $conn->rollback();
             error_log('chess room move event: ' . $conn->error);
             chess_err('server');
+        }
+        // 有人走了一步，之前提的和就算过去了。清不掉只记一笔：保留下来
+        // 也是一条仍然成立的提和，不该为它把一手合法的棋退回去。
+        if (!chess_draw_clear($conn, (int) $room['id'])) {
+            error_log('chess room move: draw row not cleared for room ' . $room['id']);
         }
         $conn->commit();
     } catch (Throwable $e) {

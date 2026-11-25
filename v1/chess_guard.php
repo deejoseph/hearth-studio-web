@@ -72,6 +72,9 @@ const CHESS_ERRORS = [
     'bad_room_color' => ['颜色只能是白、黑或随机', 400],
     'too_many_rooms' => ['这个网络开房间的次数太多了，稍后再试', 429],
     'too_many_joins' => ['房间码试的次数太多，请核对之后再试', 429],
+    'draw_pending' => ['已经有一次提和没答复，等对方回应', 409],
+    'no_draw_offer' => ['没有待答复的提和', 409],
+    'not_your_offer' => ['这是你提的和，要等对方答复', 409],
 
     // 教练偏好（P3）。界面按 code + field 出句子，中文只当兜底。
     'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
@@ -389,6 +392,14 @@ function chess_room_schema($conn) {
         played_at DATETIME NOT NULL,
         UNIQUE KEY uq_room_seq (room_id, seq)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // 提和。一间房最多一条待答复的记录（主键就是 room_id）—— 同时有两条
+    // "谁在等谁答复"就说不清了。不并进 chess_rooms：那行每次都是整行写回、
+    // 还要过 seq/status 两道乐观锁，而提和不涨 seq，也不该让一局棋卡在锁上。
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_room_draws (
+        room_id INT PRIMARY KEY,
+        offered_by CHAR(1) NOT NULL,
+        offered_ms BIGINT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     $ready = true;
 }
 
@@ -628,6 +639,42 @@ function chess_room_names($conn, array $room) {
         $names[(int) $row['id']] = $row['nickname'];
     }
     return $names;
+}
+
+/* --------------------------------------------------------------------------
+ * 提和。规则在 chess_room_core.php（纯函数），这里只管那张一行一房的小表。
+ * ------------------------------------------------------------------------ */
+
+/** 这间房待答复的提和；没有返回 null（"没有人提"是常态）。 */
+function chess_draw_read($conn, $roomId) {
+    chess_room_schema($conn);
+    $stmt = $conn->prepare("SELECT offered_by, offered_ms FROM chess_room_draws WHERE room_id = ? LIMIT 1");
+    $stmt->bind_param("i", $roomId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ? ['by' => $row['offered_by'], 'at_ms' => (int) $row['offered_ms']] : null;
+}
+
+/** 记下一条提和。同一间房再来一条就覆盖 —— 主键已经把"最多一条"钉死在库里。 */
+function chess_draw_write($conn, $roomId, $by, $nowMs) {
+    chess_room_schema($conn);
+    $stmt = $conn->prepare("INSERT INTO chess_room_draws (room_id, offered_by, offered_ms)
+        VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE offered_by = VALUES(offered_by), offered_ms = VALUES(offered_ms)");
+    $stmt->bind_param("isi", $roomId, $by, $nowMs);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+/** 清掉提和：答复完了、有人走了一步、或者这局已经结束。 */
+function chess_draw_clear($conn, $roomId) {
+    chess_room_schema($conn);
+    $stmt = $conn->prepare("DELETE FROM chess_room_draws WHERE room_id = ?");
+    $stmt->bind_param("i", $roomId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
 }
 
 /* --------------------------------------------------------------------------
@@ -1006,12 +1053,59 @@ function chess_app_is_teacher($conn, $playerId) {
 }
 
 /**
+ * 管理员 = 这个棋手的登录邮箱也在 admin_users 里（留言板后台那批账号）。
+ *
+ * 按邮箱认，不另建一张角色表：后台加一个邮箱，棋盘这边下一次请求就认它；
+ * 而一个人不该为"我是站长"这件事维护两份身份。比较交给库的排序规则，
+ * 大小写不敏感 —— 邮箱本来就不该因为大小写变成两个人。
+ *
+ * 表不在时回 false 而不是让请求失败：admin_users 是后台那套的资产，
+ * 万一哪天它换了地方，下棋不该跟着一起 500。
+ */
+function chess_player_is_admin($conn, $playerId) {
+    static $hasTable = null;
+    static $seen = [];
+    $playerId = (int) $playerId;
+    if ($playerId < 1) {
+        return false;
+    }
+    if (array_key_exists($playerId, $seen)) {
+        return $seen[$playerId];
+    }
+    if ($hasTable === null) {
+        $result = $conn->query("SHOW TABLES LIKE 'admin_users'");
+        $hasTable = $result instanceof mysqli_result && $result->num_rows > 0;
+    }
+    if (!$hasTable) {
+        return $seen[$playerId] = false;
+    }
+    $stmt = $conn->prepare("SELECT 1 FROM chess_players p
+        JOIN admin_users a ON a.email = p.email
+        WHERE p.id = ? LIMIT 1");
+    if ($stmt === false) {
+        error_log('chess admin check: prepare failed: ' . $conn->error);
+        return $seen[$playerId] = false;
+    }
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $found = $stmt->get_result()->fetch_assoc() !== null;
+    $stmt->close();
+    return $seen[$playerId] = $found;
+}
+
+/** 能开课堂的人：管理员不用申请，其他人要申请已通过。整条链路只认这一处。 */
+function chess_player_can_teach($conn, $playerId) {
+    return chess_player_is_admin($conn, $playerId) || chess_app_is_teacher($conn, $playerId);
+}
+
+/**
  * 课堂那侧的门。调用点在 chess_class_create.php，判在 verified 之后：
  * 先确认这个邮箱是真的，再问管理员点没点批准 —— 反过来会让一个没验证的
  * 账号在界面上一路撞墙，而每一句都写着"你不够格"。
+ * 管理员（邮箱在 admin_users）不用走申请，直接就是教练。
  */
 function chess_require_teacher($conn, $playerId) {
-    if (!chess_app_is_teacher($conn, $playerId)) {
+    if (!chess_player_can_teach($conn, $playerId)) {
         chess_err('teacher_only');
     }
 }

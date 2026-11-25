@@ -36,6 +36,10 @@ try {
             chess_room_from_row(chess_find_room($conn, $code)), chess_now_ms(), $names, $id
         )]);
     }
+    // 这局已经结束，留着待答复的提和没有意义。
+    if (!chess_draw_clear($conn, (int) $room['id'])) {
+        error_log('chess room resign: draw row not cleared for room ' . $room['id']);
+    }
 
     chess_json([
         'ok' => true,

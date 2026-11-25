@@ -44,6 +44,9 @@ try {
             chess_room_from_row(chess_find_room($conn, $code)), chess_now_ms(), $names, $id
         )]);
     }
+    if ($needsWrite && !chess_draw_clear($conn, (int) $room['id'])) {
+        error_log('chess room close: draw row not cleared for room ' . $room['id']);
+    }
 
     chess_json([
         'ok' => true,

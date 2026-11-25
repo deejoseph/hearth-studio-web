@@ -35,7 +35,7 @@ const CHESS_ROOM_ACTIVE = 'active';
 const CHESS_ROOM_OVER = 'over';
 
 /**
- * 结果只有这六种，都能从"棋局本身结束"或"时钟/认输"两条路推出，
+ * 结果只有这七种，都能从"棋局本身结束"或"时钟/认输/双方同意"三条路推出，
  * 并且都写进 chess_rooms.result 给棋谱导出（P4）和结果展示用。
  */
 const CHESS_ROOM_RESULTS = [
@@ -45,6 +45,7 @@ const CHESS_ROOM_RESULTS = [
     'resign-black' => '黑方认输',
     'timeout-white' => '白方超时',
     'timeout-black' => '黑方超时',
+    'agreement' => '双方同意和棋',
 ];
 
 /** 房间码：6 位，从字母表里逐位随机取。用 random_int 而不是 shuffle/hash，
@@ -326,6 +327,87 @@ function chess_room_resign(array $room, $playerId, $nowMs) {
 }
 
 /**
+ * 提和。谁都能提，不用等轮到自己 —— 提和不占时钟，也不会自动判和：
+ * 它只是在 chess_room_draws 里留一条，等对方点"接受"或"拒绝"。
+ *
+ * $pending 是端点从 chess_room_draws 读出来的那一行（null = 没有），规则层不碰库。
+ * 判定顺序和走子同一条链：状态 → 是不是这房的人 → 结算时钟 → 局面读得懂吗 →
+ * 钟先走完没有 → 已经有一条没答复的提和没有。先判钟再判提和：钟归零的人
+ * 连提和也不该提成，和"归零之后走一步合法也不作数"是同一个道理。
+ */
+function chess_room_draw_offer(array $room, $playerId, $nowMs, $pending = null) {
+    $playerId = (int) $playerId;
+    if ($room['status'] !== CHESS_ROOM_ACTIVE) {
+        return ['room' => $room, 'offer' => null,
+                'err' => $room['status'] === CHESS_ROOM_OVER ? 'room_over' : 'room_not_active'];
+    }
+    $side = chess_room_color_of($room, $playerId);
+    if ($side === null) {
+        return ['room' => $room, 'offer' => null, 'err' => 'not_room_member'];
+    }
+    $room = chess_room_tick($room, $nowMs);
+    if (chess_engine_parse_fen($room['fen']) === null) {
+        return ['room' => $room, 'offer' => null, 'err' => 'server'];
+    }
+    $flagged = chess_room_flagged($room, $nowMs);
+    if ($flagged !== null) {
+        $room['status'] = CHESS_ROOM_OVER;
+        $room['result'] = 'timeout-' . ($flagged === CHESS_ENGINE_WHITE ? 'white' : 'black');
+        $room['winner'] = chess_engine_other($flagged);
+        return ['room' => $room, 'offer' => null, 'err' => 'flagged'];
+    }
+    if ($pending !== null) {
+        // 已经有一条在等答复：不接受第二条，也不替对方点"接受"。
+        // 界面看到这个 code 应该把那条提和摆出来让人答复。
+        return ['room' => $room, 'offer' => null, 'err' => 'draw_pending'];
+    }
+    return ['room' => $room, 'offer' => ['by' => $side, 'at_ms' => (int) $nowMs], 'err' => null];
+}
+
+/**
+ * 答复提和。只有没提过的那一方能答复 —— 提和的人自己点"接受"，
+ * 等于单方面宣布和棋，所以那不是一种宽容，是必须挡住的一条。
+ * 接受 = 和棋（result 'agreement'，没有胜者）；拒绝只清掉那条记录，
+ * 局面、时钟、seq 都不动，棋照下。
+ */
+function chess_room_draw_answer(array $room, $playerId, $accept, $nowMs, $pending = null) {
+    $playerId = (int) $playerId;
+    $accept = (bool) $accept;
+    if ($room['status'] !== CHESS_ROOM_ACTIVE) {
+        return ['room' => $room, 'accepted' => false,
+                'err' => $room['status'] === CHESS_ROOM_OVER ? 'room_over' : 'room_not_active'];
+    }
+    $side = chess_room_color_of($room, $playerId);
+    if ($side === null) {
+        return ['room' => $room, 'accepted' => false, 'err' => 'not_room_member'];
+    }
+    $room = chess_room_tick($room, $nowMs);
+    if (chess_engine_parse_fen($room['fen']) === null) {
+        return ['room' => $room, 'accepted' => false, 'err' => 'server'];
+    }
+    $flagged = chess_room_flagged($room, $nowMs);
+    if ($flagged !== null) {
+        $room['status'] = CHESS_ROOM_OVER;
+        $room['result'] = 'timeout-' . ($flagged === CHESS_ENGINE_WHITE ? 'white' : 'black');
+        $room['winner'] = chess_engine_other($flagged);
+        return ['room' => $room, 'accepted' => false, 'err' => 'flagged'];
+    }
+    if ($pending === null) {
+        return ['room' => $room, 'accepted' => false, 'err' => 'no_draw_offer'];
+    }
+    if ($pending['by'] === $side) {
+        return ['room' => $room, 'accepted' => false, 'err' => 'not_your_offer'];
+    }
+    if (!$accept) {
+        return ['room' => $room, 'accepted' => false, 'err' => null];
+    }
+    $room['status'] = CHESS_ROOM_OVER;
+    $room['result'] = 'agreement';
+    $room['winner'] = null;
+    return ['room' => $room, 'accepted' => true, 'err' => null];
+}
+
+/**
  * 把时钟已经判出的结果写进房间。poll 是 GET，不能改库；超时的另一方可能源源不断地
  * 看着对方归零却不发一个 POST，那样这局在库里永远停在 active，棋谱导出会拿到半局。
  * 所以规则层给一个幂等的收尾：没人超时就原样返回，有人超时就结案。
@@ -346,16 +428,19 @@ function chess_room_close(array $room, $nowMs) {
 }
 
 /**
- * 两边客户端读的是同一份：局面、状态、还剩多少、轮到谁。
+ * 两边客户端读的是同一份：局面、状态、还剩多少、轮到谁、有没有人在等答复的提和。
  * server_now_ms 让棋盘算出"服务器时刻 - 本机时刻"的差值再用本机时钟平滑显示 ——
  * 显示用的仍然是本机时钟，裁决用的永远是服务器算出来的那几个字段。
  * $names 由端点从 chess_players 查出来传进来（规则层不该知道昵称长什么样）。
  * $viewerId 决定 you：棋盘靠它知道该把哪个时钟放自己面前、能不能落子。
+ * $drawBy 是端点从 chess_room_draws 读出来的提和方颜色；mine 让界面知道
+ * 该显示"等对方答复"还是把接受/拒绝摆出来。
  */
-function chess_room_public(array $room, $nowMs, array $names = [], $viewerId = null) {
+function chess_room_public(array $room, $nowMs, array $names = [], $viewerId = null, $drawBy = null) {
     $nowMs = (int) $nowMs;
     $clock = chess_room_clock($room, $nowMs);
     $id = ['w' => (int) $room['white_player_id'], 'b' => (int) $room['black_player_id']];
+    $you = chess_room_color_of($room, (int) $viewerId);
     return [
         'code' => $room['code'],
         'status' => $room['status'],
@@ -366,11 +451,15 @@ function chess_room_public(array $room, $nowMs, array $names = [], $viewerId = n
         'winner' => $room['winner'],
         'fen' => $room['fen'],
         'turn' => chess_room_turn($room),
-        'you' => chess_room_color_of($room, (int) $viewerId),
+        'you' => $you,
         'seq' => (int) $room['seq'],
         'time_ms' => (int) $room['time_ms'],
         'clock' => ['w' => $clock['w'], 'b' => $clock['b']],
         'flagged' => chess_room_flagged($room, $nowMs),
+        // 只有进行中的局才报提和：终局之后那一条即使还没删，也不该再让人答复。
+        'draw_offer' => ($room['status'] === CHESS_ROOM_ACTIVE && $drawBy !== null)
+            ? ['by' => $drawBy, 'mine' => $you === $drawBy]
+            : null,
         'server_now_ms' => $nowMs,
         'players' => [
             'w' => ['id' => $id['w'] ?: null, 'nickname' => $names[$id['w']] ?? null],
