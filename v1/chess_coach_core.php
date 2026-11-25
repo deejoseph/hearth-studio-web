@@ -44,6 +44,26 @@ const COACH_LANGUAGES = ['zh', 'en', 'zh_en'];
 /** 补充说明的码点上限。库里那一列按字符建，两边取同一个数。 */
 const COACH_NOTE_MAX = 240;
 
+/* --------------------------------------------------------------------------
+ * 想当教练的那一份申请。和偏好的区别：偏好是"我想要什么"，随时能改；
+ * 申请是"我要替别人上课"，交上来就要有人审，审过才算数。
+ * ------------------------------------------------------------------------ */
+
+/**
+ * 三态。'pending' 是唯一能从界面进去的状态 —— approved / rejected 只能由
+ * 管理员那侧写（coach_admin_decide.php），端点这边没有能让自己的申请变
+ * approved 的路径。这一条是整个资格位的支点：棋盘上任何一个人发什么都
+ * 换不来开课堂的权利。
+ */
+const COACH_APP_STATUSES = ['pending', 'approved', 'rejected'];
+
+/** 自我介绍的码点区间。下限是真的有用：空着一段话，管理员没东西可判。 */
+const COACH_INTRO_MIN = 10;
+const COACH_INTRO_MAX = 400;
+
+/** 管理员点的是批准还是拒绝。'pending' 不在这里 —— 没人能"批准成待审"。 */
+const COACH_DECISIONS = ['approved', 'rejected'];
+
 /**
  * "按码点量长度"和"按码点截断"必须同一口径，否则同一段中文会被量成两种长度。
  * 和 chess_guard.php 的 chess_len/chess_trim 是同一套写法：共享主机不一定编了
@@ -194,7 +214,13 @@ function coach_pref_normalize($data) {
         return $fail('bad_pref', $field);
     }
 
-    $note = coach_trim($data['note'] ?? '');
+    // note 只收字符串：数组经 coach_trim 会变成 'Array' 五个字，安安静静存进库，
+    // 教练那边看到的就是一句没头没尾的话。
+    $givenNote = $data['note'] ?? '';
+    if (!is_string($givenNote)) {
+        return $fail('bad_note', 'note');
+    }
+    $note = coach_trim($givenNote);
     if ($note !== '' && !coach_is_utf8($note)) {
         return $fail('bad_note', 'note');
     }
@@ -239,5 +265,116 @@ function coach_pref_public($row) {
         'note' => $row['note'] ?? '',
         'contact_ok' => (bool) ($row['contact_ok'] ?? false),
         'updated_at' => $row['updated_at'] ?? null,
+    ];
+}
+
+/**
+ * 有没有开课堂的资格。整条链路上只有这一行判它 —— 数据层（chess_app_is_teacher）、
+ * 端点回给界面的 can_teach 都走这里，别再写一遍 === 'approved'。
+ */
+function coach_can_teach($status) {
+    return coach_key($status) === 'approved';
+}
+
+/**
+ * 一份申请 → 能落库的那一份。
+ *
+ * 只有一个字段，所以判定也只剩"这段话能不能用"：
+ * short_intro（空着或太短，管理员没东西可判）、long_intro（超过 400 码点，
+ * 库里那一列装不下）、bad_intro（混了坏字节，INSERT 会直接失败）。
+ * 和偏好那条 note 一样，字数按码点量 —— 一句中文按字节量能翻三倍，
+ * 界面写的"最多 400 字"就不是同一个 400。
+ */
+function coach_app_normalize($data) {
+    $fail = static function ($code) {
+        return ['ok' => false, 'intro' => '', 'code' => $code, 'field' => 'intro'];
+    };
+    if (!is_array($data)) {
+        return $fail('short_intro');
+    }
+
+    // 只收字符串。发来个数组就当成"没写"：coach_trim 会把数组硬转成 'Array' 五个字，
+    // 那种东西不该出现在管理员的审核屏上。
+    $given = $data['intro'] ?? '';
+    if (!is_string($given)) {
+        return $fail('short_intro');
+    }
+    $intro = coach_trim($given);
+    if ($intro !== '' && !coach_is_utf8($intro)) {
+        return $fail('bad_intro');
+    }
+    $len = coach_len($intro);
+    if ($len < COACH_INTRO_MIN) {
+        return $fail('short_intro');
+    }
+    if ($len > COACH_INTRO_MAX) {
+        return $fail('long_intro');
+    }
+
+    return ['ok' => true, 'intro' => $intro, 'code' => null, 'field' => null];
+}
+
+/** 管理员点的那一下是不是"批准/拒绝"里的一个。别的值一律不认。 */
+function coach_decision($value) {
+    $key = coach_key($value);
+    return $key !== null && in_array($key, COACH_DECISIONS, true) ? $key : null;
+}
+
+/**
+ * 状态机：现在这一态 + 管理员这一个动作 → 下一态；null 表示这一步不成立。
+ *
+ * 三条都真会用到，所以写出来而不是"显然"：
+ *   pending → approved/rejected  正常审核
+ *   rejected → approved           看错了要能改
+ *   approved → rejected           撤销开课堂的资格
+ * 唯一不给的是任何态 → pending：重新提交走的是学员那侧的 upsert
+ * （chess_app_submit），不是管理员的动作。把它放进这张表就等于给后台
+ * 开了一个"把已批准的教练打回待审"的按钮，而那个位置点下去是静默丢权限的。
+ */
+function coach_app_decide($status, $decision) {
+    $from = coach_key($status);
+    $to = coach_decision($decision);
+    // 现在这一态必须是那三个之一。库里冒出第四个值说明数据被谁改坏了，
+    // 这时候照写新状态会把痕迹盖掉，回头查不到是怎么来的。
+    if ($to === null || !in_array($from, COACH_APP_STATUSES, true)) {
+        return null;
+    }
+    return $to;
+}
+
+/** 申请人自己看到的那一份：不带谁审的、不带管理员的任何信息。 */
+function coach_app_public($row) {
+    return [
+        'status' => $row['status'] ?? 'pending',
+        'intro' => $row['intro'] ?? '',
+        'submitted_at' => $row['submitted_at'] ?? null,
+        'updated_at' => $row['updated_at'] ?? null,
+        'decided_at' => $row['decided_at'] ?? null,
+    ];
+}
+
+/**
+ * 管理员列表里的一行。
+ *
+ * email/nickname 是判这个人能不能教书要看的，也是管理员回复申请人的唯一途径 ——
+ * 而 password_hash / verify_token_hash 一列都不在这里出现，连读都不读
+ * （见 chess_guard.php 的 chess_app_list()，SELECT 里就没有那两列）。
+ *
+ * has_pref 带的是"这个人填过想找什么样的教练"：他自己来下过棋、还写了偏好，
+ * 是管理员判"是学员还是来打广告"时最省事的一条线索。
+ */
+function coach_app_admin($row) {
+    return [
+        'player_id' => (int) ($row['player_id'] ?? 0),
+        'status' => $row['status'] ?? 'pending',
+        'intro' => $row['intro'] ?? '',
+        'nickname' => $row['nickname'] ?? '',
+        'email' => $row['email'] ?? '',
+        'verified' => ($row['verified_at'] ?? null) !== null,
+        'rating' => (int) ($row['rating'] ?? 1200),
+        'has_pref' => (int) ($row['has_pref'] ?? 0) > 0,
+        'joined_at' => $row['joined_at'] ?? null,
+        'submitted_at' => $row['submitted_at'] ?? null,
+        'decided_at' => $row['decided_at'] ?? null,
     ];
 }

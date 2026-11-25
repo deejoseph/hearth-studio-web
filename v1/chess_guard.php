@@ -77,6 +77,18 @@ const CHESS_ERRORS = [
     'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
     'long_note' => ['说明太长了，请缩到 ' . COACH_NOTE_MAX . ' 个字以内', 400],
     'bad_note' => ['说明里有打不出来的字符，重写一遍就好', 400],
+
+    // 想当教练的申请 + 开课堂的资格位。
+    // teacher_only 是这一整块的门：棋盘上任何一个人提交什么都换不来它，
+    // 只有管理员在 /coach-admin 点了批准才算过 —— 界面按这个 code 出
+    // "先申请成为教练"那一句并把人送到申请表上。
+    'teacher_only' => ['开课堂要先申请成为教练，审核通过后才能用', 403],
+    'short_intro' => ['这一段至少写 ' . COACH_INTRO_MIN . ' 个字', 400],
+    'long_intro' => ['介绍太长了，请缩到 ' . COACH_INTRO_MAX . ' 个字以内', 400],
+    'bad_intro' => ['介绍里有打不出来的字符，重写一遍就好', 400],
+    'already_teacher' => ['你已经能开课堂了，不用再提交一遍介绍', 409],
+    'bad_decision' => ['批准还是驳回，要选一个', 400],
+    'no_such_app' => ['没找到这一份申请', 404],
 ];
 
 function chess_err($code, $extra = []) {
@@ -912,4 +924,178 @@ function chess_coach_pref_write($conn, $playerId, array $pref) {
     }
     $stmt->close();
     return $ok;
+}
+
+/* --------------------------------------------------------------------------
+ * 想当教练的申请（P4）。一张表当两件事用：申请本身 + "谁能开课堂"的资格位。
+ *
+ * 为什么资格位要落在数据库而不是界面：棋盘上那个【开课堂】按钮藏不藏得住
+ * 都不算挡 —— 直接对 chess_class_create.php 发一个请求就是绕过去。
+ * 按钮的显示状态（coachApp.js）只是少让人点一次错，真正的门在这里：
+ * status 只能被 coach_admin_decide.php 改成 approved。
+ *
+ * 一人一行（player_id 就是主键）：改介绍改的是同一份申请，不会出现
+ * "一个人三条申请、管理员批了最老的那条"这种现场。
+ * ------------------------------------------------------------------------ */
+
+function chess_app_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    chess_schema($conn);     // 那句 FOREIGN KEY 要 chess_players 先在
+    // 偏好表也要在：chess_app_list() 里那句 has_pref 子查询和后台那几个数都点它。
+    // 表还没建时 mysqli 不是报错而是让整条 SELECT 返回 false ——
+    // 管理员看到的会是一张"没有人申请"的空表，而这其实是查询没跑成。
+    chess_coach_schema($conn);
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_apps (
+        player_id INT PRIMARY KEY,
+        status VARCHAR(16) NOT NULL,
+        intro VARCHAR(" . COACH_INTRO_MAX . ") NOT NULL DEFAULT '',
+        submitted_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        decided_at DATETIME NULL,
+        decided_by INT NULL,
+        INDEX idx_app_status (status, updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ready = true;
+}
+
+/** 这个人的申请；没交过返回 null（"没交过"是常态，不是错误）。 */
+function chess_app_read($conn, $playerId) {
+    chess_app_schema($conn);
+    $stmt = $conn->prepare("SELECT status, intro, submitted_at, updated_at, decided_at
+        FROM chess_coach_apps WHERE player_id = ? LIMIT 1");
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+/**
+ * 交（或改）介绍。永远写成 pending ——
+ * 这是全项目里唯一一个学员侧能改 status 的语句，而它能写的只有这一个值，
+ * 而且不碰 decided_at/decided_by 之外的东西：重新提交要把上一次的结论清掉，
+ * 否则管理员看到的还是"上次已驳回"，人却在等审核。
+ */
+function chess_app_submit($conn, $playerId, $intro) {
+    chess_app_schema($conn);
+    $stmt = $conn->prepare("INSERT INTO chess_coach_apps
+        (player_id, status, intro, submitted_at, updated_at, decided_at, decided_by)
+        VALUES (?, 'pending', ?, NOW(), NOW(), NULL, NULL)
+        ON DUPLICATE KEY UPDATE intro = VALUES(intro), status = 'pending',
+            submitted_at = NOW(), updated_at = NOW(),
+            decided_at = NULL, decided_by = NULL");
+    if ($stmt === false) {
+        error_log('chess coach app: prepare failed: ' . $conn->error);
+        return false;
+    }
+    $stmt->bind_param("is", $playerId, $intro);
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess coach app: execute failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    return $ok;
+}
+
+/** 有没有开课堂的资格 —— 判定在规则层那一个函数里，这里只负责去库里取状态。 */
+function chess_app_is_teacher($conn, $playerId) {
+    return coach_can_teach(chess_app_read($conn, $playerId)['status'] ?? null);
+}
+
+/**
+ * 课堂那侧的门。调用点在 chess_class_create.php，判在 verified 之后：
+ * 先确认这个邮箱是真的，再问管理员点没点批准 —— 反过来会让一个没验证的
+ * 账号在界面上一路撞墙，而每一句都写着"你不够格"。
+ */
+function chess_require_teacher($conn, $playerId) {
+    if (!chess_app_is_teacher($conn, $playerId)) {
+        chess_err('teacher_only');
+    }
+}
+
+/**
+ * 管理员那一列。
+ *
+ * 🔴 SELECT 里没有 password_hash，也没有 verify_token_hash / verify_expires：
+ * 后台的屏幕是会拍照发群的，而这两列一个能登进来、一个能直接点验证链接。
+ * 要加列就回到这一行来看一眼是不是把凭据带上去了。
+ */
+function chess_app_list($conn, $status = null, $cap = 100) {
+    chess_app_schema($conn);
+    $limit = max(1, min(200, (int) $cap));
+    $sql = "SELECT a.player_id, a.status, a.intro, a.submitted_at, a.updated_at, a.decided_at,
+            p.nickname, p.email, p.verified_at, p.created_at AS joined_at, p.rating,
+            (SELECT COUNT(*) FROM chess_coach_prefs c WHERE c.player_id = a.player_id) AS has_pref
+        FROM chess_coach_apps a
+        JOIN chess_players p ON p.id = a.player_id";
+    // 状态是白名单里的三个 ASCII 串之一，所以拼进 WHERE 之前先过一遍判定 ——
+    // 参数绑定在这里要做成两条 SQL 反而更绕，而过不了 COACH_APP_STATUSES 的值
+    // 根本到不了这一行（coach_admin_apps.php 先判）。
+    if ($status === null) {
+        $sql .= " ORDER BY a.updated_at DESC LIMIT {$limit}";
+        $result = $conn->query($sql);
+    } else {
+        $safe = in_array($status, COACH_APP_STATUSES, true) ? $status : 'pending';
+        $sql .= " WHERE a.status = '{$safe}' ORDER BY a.updated_at DESC LIMIT {$limit}";
+        $result = $conn->query($sql);
+    }
+    $rows = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+    }
+    return $rows;
+}
+
+/**
+ * 管理员点下批准/驳回。
+ *
+ * 新状态由 coach_app_decide() 那张状态机表算出来（这里不重判），
+ * 所以"批准成 pending"这类根本不该存在的跳转在这一层也过不去。
+ */
+function chess_app_decide($conn, $playerId, $decision, $adminId) {
+    $current = chess_app_read($conn, $playerId);
+    if ($current === null) {
+        return null;   // 界面据此回 no_such_app：这人没交过申请
+    }
+    $next = coach_app_decide($current['status'], $decision);
+    if ($next === null) {
+        return false;  // 状态机不认这一步
+    }
+    $stmt = $conn->prepare("UPDATE chess_coach_apps
+        SET status = ?, decided_at = NOW(), decided_by = ?, updated_at = NOW()
+        WHERE player_id = ?");
+    $stmt->bind_param("sii", $next, $adminId, $playerId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok ? $next : false;
+}
+
+/**
+ * 后台顶上的那几个数。一次查完，界面就不必为每个数发一个请求。
+ * 全是 COUNT —— 没有任何一行能指出"这是谁"。
+ */
+function chess_app_counts($conn) {
+    chess_app_schema($conn);
+    $out = ['players' => 0, 'verified' => 0, 'pending' => 0, 'approved' => 0,
+        'rejected' => 0, 'prefs' => 0, 'games' => 0];
+    $one = static function ($sql, $key) use ($conn, &$out) {
+        $row = $conn->query($sql);
+        if ($row) {
+            $val = $row->fetch_assoc();
+            $out[$key] = (int) reset($val);
+        }
+    };
+    $one("SELECT COUNT(*) FROM chess_players", 'players');
+    $one("SELECT COUNT(*) FROM chess_players WHERE verified_at IS NOT NULL", 'verified');
+    $one("SELECT COUNT(*) FROM chess_coach_apps WHERE status = 'pending'", 'pending');
+    $one("SELECT COUNT(*) FROM chess_coach_apps WHERE status = 'approved'", 'approved');
+    $one("SELECT COUNT(*) FROM chess_coach_apps WHERE status = 'rejected'", 'rejected');
+    $one("SELECT COUNT(*) FROM chess_coach_prefs", 'prefs');
+    $one("SELECT COUNT(*) FROM chess_library", 'games');
+    return $out;
 }

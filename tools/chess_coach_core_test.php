@@ -170,6 +170,130 @@ $back = coach_pref_public($round);
 $assert($back['goals'] === ['basics', 'endgame'], '往返后 goals 还是那两项');
 $assert($back['formats'] === ['one', 'review'], '往返后 formats 还是那两项');
 
+/* --- note 只收字符串（发来个数组不能被写成 'Array'）--- */
+$assert($bad($good(['note' => ['想周末']])) === ['bad_note', 'note'], 'note 给数组 → bad_note');
+$assert($bad($good(['note' => 123])) === ['bad_note', 'note'], 'note 给数字 → bad_note');
+$assert($ok($good(['note' => null]))['note'] === '', 'note 给 null 等于没填（漏传是常态，不报红字）');
+
+/* ========== 教练申请（P4 资格位）========== */
+
+/** 一段合格的介绍：16 个码点，比下限多出 6 个，改文案时看下面那条哨兵。 */
+$introOk = '我教了三年少儿国象，带过零基础。';
+$app = static function ($data) {
+    $r = coach_app_normalize($data);
+    return $r['ok'] ? $r['intro'] : null;
+};
+$appBad = static function ($data) {
+    $r = coach_app_normalize($data);
+    return $r['ok'] ? null : [$r['code'], $r['field']];
+};
+
+/* --- 介绍本身 --- */
+$assert(COACH_INTRO_MIN === 10 && COACH_INTRO_MAX === 400,
+    '界面上印的是"至少 10 个字、最多 400 个字"：改这两个数要同时改文案');
+$assert(coach_len($introOk) === 16, '哨兵：样本文案确实在下限之上（改了这句就来看这条）');
+$assert($app(['intro' => $introOk]) === $introOk, '一段正常的话原样收下');
+$assert($appBad(['intro' => '']) === ['short_intro', 'intro'], '空着 → short_intro 并点名 intro');
+$assert($appBad([]) === ['short_intro', 'intro'], '整个字段没发 → short_intro');
+$assert($appBad('nope') === ['short_intro', 'intro'], 'body 不是对象 → short_intro');
+$assert($appBad(['intro' => [$introOk]]) === ['short_intro', 'intro'], 'intro 给数组不能变成 "Array"');
+$assert($appBad(['intro' => 123456789012]) === ['short_intro', 'intro'], 'intro 给数字同上');
+$assert($appBad(['intro' => '我会下棋而已']) === ['short_intro', 'intro'], '会下棋不等于教得动：6 个字不够');
+$atMin = $app(['intro' => str_repeat('马', COACH_INTRO_MIN)]);
+$assert($atMin !== null && coach_len($atMin) === COACH_INTRO_MIN,
+    '恰好 ' . COACH_INTRO_MIN . ' 个码点要收得住（下限含）');
+$assert($appBad(['intro' => str_repeat('马', COACH_INTRO_MIN - 1)]) === ['short_intro', 'intro'],
+    '短一个码点 → short_intro');
+$atMax = $app(['intro' => str_repeat('马', COACH_INTRO_MAX)]);
+$assert($atMax !== null && coach_len($atMax) === COACH_INTRO_MAX,
+    '恰好 ' . COACH_INTRO_MAX . ' 个码点要收得住（库里那一列就是这个宽度）');
+$assert($appBad(['intro' => str_repeat('马', COACH_INTRO_MAX + 1)]) === ['long_intro', 'intro'],
+    '超一个码点 → long_intro');
+$assert($appBad(['intro' => str_repeat('a', COACH_INTRO_MAX + 1)]) === ['long_intro', 'intro'],
+    '按码点量：纯 ASCII 也一样');
+$assert($app(['intro' => "  教了三年　国象\n带过零基础  "]) === '教了三年 国象 带过零基础',
+    '首尾去掉、全角空格和换行归成一个普通空格（和偏好那条 note 同一口径）');
+$assert($appBad(['intro' => "教了三年\xa0国象国象国象"]) === ['bad_intro', 'intro'],
+    '单独的 0xA0 不是合法 UTF-8：宁可有话可说地拒掉，也不要让 INSERT 在半路失败');
+$assert($appBad(['intro' => '　　　　　　　　　　　　']) === ['short_intro', 'intro'],
+    '只有一串全角空格 = 没写东西，不能算它 12 个字过关');
+
+/* --- can_teach：整条链路只有这一行判资格 --- */
+$assert(coach_can_teach('approved') === true, 'approved 才算有资格');
+foreach (['pending', 'rejected', '', 'Approved', 'APPROVED', null, false, 0, ['approved']] as $status) {
+    $assert(coach_can_teach($status) === false,
+        '别的一律不算：' . var_export($status, true));
+}
+
+/* --- decision：管理员点的那一下 --- */
+$assert(coach_decision('approved') === 'approved', '批准');
+$assert(coach_decision(' rejected ') === 'rejected', '只去空格,不改大小写');
+foreach (['pending', 'approve', 'REJECTED', '', 'nope', null, true, 1, ['approved']] as $given) {
+    $assert(coach_decision($given) === null, '不是那两个 key 就不认：' . var_export($given, true));
+}
+
+/* --- 状态机：三态之间只允许管理员那两种跳转 --- */
+$assert(coach_app_decide('pending', 'approved') === 'approved', '待审 → 批准');
+$assert(coach_app_decide('pending', 'rejected') === 'rejected', '待审 → 驳回');
+$assert(coach_app_decide('approved', 'rejected') === 'rejected', '批准后还能撤 —— Eddie 定的"随时可撤"');
+$assert(coach_app_decide('rejected', 'approved') === 'approved', '驳回后再申请、批了就是批了');
+$assert(coach_app_decide('approved', 'approved') === 'approved', '重复点批准不会把状态弄坏');
+$assert(coach_app_decide('pending', 'pending') === null, '没人能"批准成待审"');
+foreach (['pending', 'approved', 'rejected'] as $from) {
+    $assert(coach_app_decide($from, 'pending') === null, "{$from} 跳不到 pending（学员侧那条路不在这里）");
+    $assert(coach_app_decide($from, 'delete') === null, "{$from} + 不认识的动作 → null");
+    $assert(coach_app_decide($from, null) === null, "{$from} + 没选 → null");
+}
+foreach ([null, '', 'Approved', 'wait', 0, ['approved']] as $from) {
+    $assert(coach_app_decide($from, 'approved') === null, '现在这一态不认识 → 不写：' . var_export($from, true));
+}
+
+/* --- 回给申请人的形状 --- */
+$appPublic = coach_app_public([
+    'status' => 'pending',
+    'intro' => '教了三年少儿国象',
+    'submitted_at' => '2026-11-26 10:00:00',
+    'updated_at' => '2026-11-26 10:00:00',
+    'decided_at' => null,
+]);
+$assert($appPublic['status'] === 'pending', '状态带回去');
+$assert($appPublic['intro'] === '教了三年少儿国象', '介绍带回去,界面好让人改');
+$assert($appPublic['decided_at'] === null, '还没审就是 null');
+$assert(!array_key_exists('decided_by', $appPublic), '谁审的不给申请人看');
+$assert(coach_app_public([]) === ['status' => 'pending', 'intro' => '', 'submitted_at' => null,
+    'updated_at' => null, 'decided_at' => null], '行里缺字段不会给界面 undefined');
+
+/* --- 管理员那一行：绝不能把凭据带上屏幕 --- */
+$adminRow = coach_app_admin([
+    'player_id' => '7',
+    'status' => 'pending',
+    'intro' => '教了三年少儿国象',
+    'nickname' => '青瓷',
+    'email' => 'a@b.c',
+    'verified_at' => '2026-11-20 09:00:00',
+    'rating' => '1450',
+    'has_pref' => '1',
+    'joined_at' => '2026-11-20 08:00:00',
+    'submitted_at' => '2026-11-26 10:00:00',
+    'decided_at' => null,
+    // 故意塞进"源行"里：万一哪天有人往 chess_app_list() 的 SELECT 里加了这两列，
+    // 下面那两条哨兵会当场红 —— 后台的屏幕是会拍照发群的。
+    'password_hash' => '$2y$10$leak',
+    'verify_token_hash' => 'deadbeef',
+    'verify_expires' => '2026-12-01 00:00:00',
+]);
+$assert($adminRow['player_id'] === 7, 'player_id 取成整数（mysqli 回来的是串）');
+$assert($adminRow['rating'] === 1450, 'rating 取成整数');
+$assert($adminRow['verified'] === true, 'verified_at 有值 → verified true');
+$assert($adminRow['has_pref'] === true, 'has_pref 的 "1" 变真值');
+foreach (['password_hash', 'verify_token_hash', 'verify_expires'] as $secret) {
+    $assert(!array_key_exists($secret, $adminRow), "管理员那一行不带 {$secret}");
+}
+$anonRow = coach_app_admin(['player_id' => 8, 'verified_at' => null, 'has_pref' => '0']);
+$assert($anonRow['verified'] === false && $anonRow['has_pref'] === false, '"0" 和 null 都算没有');
+$assert($anonRow['status'] === 'pending' && $anonRow['intro'] === '' && $anonRow['email'] === '',
+    '缺字段时给空值,界面不用判 undefined');
+
 printf("%d checks, %d failures\n", $checks, count($failures));
 foreach ($failures as $label) {
     echo "  FAIL  {$label}\n";
