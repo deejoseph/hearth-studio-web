@@ -293,6 +293,288 @@ $anonRow = coach_app_admin(['player_id' => 8, 'verified_at' => null, 'has_pref' 
 $assert($anonRow['verified'] === false && $anonRow['has_pref'] === false, '"0" 和 null 都算没有');
 $assert($anonRow['status'] === 'pending' && $anonRow['intro'] === '' && $anonRow['email'] === '',
     '缺字段时给空值,界面不用判 undefined');
+// 管理员批的是"能不能教"，称号/等级分/教龄是他核对的那三样，所以要出现在列表行上。
+$proRow = coach_app_admin(['player_id' => 9, 'status' => 'pending', 'title' => 'im', 'elo' => '2210',
+    'years' => '7', 'password_hash' => '$2y$10$leak']);
+$assert($proRow['title'] === 'im' && $proRow['elo'] === '2210' && $proRow['years'] === '7',
+    '申请列表带上称号/ELO/教龄,管理员有的可判');
+$assert(!array_key_exists('password_hash', $proRow), '带了资料列也没把密码哈希带上屏幕');
+$assert($proRow['elo'] === '2210', '库里回来的整数保持原样(这里不换算,换算在资料那一路判)');
+
+/* ========== 教练资料（名录上那张门面）========== */
+
+$prof = static function ($data) {
+    $r = coach_profile_normalize($data);
+    return $r['ok'] ? $r['profile'] : null;
+};
+$profBad = static function ($data) {
+    $r = coach_profile_normalize($data);
+    return $r['ok'] ? null : [$r['code'], $r['field']];
+};
+
+/** 一张 24 位十六进制的合法文件名，改坏用例时只改一处。 */
+$imgA = 'a1b2c3d4e5f60718293a4b5c.jpg';
+$imgB = '0f1e2d3c4b5a69788796a5b4.png';
+$imgC = 'deadbeefdeadbeefdeadbeef.webp';
+$imgD = '0123456789abcdef01234567.jpg';
+
+/** 一份什么都对的资料。 */
+$full = static function (array $over = []) use ($imgD) {
+    return array_merge([
+        'title' => 'im',
+        'elo' => 2210,
+        'years' => 7,
+        'tagline' => '带零基础到比赛',
+        'honors' => '市青少年锦标赛 优秀教练',
+        'language' => 'zh_en',
+        'timezone' => 'Asia/Shanghai',
+        'levels' => ['zero', 'moves'],
+        'goals' => ['tactics', 'basics'],
+        'formats' => ['one', 'group'],
+        'slots' => ['wkend_am'],
+        'avatar' => 'a1b2c3d4e5f60718293a4b5c.jpg',
+        'photos' => ['0f1e2d3c4b5a69788796a5b4.png'],
+        'certificates' => [$imgD],
+    ], $over);
+};
+
+/* --- 一份完整表 --- */
+$p = $prof($full());
+$assert($p !== null, '一份完整资料该通过');
+$assert($p['title'] === 'im', 'title 原样');
+$assert($p['elo'] === 2210, 'elo 取成整数');
+$assert($p['years'] === 7, 'years 取成整数');
+$assert($p['levels'] === 'zero,moves', 'levels 按白名单顺序,不按点击顺序');
+$assert($p['goals'] === 'basics,tactics', 'goals 与学员那侧同一套 key');
+$assert($p['formats'] === 'one,group', 'formats 两条');
+$assert($p['slots'] === 'wkend_am', 'slots 一条');
+$assert($p['avatar'] === $imgA, 'avatar 原样(形状已判过)');
+$assert($p['photos'] === $imgB, 'photos 一张');
+$assert($p['certificates'] === $imgD, 'certificates 一张');
+
+/* --- 每个字段都可以留空：资料不是门槛 --- */
+$assert($prof([]) !== null, '整张表单空着也要存得下 —— 判够不够格的是申请状态,不是这里');
+$blank = $prof([]);
+foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'levels', 'goals',
+    'formats', 'slots', 'avatar', 'photos', 'certificates'] as $key) {
+    $assert(($blank[$key] ?? '缺键') === '', "空着 {$key} 存空串");
+}
+$assert($blank['elo'] === null && $blank['years'] === null, 'elo/years 空着是 null,不是 0');
+$assert($prof($full(['elo' => '', 'years' => '']))['elo'] === null, '显式发空串 = 清空登记');
+$assert($prof($full(['years' => 0]))['years'] === 0, '0 年教龄收得住,且和"没填"不是一回事');
+$assert($profBad($full(['years' => '三年'])) === ['bad_profile', 'years'], 'years 要数字,不收汉字');
+$assert($profBad($full(['years' => 61])) === ['bad_profile', 'years'], 'years 超 ' . COACH_YEARS_MAX . ' 年拒');
+$assert($prof($full(['years' => COACH_YEARS_MAX]))['years'] === COACH_YEARS_MAX, 'years 上限含');
+
+/* --- title --- */
+foreach (COACH_TITLES as $t) {
+    $assert($prof($full(['title' => $t]))['title'] === $t, "title 每一个都收：{$t}");
+}
+$assert($prof($full(['title' => ' im ']))['title'] === 'im', 'title 只去空格');
+$assert($profBad($full(['title' => 'IM'])) === ['bad_profile', 'title'], '大小写不一样就是不认');
+$assert($profBad($full(['title' => 'nm'])) === ['bad_profile', 'title'],
+    '美国那套称号不在这里：宁可让界面加一档,也不要库里冒出第五种口径');
+$assert($profBad($full(['title' => ['im']])) === ['bad_profile', 'title'], 'title 给数组 → bad_profile');
+$assert($profBad($full(['title' => 123])) === ['bad_profile', 'title'], 'title 给数字同上');
+
+/* --- elo --- */
+foreach ([[1500, 1500], ['1500', 1500], [' 2210 ', 2210], [COACH_ELO_MIN, COACH_ELO_MIN],
+    [COACH_ELO_MAX, COACH_ELO_MAX]] as [$given, $want]) {
+    $got = $prof($full(['elo' => $given]));
+    $assert($got !== null && $got['elo'] === $want, 'elo ' . var_export($given, true) . " → {$want}");
+}
+foreach ([0, 599, 2851, 99999, '1500 分左右', 'abc', '-100', '1e3', [1500], 1234.5] as $given) {
+    $assert($profBad($full(['elo' => $given])) === ['bad_profile', 'elo'],
+        'elo 这种形状不收：' . var_export($given, true));
+}
+
+/* --- tagline / honors：码点口径同 note --- */
+$assert($prof($full(['tagline' => "  带零基础　到比赛\n  "]))['tagline'] === '带零基础 到比赛',
+    '简介同 coach_trim 口径：全角空格和换行归成一个普通空格');
+$assert($prof($full(['tagline' => str_repeat('马', COACH_TAGLINE_MAX)])) !== null,
+    '简介恰好 ' . COACH_TAGLINE_MAX . ' 个字收得住');
+$assert($profBad($full(['tagline' => str_repeat('马', COACH_TAGLINE_MAX + 1)]))
+    === ['long_tagline', 'tagline'], '简介超一个码点 → long_tagline 并点名这一组');
+$assert($prof($full(['tagline' => "带\x00零基础"]))['tagline'] === '带 零基础',
+    'NUL 那种控制字节被 coach_trim 换成空格（和 note 同一口径），不会进库');
+$assert($profBad($full(['tagline' => "带\xa0零基础"])) === ['bad_tagline', 'tagline'],
+    '单独的 0xA0 不是合法 UTF-8 → bad_tagline（不让 INSERT 在半路失败）');
+$assert($profBad($full(['tagline' => ['带零基础']])) === ['bad_tagline', 'tagline'],
+    '简介给数组不能存成 "Array"');
+$assert($prof($full(['honors' => str_repeat('奖', COACH_HONORS_MAX)])) !== null,
+    '荣誉恰好 ' . COACH_HONORS_MAX . ' 个字收得住');
+$assert($profBad($full(['honors' => str_repeat('奖', COACH_HONORS_MAX + 1)]))
+    === ['long_honors', 'honors'], '荣誉超长 → long_honors');
+$assert($profBad($full(['honors' => "奖\xa0杯"])) === ['bad_honors', 'honors'], '荣誉坏字节 → bad_honors');
+
+/* --- 多选：可以整条不填，但填了就得全认 --- */
+$assert($prof($full(['levels' => []]))['levels'] === '', 'levels 不填允许');
+$assert($prof($full(['levels' => '']))['levels'] === '',
+    'levels 发空串也当"一个都没选",而不是"选了一个不存在的 key"');
+$assert($prof($full(['levels' => ['rated', 'zero', 'moves', 'play']]))['levels']
+    === 'zero,moves,play,rated', 'levels 四条选满,按白名单顺序');
+$assert($profBad($full(['levels' => ['zero', 'nope']])) === ['bad_profile', 'levels'],
+    'levels 混一项不认识 → bad_profile 并点名');
+$assert($prof($full(['goals' => ['basics', 'tactics', 'contest']]))['goals'] === 'basics,tactics,contest',
+    'goals 三条恰好到上限');
+$assert($profBad($full(['goals' => ['basics', 'tactics', 'opening', 'endgame']]))
+    === ['bad_profile', 'goals'], 'goals 四条超上限 ' . COACH_GOALS_MAX_COACH . '（五项全勾等于没标）');
+$assert($prof($full(['goals' => ['tactics', 'tactics']]))['goals'] === 'tactics', 'goals 重复项吃掉');
+$assert($profBad($full(['formats' => ['one', 'group', 'review', 'one']])) === ['bad_profile', 'formats'],
+    'formats 条目数比白名单还多就不收：那 ' . COACH_FORMATS_MAX_COACH . ' 种能全列,四条不行');
+$assert($prof($full(['slots' => ['wkend_ev', 'wk_ev', 'wkend_pm', 'wkend_am']]))['slots']
+    === 'wk_ev,wkend_am,wkend_pm,wkend_ev', 'slots 四个全选满');
+$assert($profBad($full(['language' => 'fr'])) === ['bad_profile', 'language'],
+    '语言只有中英和"都行",别的没有');
+$assert($profBad($full(['timezone' => 'Beijing'])) === ['bad_profile', 'timezone'],
+    '时区存 IANA 名,城市名不收');
+
+/* --- 图片文件名：形状判死,路径根本进不来 --- */
+foreach ([$imgA, $imgB, $imgC] as $name) {
+    $assert($prof($full(['avatar' => $name]))['avatar'] === $name, "合法文件名照收：{$name}");
+}
+foreach ([
+    '../' . $imgA,
+    'coach_media/9/' . $imgA,
+    $imgA . '.php',
+    'a1b2c3d4e5f60718293a4b5.jpg',
+    'A1B2C3D4E5F60718293A4B5C.JPG',
+    'a1b2c3d4e5f60718293a4b5c.gif',
+    'a1b2c3d4e5f60718293a4b5c.jpg\x00.png',
+    '',
+] as $i => $name) {
+    if ($name === '') {
+        continue;
+    }
+    $assert($profBad($full(['avatar' => $name])) === ['bad_image', 'avatar'],
+        '这种名字一律不收：' . var_export($name, true));
+}
+$assert($prof($full(['avatar' => ' ' . $imgA . ' ']))['avatar'] === $imgA, '文件名只去首尾空格');
+$assert($prof($full(['photos' => [$imgB, $imgC, $imgA]]))['photos'] === "{$imgB},{$imgC},{$imgA}",
+    '照片保留教练排的顺序(第一张是封面),不像选项那样有规范次序');
+$assert($prof($full(['photos' => [$imgB, $imgB]]))['photos'] === $imgB, '照片重复吃掉');
+$assert($prof($full(['photos' => $imgB]))['photos'] === $imgB, '照片发单个字符串当一张');
+$assert($prof($full(['photos' => '']))['photos'] === '', '照片清空发空串');
+$assert($prof($full(['photos' => []]))['photos'] === '', '照片清空发空数组');
+$assert($prof($full(['photos' => [$imgA, $imgB, $imgC, $imgA]]))['photos'] === "{$imgA},{$imgB},{$imgC}",
+    '重复的那一张不占额度：四条目去重成三张，正好是上限');
+$assert($profBad($full(['photos' => [$imgA, $imgB, $imgC, $imgD]]))
+    === ['too_many_photos', 'photos'], '照片第四张 → too_many_photos');
+$assert($profBad($full(['photos' => [$imgA, '../x.jpg']])) === ['bad_image', 'photos'],
+    '照片里混一个坏名字,整份都不落库');
+
+/* --- certificates：独立六张，不占照片那三张 --- */
+$certNames = [];
+for ($i = 1; $i <= COACH_CERTIFICATES_MAX; $i++) {
+    $certNames[] = str_pad(dechex($i), 24, '0', STR_PAD_LEFT) . '.jpg';
+}
+$assert($prof($full(['certificates' => $certNames]))['certificates'] === implode(',', $certNames),
+    '证书六张恰好到上限,按发来的顺序收下');
+$assert($prof($full(['certificates' => [$certNames[2], $certNames[0], $certNames[2]]]))['certificates']
+    === "{$certNames[2]},{$certNames[0]}", '证书保留顺序,重复项不占额度');
+$assert($prof($full(['certificates' => $certNames[0]]))['certificates'] === $certNames[0],
+    '证书发单个字符串当一张');
+$assert($prof($full(['certificates' => '']))['certificates'] === '', '证书清空发空串');
+$assert($prof($full(['certificates' => []]))['certificates'] === '', '证书清空发空数组');
+$seventh = str_pad(dechex(COACH_CERTIFICATES_MAX + 1), 24, '0', STR_PAD_LEFT) . '.png';
+$assert($profBad($full(['certificates' => [...$certNames, $seventh]]))
+    === ['too_many_certificates', 'certificates'], '证书第七张 → too_many_certificates');
+$assert($profBad($full(['certificates' => [$imgA, $imgB . '.php']]))
+    === ['bad_image', 'certificates'], '证书里混坏名字 → bad_image 并点名 certificates');
+$assert($profBad($full(['certificates' => ['../' . $imgA]]))
+    === ['bad_image', 'certificates'], '证书文件名不许带路径');
+
+/* --- 库里的一行 → 回给界面 --- */
+$row = coach_profile_public($p);
+$assert($row['levels'] === ['zero', 'moves'], '回界面时多选变数组');
+$assert($row['photos'] === [$imgB], '照片变数组,顺序还是那一列');
+$assert($row['certificates'] === [$imgD], '证书变数组,公开主页拿得到');
+$assert($row['elo'] === 2210 && $row['years'] === 7, '整数带回去');
+$empty = coach_profile_public([]);
+$assert($empty['title'] === '' && $empty['levels'] === [] && $empty['photos'] === []
+    && $empty['certificates'] === [] && $empty['elo'] === null && $empty['updated_at'] === null,
+    '空行不会给界面 undefined');
+$zero = coach_profile_public(['elo' => '0', 'years' => '0']);
+$assert($zero['elo'] === 0 && $zero['years'] === 0, '库里的 "0" 还是 0,不会被当成没登记');
+
+/* --- 名录/主页上的一行 --- */
+$entry = coach_directory_entry([
+    'player_id' => '12',
+    'nickname' => '青瓷',
+    'rating' => '1450',
+    // 故意塞进来：哪天有人往 chess_coach_rows() 的 SELECT 里加了这几列，
+    // 下面的哨兵会当场红 —— 名录是公开页面。
+    // intro 这一列确实在申请那趟查询里出现过，但它是写给管理员看的，
+    // 界面上承诺了"只有管理员看得到"，所以公开行里必须没有它。
+    'intro' => '教了三年少儿国象',
+    'submitted_at' => '2026-11-26 10:00:00',
+    'status' => 'approved',
+    'profile_at' => '2026-11-26 12:00:00',
+    'title' => 'im',
+    'elo' => '2210',
+    'years' => '7',
+    'levels' => 'zero,moves',
+    'photos' => "{$imgB},{$imgC}",
+    'certificates' => $imgD,
+    'avatar' => $imgA,
+    'email' => 'a@b.c',
+    'verified_at' => '2026-11-20 09:00:00',
+    'password_hash' => '$2y$10$leak',
+]);
+$assert($entry['player_id'] === 12, 'player_id 取成整数（mysqli 回来的是串）');
+$assert($entry['nickname'] === '青瓷' && $entry['rating'] === 1450, '名头和等级分带出去');
+$assert($entry['profile']['levels'] === ['zero', 'moves'], '资料那一坨按 public 的形状');
+$assert($entry['profile']['photos'] === [$imgB, $imgC], '照片是数组,第一张当封面');
+$assert($entry['profile']['certificates'] === [$imgD], '证书按 public 的形状上主页');
+$assert($entry['profile']['updated_at'] === '2026-11-26 12:00:00', '资料改过的时刻取 profile_at');
+$assert($entry['has_profile'] === true, '填过了就说填过了');
+foreach (['email', 'verified_at', 'password_hash'] as $secret) {
+    $assert(!array_key_exists($secret, $entry), "名录那一行不带 {$secret}");
+    $assert(!array_key_exists($secret, $entry['profile']), "profile 里也不带 {$secret}");
+}
+foreach (['intro', 'submitted_at', 'status'] as $private) {
+    $assert(!array_key_exists($private, $entry), "申请那一段（{$private}）不上公开页");
+}
+$bare = coach_directory_entry(['player_id' => 3]);
+$assert($bare['has_profile'] === false, '只有 id 的一行 = 还没填资料');
+$assert($bare['nickname'] === '' && $bare['rating'] === null, '缺字段给空值,界面不用判 undefined');
+$assert($bare['profile']['elo'] === null && $bare['profile']['photos'] === [], '资料整坨是默认形状');
+$assert(coach_directory_entry(['player_id' => 4, 'rating' => ''])['rating'] === null,
+    '没登记等级分是 null,不是 0 —— 0 分会被读成"很弱"');
+$assert(coach_profile_filled(coach_profile_public(['elo' => 0])) === true,
+    'elo 0 也是填过了：0 和没填不是一回事');
+$assert(coach_profile_filled(coach_profile_public(['years' => 0])) === true, '0 年教龄同上');
+$assert(coach_profile_filled(coach_profile_public(['photos' => $imgA])) === true,
+    '只传了一张照片也算填过（那一行是先建起来的）');
+$assert(coach_profile_filled(coach_profile_public(['certificates' => $imgA])) === true,
+    '只传一张证书也算填过,不会显示成"还没填资料"');
+
+/* --- 上传那张图该不该收 --- */
+[$name, $code] = coach_image_store_name(['mime' => 'image/jpeg', 0 => 800, 1 => 600], 1024, 'a1b2c3d4e5f60718293a4b5c');
+$assert($code === null && $name === $imgA, '真 JPEG → 用真类型给的扩展名');
+foreach ([['image/png', 'png'], ['image/webp', 'webp']] as [$mime, $ext]) {
+    [$n2, $c2] = coach_image_store_name(['mime' => $mime, 0 => 100, 1 => 100], 10, 'a1b2c3d4e5f60718293a4b5c');
+    $assert($c2 === null && substr($n2, -strlen($ext)) === $ext, "{$mime} 存成 .{$ext}");
+}
+foreach ([['mime' => 'image/gif', 0 => 10, 1 => 10], ['mime' => 'text/php', 0 => 10, 1 => 10],
+    ['mime' => '', 0 => 10, 1 => 10], []] as $info) {
+    [, $c] = coach_image_store_name($info, 1024, 'a1b2c3d4e5f60718293a4b5c');
+    $assert($c === 'bad_image', '不是那三种图就不收：' . var_export($info, true));
+}
+foreach ([[0, '零字节'], [COACH_IMAGE_BYTES_MAX + 1, '超两兆']] as [$bytes, $why]) {
+    [, $c] = coach_image_store_name(['mime' => 'image/jpeg', 0 => 100, 1 => 100], $bytes,
+        'a1b2c3d4e5f60718293a4b5c');
+    $assert($c === 'big_image', "字节数不对（{$why}）→ big_image");
+}
+foreach ([[4001, 100], [100, 4001], [0, 100], [8000, 8000]] as [$w, $h]) {
+    [, $c] = coach_image_store_name(['mime' => 'image/jpeg', 0 => $w, 1 => $h], 1024,
+        'a1b2c3d4e5f60718293a4b5c');
+    $assert($c === 'big_image', "边长 {$w}x{$h} → big_image");
+}
+[, $c] = coach_image_store_name(['mime' => 'image/jpeg', 0 => 100, 1 => 100], 1024, 'DEADBEEF');
+$assert($c === 'bad_image', '随机名不是那 24 位十六进制就不落盘(不给目录里留脏文件)');
+$assert(COACH_IMAGE_BYTES_MAX === 2097152 && COACH_PHOTOS_MAX === 3 && COACH_CERTIFICATES_MAX === 6,
+    '界面上印的是"两兆、照片三张、证书六张"：改这三个数要同时改文案');
 
 printf("%d checks, %d failures\n", $checks, count($failures));
 foreach ($failures as $label) {

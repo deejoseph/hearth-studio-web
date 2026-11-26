@@ -1,0 +1,14 @@
+# 教练上传的头像与照片：禁止任何静态访问。
+#
+# 这些字节只该从 chess_coach_photo.php 那一侧出去 —— 那里会问一句
+# "这个人的资料行还指着这张图吗"，所以删掉的照片当场就取不到了；
+# 留成静态可读的话，一张删掉的照片还会长年在盘上按 URL 可取。
+#
+# 子目录（coach_media/<player_id>/）会继承这一条，除非它自己再写一份。
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

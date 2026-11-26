@@ -1,20 +1,21 @@
 <?php
 /**
- * 反向验证：故意把教练那层规则改坏十三处，看测试能不能各抓到一类问题。
+ * 反向验证：故意把教练那层规则逐条改坏（下面 $mutations 里一处一条），看测试能不能各抓到一类问题。
  *
  *   D:/tmp/php81/php.exe tools/chess_coach_core_mutate.php
  *
  * 和 chess_class_core_mutate.php 同一个道理：一份"全绿"既可能说明规则层对，
- * 也可能说明测试压根没在看。这里挑的每一处都是申请通道里一条独立规则 ——
+ * 也可能说明测试压根没在看。这里挑的每一处都是一条独立规则 ——
  * 介绍的下限/上限（含边界差一个）、非字符串、够不够格、大小写、状态机的两头的门、
- * 回给申请人/管理员的形状。抓到就说明那条规则真在被覆盖；漏了要补用例，
+ * 回给申请人/管理员的形状，以及资料那一层的范围/码点量法/坏字节/图片形状/
+ * "0 和没填不是一回事"。抓到就说明那条规则真在被覆盖；漏了要补用例，
  * 不是改规则层。
  *
  * 规则层和测试各拷一份到系统临时目录，保持 v1/ 与 tools/ 的相对位置 —— 测试里
  * `require __DIR__ . '/../v1/chess_coach_core.php'` 才会指向被改坏的那一份，
  * 仓库里的真文件一个字都不动。
  *
- * 退出码：0 = 十三处全变红且控制组全绿；1 = 有一处没抓到或控制组不干净。
+ * 退出码：0 = 每一处都变红且控制组全绿；1 = 有一处没抓到或控制组不干净。
  * 这文件不部署：它在 tools/ 下，而只有 v1/ 会同步到服务器的 /api/v1/。
  */
 
@@ -94,6 +95,99 @@ $mutations = [
         "    \$contactOk = (int) (\$contact === true || \$contact === 1 || \$contact === '1');",
         '    $contactOk = (int) ($contact !== false && $contact !== null);',
     ],
+
+    /* --- 教练资料（P4 门面）--- */
+    'M14 elo 下限放到 1' => [
+        'const COACH_ELO_MIN = 600;',
+        'const COACH_ELO_MIN = 1;',
+    ],
+    'M15 elo 上限放到 9999' => [
+        'const COACH_ELO_MAX = 2850;',
+        'const COACH_ELO_MAX = 9999;',
+    ],
+    'M16 空着的 elo 存成 0' => [
+        "    if (\$value === null || \$value === '') {\n        return [null, \$field, null];\n    }",
+        "    if (\$value === null || \$value === '') {\n        return [0, \$field, null];\n    }",
+    ],
+    'M17 教龄上限放到 99' => [
+        'const COACH_YEARS_MAX = 60;',
+        'const COACH_YEARS_MAX = 99;',
+    ],
+    'M18 称号白名单里多一档 nm' => [
+        "const COACH_TITLES = ['gm', 'im', 'fm', 'cm', 'wgm', 'wim', 'wfm', 'wcm'];",
+        "const COACH_TITLES = ['gm', 'im', 'fm', 'cm', 'wgm', 'wim', 'wfm', 'wcm', 'nm'];",
+    ],
+    'M19 简介按字节量长度' => [
+        '    if (coach_len($s) > $max) {',
+        '    if (strlen($s) > $max) {',
+    ],
+    'M20 简介收数组（存成 "Array"）' => [
+        "    if (!is_string(\$value)) {\n        return ['', \$field, \$badCode];\n    }",
+        '',
+    ],
+    'M21 简介不再判坏字节' => [
+        "    if (\$s !== '' && !coach_is_utf8(\$s)) {",
+        '    if (false) {',
+    ],
+    'M22 照片上限放到 9' => [
+        'const COACH_PHOTOS_MAX = 3;',
+        'const COACH_PHOTOS_MAX = 9;',
+    ],
+    'M23 图片名不要求收尾（.jpg.php 混进来）' => [
+        "const COACH_IMAGE_PATTERN = '/^[a-f0-9]{24}\\.(?:jpg|png|webp)\$/';",
+        "const COACH_IMAGE_PATTERN = '/^[a-f0-9]{24}\\.(?:jpg|png|webp)/';",
+    ],
+    'M24 单张图不判字节上限' => [
+        '    if (!is_array($info) || $bytes <= 0 || $bytes > COACH_IMAGE_BYTES_MAX) {',
+        '    if (!is_array($info) || $bytes <= 0) {',
+    ],
+    'M25 单张图不判边长' => [
+        '    if ($w < 1 || $h < 1 || $w > COACH_IMAGE_SIDE_MAX || $h > COACH_IMAGE_SIDE_MAX) {',
+        '    if ($w < 1 || $h < 1) {',
+    ],
+    'M26 0 年教龄回界面当成没登记' => [
+        "        return \$value === null || \$value === '' ? null : (int) \$value;",
+        '        return (int) $value ?: null;',
+    ],
+    'M27 擅长方向上限放到 9（全勾也收）' => [
+        'const COACH_GOALS_MAX_COACH = 3;',
+        'const COACH_GOALS_MAX_COACH = 9;',
+    ],
+    'M28 多选不再把空串当"一个都没选"' => [
+        "    if (\$value === null || \$value === '') {\n        \$value = [];\n    }",
+        '',
+    ],
+    'M29 名录那行把 email 带出去' => [
+        "        'nickname' => (string) (\$row['nickname'] ?? ''),\n        'rating' =>",
+        "        'nickname' => (string) (\$row['nickname'] ?? ''),\n        'email' => \$row['email'] ?? '',\n        'rating' =>",
+    ],
+    'M30 名录永远说"填过资料"' => [
+        "        'has_profile' => coach_profile_filled(\$profile),",
+        "        'has_profile' => true,",
+    ],
+    // 这一条盯的是"公开页把申请那一段带出去"：intro 在库里是给管理员看的，
+    // 界面上写死了"只有管理员看得到"，所以哪天有人顺手加回来必须当场红。
+    'M31 名录把申请介绍带出去' => [
+        "        'profile' => \$profile,",
+        "        'intro' => (string) (\$row['intro'] ?? ''),\n        'profile' => \$profile,",
+    ],
+    'M32 名录把提交日期带出去' => [
+        "        'profile' => \$profile,",
+        "        'submitted_at' => \$row['submitted_at'] ?? null,\n        'profile' => \$profile,",
+    ],
+    'M33 证书上限放到 9' => [
+        'const COACH_CERTIFICATES_MAX = 6;',
+        'const COACH_CERTIFICATES_MAX = 9;',
+    ],
+    'M34 公开资料漏掉证书' => [
+        "        'certificates' => \$list(\$row['certificates'] ?? ''),\n",
+        '',
+    ],
+    'M35 只传证书不算填过资料' => [
+        "    foreach (['levels', 'goals', 'formats', 'slots', 'photos', 'certificates'] as \$key) {",
+        "    foreach (['levels', 'goals', 'formats', 'slots', 'photos'] as \$key) {",
+    ],
+
     '控制：一个字都不改' => [null, null],
 ];
 
@@ -169,5 +263,5 @@ if ($missed) {
     echo "\n反向验证不成立：" . implode('、', $missed) . "\n";
     exit(1);
 }
-echo "\n十三处变异全部变红，控制组全绿 —— 上面那些规则确实逐条在被测试覆盖。\n";
+echo "\n" . (count($mutations) - 1) . " 处变异全部变红，控制组全绿 —— 上面那些规则确实逐条在被测试覆盖。\n";
 exit(0);

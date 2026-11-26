@@ -30,6 +30,12 @@ const CHESS_ROOM_CREATE_LIMIT = 8;  // 同一 IP 每小时真开出来的房间
 const CHESS_JOIN_WINDOW = 900;
 const CHESS_JOIN_LIMIT = 20;        // 同一 IP 15 分钟内"查无此房"的次数
 
+// 图片按"真落盘的那一张"计，一个教练最多三张照片加一个头像 = 4 张，
+// 留到 12 张/小时够他反复挑图，又挡得住有人拿这个端点往盘上堆东西
+// （共享主机的磁盘是这台机器上最贵、也最难回退的那一项）。
+const CHESS_PHOTO_WINDOW = 3600;
+const CHESS_PHOTO_LIMIT = 12;
+
 /**
  * 每个错误一个稳定 code，中文提示留在这里当兜底。
  * 棋盘（/chess）的界面是英文的，它按 code 出英文句子；加新错误时两边都要动，
@@ -92,6 +98,22 @@ const CHESS_ERRORS = [
     'already_teacher' => ['你已经能开课堂了，不用再提交一遍介绍', 409],
     'bad_decision' => ['批准还是驳回，要选一个', 400],
     'no_such_app' => ['没找到这一份申请', 404],
+
+    // 教练资料（名录上那张门面）。每个字段都可以留空，所以这些 code 全在
+    // "填了但填错"这一侧；界面按 code + field 把红字挂到对应那一组上。
+    'bad_profile' => ['这几项里有一项不对，请再检查一遍', 400],
+    'long_tagline' => ['一句话简介太长了，请缩到 ' . COACH_TAGLINE_MAX . ' 个字以内', 400],
+    'bad_tagline' => ['简介里有打不出来的字符，重写一遍就好', 400],
+    'long_honors' => ['荣誉写得太长了，请缩到 ' . COACH_HONORS_MAX . ' 个字以内', 400],
+    'bad_honors' => ['荣誉里有打不出来的字符，重写一遍就好', 400],
+    'no_such_coach' => ['没有这位教练，或他还没进名录', 404],
+
+    // 头像、照片与证书。中文兜底同 bad_*：界面按 code 出句子。
+    'bad_image' => ['那不是一个图片文件，换一张试试', 400],
+    'big_image' => ['图片太大了（两兆、每边四千像素以内）', 400],
+    'too_many_photos' => ['照片最多 ' . COACH_PHOTOS_MAX . ' 张，先删一张再传', 400],
+    'too_many_certificates' => ['证书图片最多 ' . COACH_CERTIFICATES_MAX . ' 张，先删一张再传', 400],
+    'too_many_uploads' => ['今天传的图片太多了，稍后再试', 429],
 ];
 
 function chess_err($code, $extra = []) {
@@ -1118,13 +1140,17 @@ function chess_require_teacher($conn, $playerId) {
  * 要加列就回到这一行来看一眼是不是把凭据带上去了。
  */
 function chess_app_list($conn, $status = null, $cap = 100) {
-    chess_app_schema($conn);
+    // 资料表也要在：下面那句 LEFT JOIN 点到它。表没建时 mysqli 不是报错而是让
+    // 整条 SELECT 返回 false —— 后台会显示成"没有人申请"，而其实是查询没跑成。
+    chess_profile_schema($conn);
     $limit = max(1, min(200, (int) $cap));
     $sql = "SELECT a.player_id, a.status, a.intro, a.submitted_at, a.updated_at, a.decided_at,
             p.nickname, p.email, p.verified_at, p.created_at AS joined_at, p.rating,
+            f.title, f.elo, f.years,
             (SELECT COUNT(*) FROM chess_coach_prefs c WHERE c.player_id = a.player_id) AS has_pref
         FROM chess_coach_apps a
-        JOIN chess_players p ON p.id = a.player_id";
+        JOIN chess_players p ON p.id = a.player_id
+        LEFT JOIN chess_coach_profiles f ON f.player_id = a.player_id";
     // 状态是白名单里的三个 ASCII 串之一，所以拼进 WHERE 之前先过一遍判定 ——
     // 参数绑定在这里要做成两条 SQL 反而更绕，而过不了 COACH_APP_STATUSES 的值
     // 根本到不了这一行（coach_admin_apps.php 先判）。
@@ -1192,4 +1218,358 @@ function chess_app_counts($conn) {
     $one("SELECT COUNT(*) FROM chess_coach_prefs", 'prefs');
     $one("SELECT COUNT(*) FROM chess_library", 'games');
     return $out;
+}
+
+/* ------------------------------------------------------------------------ *
+ * 教练资料（名录上那一张脸）
+ *
+ * 单独一张表，不往 chess_coach_apps 上加列：chess_app_submit() 每次交介绍都会把
+ * status 打回 pending 并清掉 decided_at，而"教龄几年、能带什么水平"是门面，
+ * 不该跟着一次重新申请就被卷走。审核记录归审核，公开资料归公开资料。
+ *
+ * 多选照旧存逗号串（和 chess_coach_prefs 同一口径），图片只存文件名：
+ * 图的字节在磁盘上（coach_media/<player_id>/），库里那一列只放
+ * coach_image_name() 认过的那 28 个字符，所以这一行里没有一条路径能拼出来。
+ * ------------------------------------------------------------------------ */
+
+function chess_profile_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    // 那句 FOREIGN KEY 要 chess_players 先在；chess_app_schema() 顺带把
+    // apps 和 prefs 两张表也建了（名录的 JOIN 点这两张）。
+    chess_app_schema($conn);
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_profiles (
+        player_id INT PRIMARY KEY,
+        title VARCHAR(8) NOT NULL DEFAULT '',
+        elo SMALLINT NULL,
+        years TINYINT NULL,
+        tagline VARCHAR(" . COACH_TAGLINE_MAX . ") NOT NULL DEFAULT '',
+        honors VARCHAR(" . COACH_HONORS_MAX . ") NOT NULL DEFAULT '',
+        language VARCHAR(8) NOT NULL DEFAULT '',
+        timezone VARCHAR(40) NOT NULL DEFAULT '',
+        levels VARCHAR(64) NOT NULL DEFAULT '',
+        goals VARCHAR(64) NOT NULL DEFAULT '',
+        formats VARCHAR(32) NOT NULL DEFAULT '',
+        slots VARCHAR(64) NOT NULL DEFAULT '',
+        avatar VARCHAR(32) NOT NULL DEFAULT '',
+        photos VARCHAR(128) NOT NULL DEFAULT '',
+        certificates VARCHAR(192) NOT NULL DEFAULT '',
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        INDEX idx_profile_title (title),
+        FOREIGN KEY (player_id) REFERENCES chess_players(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // CREATE IF NOT EXISTS 不会给已经建好的表补列；两个请求同时迁移时，
+    // 后一个可能只撞到 1060（列已存在），那不是故障。
+    $columns = $conn->query("SHOW COLUMNS FROM chess_coach_profiles LIKE 'certificates'");
+    if ($columns instanceof mysqli_result && $columns->num_rows === 0) {
+        $migrated = $conn->query("ALTER TABLE chess_coach_profiles
+            ADD COLUMN certificates VARCHAR(192) NOT NULL DEFAULT '' AFTER photos");
+        if (!$migrated && (int) $conn->errno !== 1060) {
+            error_log('chess coach profile: add certificates failed: ' . $conn->error);
+        }
+    }
+    $ready = true;
+}
+
+/** 这个人的资料行；没建过返回 null。 */
+function chess_profile_row($conn, $playerId) {
+    chess_profile_schema($conn);
+    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors, language, timezone,
+            levels, goals, formats, slots, avatar, photos, certificates, updated_at
+        FROM chess_coach_profiles WHERE player_id = ? LIMIT 1");
+    if ($stmt === false) {
+        error_log('chess coach profile: prepare(read) failed: ' . $conn->error);
+        return null;
+    }
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+/** 先建一行全空的：传照片的人可能一个字都没填，那时也得有个地方挂文件名。 */
+function chess_profile_ensure($conn, $playerId) {
+    chess_profile_schema($conn);
+    $stmt = $conn->prepare("INSERT IGNORE INTO chess_coach_profiles
+        (player_id, created_at, updated_at) VALUES (?, NOW(), NOW())");
+    if ($stmt === false) {
+        error_log('chess coach profile: prepare(ensure) failed: ' . $conn->error);
+        return false;
+    }
+    $stmt->bind_param("i", $playerId);
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess coach profile: execute(ensure) failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    return $ok;
+}
+
+/**
+ * 整份覆盖式保存。$profile 是 coach_profile_normalize() 通过后的那一份，
+ * 字段顺序就是规则层的字段顺序 —— 端点不参与判断合不合法。
+ *
+ * created_at 只在第一次插入时写（ON DUPLICATE 那一段不碰它），
+ * 于是"什么时候开始挂名录"和"最后一次改是什么时候"两个时刻都留得住。
+ */
+function chess_profile_write($conn, $playerId, array $profile) {
+    chess_profile_schema($conn);
+    $stmt = $conn->prepare("INSERT INTO chess_coach_profiles
+        (player_id, title, elo, years, tagline, honors, language, timezone,
+         levels, goals, formats, slots, avatar, photos, certificates, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE title = VALUES(title), elo = VALUES(elo),
+            years = VALUES(years), tagline = VALUES(tagline), honors = VALUES(honors),
+            language = VALUES(language), timezone = VALUES(timezone),
+            levels = VALUES(levels), goals = VALUES(goals), formats = VALUES(formats),
+            slots = VALUES(slots), avatar = VALUES(avatar), photos = VALUES(photos),
+            certificates = VALUES(certificates), updated_at = NOW()");
+    if ($stmt === false) {
+        error_log('chess coach profile: prepare(write) failed: ' . $conn->error);
+        return false;
+    }
+    // elo/years 绑成 i 时 PHP 的 null 会作为 SQL NULL 下发（不是 0），
+    // 这正是规则层要区分"没登记"和"0"的那一处。
+    $stmt->bind_param(
+        "isiisssssssssss",
+        $playerId,
+        $profile['title'],
+        $profile['elo'],
+        $profile['years'],
+        $profile['tagline'],
+        $profile['honors'],
+        $profile['language'],
+        $profile['timezone'],
+        $profile['levels'],
+        $profile['goals'],
+        $profile['formats'],
+        $profile['slots'],
+        $profile['avatar'],
+        $profile['photos'],
+        $profile['certificates']
+    );
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess coach profile: execute(write) failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    return $ok;
+}
+
+/**
+ * 只改 avatar / photos / certificates 那一列（上传端点用）。
+ *
+ * 列名不能参数绑定，所以这里不是"把传进来的字段名拼进 SQL"：
+ * $field 只从这张白名单取列名，别的值退到 avatar。
+ */
+function chess_profile_set_image($conn, $playerId, $field, $value) {
+    $column = ['photos' => 'photos', 'certificates' => 'certificates'][$field] ?? 'avatar';
+    if (!chess_profile_ensure($conn, $playerId)) {
+        return false;
+    }
+    $stmt = $conn->prepare("UPDATE chess_coach_profiles
+        SET {$column} = ?, updated_at = NOW() WHERE player_id = ?");
+    if ($stmt === false) {
+        error_log('chess coach profile: prepare(image) failed: ' . $conn->error);
+        return false;
+    }
+    $stmt->bind_param("si", $value, $playerId);
+    $ok = $stmt->execute();
+    if (!$ok) {
+        error_log('chess coach profile: execute(image) failed: ' . $stmt->error);
+    }
+    $stmt->close();
+    return $ok;
+}
+
+/**
+ * 管理员的棋手 id（邮箱在 admin_users 里的那批）。
+ *
+ * 名录要把管理员算进去：他们没交过介绍也能开课堂，只查 approved 的话
+ * 站长自己在名录上就是隐身的。admin_users 是后台那套的资产，表不在就回空数组
+ * —— 名录少几个人，比整个页面 500 好。
+ */
+function chess_admin_player_ids($conn) {
+    static $ids = null;
+    if ($ids !== null) {
+        return $ids;
+    }
+    $ids = [];
+    $tables = $conn->query("SHOW TABLES LIKE 'admin_users'");
+    if (!($tables instanceof mysqli_result) || $tables->num_rows === 0) {
+        return $ids;
+    }
+    $result = $conn->query("SELECT p.id FROM chess_players p
+        JOIN admin_users a ON a.email = p.email");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $ids[] = (int) $row['id'];
+        }
+    }
+    return $ids;
+}
+
+/**
+ * 名录该列哪些人：申请已批准的 ∪ 管理员。
+ *
+ * 这里只认 status='approved'（参数绑死，学员侧写不出这个值），所以"谁能出现在
+ * 公开页面上"这件事全凭管理员点过那一下 —— 传再多表单也换不来一个名录位。
+ */
+function chess_coach_ids($conn, $cap = 100) {
+    chess_profile_schema($conn);
+    $limit = max(1, min(200, (int) $cap));
+    $ids = [];
+    $result = $conn->query("SELECT player_id FROM chess_coach_apps
+        WHERE status = 'approved' ORDER BY decided_at DESC LIMIT {$limit}");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $ids[(int) $row['player_id']] = true;
+        }
+    }
+    foreach (chess_admin_player_ids($conn) as $id) {
+        $ids[$id] = true;
+    }
+    unset($ids[0]);
+    return array_keys($ids);
+}
+
+/**
+ * 一批人 → 名录/主页用的扁平行。
+ *
+ * 🔴 SELECT 里没有 email，也没有 verified_at / 任何 *_hash：这两列一个把邮箱
+ * 挂在公开页面上，一个能点验证链接。要加列就回到这一行看一眼。
+ *
+ * 🔴 也不取 chess_coach_apps.intro：那段是申请时写给管理员看的，界面上承诺了
+ * "只有管理员看得到"。谁能上名录由 chess_coach_ids() 判完，这里只需要玩家本人
+ * 那一行 + 他自己填的资料，所以连 apps 表都不必 JOIN。
+ *
+ * $ids 是 chess_coach_ids() 自己算出来的整数数组（不是人发来的），所以拼进 IN
+ * 之前先逐个 intval —— 拼 SQL 的地方必须自己把类型钉死，不靠调用点自觉。
+ */
+function chess_coach_rows($conn, array $ids) {
+    chess_profile_schema($conn);
+    $clean = [];
+    foreach ($ids as $id) {
+        $id = (int) $id;
+        if ($id > 0) {
+            $clean[$id] = true;
+        }
+    }
+    if (!$clean) {
+        return [];
+    }
+    $in = implode(',', array_keys($clean));
+    $result = $conn->query("SELECT p.id AS player_id, p.nickname, p.rating,
+            f.title, f.elo, f.years, f.tagline, f.honors, f.language, f.timezone,
+            f.levels, f.goals, f.formats, f.slots, f.avatar, f.photos, f.certificates,
+            f.updated_at AS profile_at
+        FROM chess_players p
+        LEFT JOIN chess_coach_profiles f ON f.player_id = p.id
+        WHERE p.id IN ({$in})");
+    $rows = [];
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = coach_directory_entry($row);
+        }
+    }
+    return $rows;
+}
+
+/** 名录整页；没教练时回空数组，界面据此说"老师还在入驻"。 */
+function chess_coach_directory($conn, $cap = 100) {
+    return chess_coach_rows($conn, chess_coach_ids($conn, $cap));
+}
+
+/**
+ * 主页那一个教练；不在名录里就返回 null（界面据此回 no_such_coach）。
+ *
+ * "查无此人"和"这个人存在但没批准"给的是同一句 404：后者不该由公开页面告诉路人
+ * 谁交过申请、审到哪一步。
+ */
+function chess_coach_one($conn, $playerId) {
+    $playerId = (int) $playerId;
+    if ($playerId < 1 || !in_array($playerId, chess_coach_ids($conn), true)) {
+        return null;
+    }
+    $rows = chess_coach_rows($conn, [$playerId]);
+    return $rows[0] ?? null;
+}
+
+/* ------------------------------------------------------------------------ *
+ * 教练图片（头像 + 最多三张照片 + 最多六张证书）
+ *
+ * 文件在 v1/coach_media/<player_id>/ 下，目录里那张 .htaccess 写着 Require all denied：
+ * 这些字节只能从 chess_coach_photo.php 那一侧出去。为什么绕这一道：
+ *   - 静态可达就等于"任何人拿目录能枚举"，而共享主机上 mod_rewrite 能不能挡住
+ *     要看主机给不给力，这一条我在这儿没法验；
+ *   - 走 PHP 就能顺手问一句"这一行还指着这张图吗"，删掉的照片当场 404，
+ *     而不是留在盘上任人按 URL 取。
+ * 库里的列只存 coach_image_name() 认过的那 28 个字符，路径的每一段都由服务端拼，
+ * 所以这里没有任何一个字符串能决定"去读哪儿"。
+ * ------------------------------------------------------------------------ */
+
+function chess_coach_media_dir($playerId) {
+    return __DIR__ . '/coach_media/' . (int) $playerId;
+}
+
+/** 一条资料行现在引用着哪些文件名（用来判断哪些图该删、哪张图该给）。 */
+function chess_coach_media_names($row) {
+    $row = is_array($row) ? $row : [];
+    $names = [];
+    $avatar = trim((string) ($row['avatar'] ?? ''));
+    if ($avatar !== '') {
+        $names[] = $avatar;
+    }
+    foreach (['photos', 'certificates'] as $field) {
+        foreach (array_filter(array_map('trim', explode(',', (string) ($row[$field] ?? '')))) as $name) {
+            $names[] = $name;
+        }
+    }
+    return $names;
+}
+
+/**
+ * 删掉不再被引用的文件。$wanted 是这一行保存后引用着的那一列名字。
+ *
+ * 只动形状对的文件（那 24 位十六进制 + 三种扩展名），所以目录里那张 .htaccess
+ * 和任何别的东西都碰不到 —— 这个函数会删文件，边界要写死在代码里而不是靠调用点。
+ */
+function chess_coach_media_prune($playerId, array $wanted) {
+    $dir = chess_coach_media_dir($playerId);
+    if (!is_dir($dir)) {
+        return 0;
+    }
+    $dropped = 0;
+    foreach (scandir($dir) ?: [] as $file) {
+        if ($file === '.' || $file === '..' || in_array($file, $wanted, true)) {
+            continue;
+        }
+        if (preg_match(COACH_IMAGE_PATTERN, $file) && @unlink($dir . '/' . $file)) {
+            $dropped++;
+        }
+    }
+    return $dropped;
+}
+
+/**
+ * 这张图该不该给出去 → 给的话是哪条路径。
+ *
+ * 判据是"这一行确实还指着它"，不是"文件在不在"：文件名本身就是一道口令，
+ * 而删掉的那张早该取不到了。$name 先过 COACH_IMAGE_PATTERN，所以拼出来的路径
+ * 里除了那个整数目录，只有服务端自己写过的文件名。
+ */
+function chess_coach_media_path($playerId, $name, $row) {
+    $name = (string) $name;
+    if (!preg_match(COACH_IMAGE_PATTERN, $name)) {
+        return null;
+    }
+    if (!in_array($name, chess_coach_media_names($row), true)) {
+        return null;
+    }
+    $path = chess_coach_media_dir($playerId) . '/' . $name;
+    return is_file($path) ? $path : null;
 }

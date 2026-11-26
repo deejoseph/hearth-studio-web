@@ -10,9 +10,11 @@
  * chess-puter/src/chess/src/game/coachPref.js），两边共用的是 key 不是措辞：
  * 加一个选项要同时改那两处，改中文不用动代码。
  *
- * 还没做的一步：推荐打分。库里现在只有学员这一半，教练的档案（教龄、
- * 能带的时间段、授课语言）还没有入驻表，所以 matchCoach(pref, coach) 之类
- * 要等那张表建好再写 —— 现在写只能凭想象定权重。
+ * 教练的资料在下面的"教练资料"一节：那份是学员在名录上看到的门面，
+ * 和这里的偏好共用同一批选项 key（水平/目标/形式/时段/语言/时区），
+ * 所以"匹配得上"是两边同一套词在比，不是两套近义词。
+ * 打分本身在棋盘那侧（src/chess/src/game/coachMatch.js）：它只决定名录的排序
+ * 和卡片上那几行理由，不参与任何资格判定，所以不在这里留一份镜像实现。
  *
  * 禁止直接 URL 访问（同目录 .htaccess 已 FilesMatch 拒绝）。
  */
@@ -373,8 +375,408 @@ function coach_app_admin($row) {
         'verified' => ($row['verified_at'] ?? null) !== null,
         'rating' => (int) ($row['rating'] ?? 1200),
         'has_pref' => (int) ($row['has_pref'] ?? 0) > 0,
+        'title' => (string) ($row['title'] ?? ''),
+        'elo' => $row['elo'] ?? null,
+        'years' => $row['years'] ?? null,
         'joined_at' => $row['joined_at'] ?? null,
         'submitted_at' => $row['submitted_at'] ?? null,
         'decided_at' => $row['decided_at'] ?? null,
     ];
+}
+
+/* --------------------------------------------------------------------------
+ * 教练的资料（名录上那张门面）。
+ *
+ * 为什么不并进 chess_coach_apps：那行是审核记录，重新提交一次介绍就会把状态
+ * 写回 pending、把上次的结论清掉（chess_app_submit）。资料不该跟着陪葬 ——
+ * 一个已批准的教练换张头像，不该当场丢掉开课堂的权利。所以资料单表、
+ * 只由教练自己写，判够不够格的还是申请那一行的 status。
+ *
+ * 🔴 每一个字段都可以留空。资料是慢慢补的，不是门槛：什么都还没填的教练
+ * 照样出现在名录里，只是卡片上少几行。这里绝不判"填全了没"。
+ *
+ * 选项 key 全部复用上面偏好那几张白名单（水平/目标/形式/时段/语言/时区）——
+ * 学员要的和一个教练能给的，必须是同一套词，否则匹配出来的是近义词。
+ * ------------------------------------------------------------------------ */
+
+/**
+ * FIDE 称号。只收这几个小写 key，中文（国际大师、棋协大师……）在棋盘那侧。
+ * 女子称号单列（wgm/wim/wfm/wcm），因为它们是四张不同的证，不是"女子版"的修饰。
+ */
+const COACH_TITLES = ['gm', 'im', 'fm', 'cm', 'wgm', 'wim', 'wfm', 'wcm'];
+
+/**
+ * ELO 区间。下限压到 600：青少年登记分能低到三位数，卡在 1000 会把真人判成非法。
+ * 上限 2850 给世界第一留了余量，同时还能挡住"手滑多打一个 0"。
+ */
+const COACH_ELO_MIN = 600;
+const COACH_ELO_MAX = 2850;
+
+/** 教龄上限（年）。超过这个数多半是填错了，不是真教了这么久。 */
+const COACH_YEARS_MAX = 60;
+
+/** 一句话简介与荣誉的码点上限。库里那两列按这两个数建，界面上印的也是这两个数。 */
+const COACH_TAGLINE_MAX = 80;
+const COACH_HONORS_MAX = 300;
+
+/** 照片上限。三张足够说明"这个人在教棋"，再多就是相册，而这是名录不是网盘。 */
+const COACH_PHOTOS_MAX = 3;
+
+/** 证书与荣誉图片上限。证书要完整露出，六张足够放主要资历。 */
+const COACH_CERTIFICATES_MAX = 6;
+
+/** 图片文件名形状：随机 24 位十六进制 + 三种真图片扩展名之一。 */
+const COACH_IMAGE_PATTERN = '/^[a-f0-9]{24}\.(?:jpg|png|webp)$/';
+
+/** 上传时认的三种真图片，key 是 getimagesize() 报的 MIME。 */
+const COACH_IMAGE_TYPES = [
+    'image/jpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+];
+
+/** 单张图的字节上限与边长上限。名录一页十几张卡，图是这台机器上最贵的那部分。 */
+const COACH_IMAGE_BYTES_MAX = 2 * 1024 * 1024;
+const COACH_IMAGE_SIDE_MAX = 4000;
+
+/**
+ * 多选上限：能带的水平 1–4、擅长方向 1–3、上课形式 1–3、时段 0–4（时段可以不填）。
+ *
+ * levels/formats 这两个数和白名单一样长，意思是"全列都允许"：确实有人就是从零基础
+ * 带到有等级分，也确实有人三种形式都开 —— 那不是超卖。留着这两个数而不是写死
+ * count()，是因为白名单以后加一档时这两个口径不该跟着自动放宽。
+ * goals 收到 3 条（白名单有 5 项）：五项全勾在名录上等于什么都没标，
+ * 而这份资料存在的理由就是让人看出这个人擅长什么。
+ */
+const COACH_LEVELS_MAX = 4;
+const COACH_GOALS_MAX_COACH = 3;
+const COACH_FORMATS_MAX_COACH = 3;
+
+/**
+ * 可选单选：留空 = "没填"（存空串），填了就必须是白名单里的 key。
+ * 返回 [值, 字段, 错误码|null]，第三项非 null 时前两项没人该看。
+ */
+function coach_pick_opt($value, array $allowed, $field, $code = 'bad_profile') {
+    if ($value === null || $value === '') {
+        return ['', $field, null];
+    }
+    $key = coach_key($value);
+    if ($key === '' || !in_array($key, $allowed, true)) {
+        return ['', $field, $code];
+    }
+    return [$key, $field, null];
+}
+
+/**
+ * 可选整数：留空给 null（"没登记"和"0 分"是两件事，不能都存成 0）；
+ * 只收纯数字串或整数，别的形状一律不合格 —— 界面发的是数字输入框，
+ * 收到 '1500 分左右' 那种东西说明有人在绕界面，那更该挡住。
+ */
+function coach_int_opt($value, $min, $max, $field, $code = 'bad_profile') {
+    if ($value === null || $value === '') {
+        return [null, $field, null];
+    }
+    if (is_int($value)) {
+        $n = $value;
+    } elseif (is_string($value) && preg_match('/^\d{1,4}$/', trim($value))) {
+        $n = (int) trim($value);
+    } else {
+        return [null, $field, $code];
+    }
+    if ($n < $min || $n > $max) {
+        return [null, $field, $code];
+    }
+    return [$n, $field, null];
+}
+
+/**
+ * 可选文本。判定和偏好那条 note 完全同口径（coach_trim → 坏字节 → 码点上限），
+ * 因为同一句中文按字节量能差三倍，界面上印的上限必须是同一个量法。
+ */
+function coach_text_opt($value, $max, $field, $longCode, $badCode) {
+    if ($value === null) {
+        return ['', $field, null];
+    }
+    // 只收字符串：数组经 coach_trim 会变成 'Array' 五个字，安安静静进库。
+    if (!is_string($value)) {
+        return ['', $field, $badCode];
+    }
+    $s = coach_trim($value);
+    if ($s !== '' && !coach_is_utf8($s)) {
+        return ['', $field, $badCode];
+    }
+    if (coach_len($s) > $max) {
+        return ['', $field, $longCode];
+    }
+    return [$s, $field, null];
+}
+
+/**
+ * 多选，可以整条不填（min 固定 0）。去重 + 按白名单顺序排，同 coach_pick_many：
+ * 之后按选项数人、算匹配度数的都是同一列，而不是几种排列。
+ */
+function coach_many_opt($value, array $allowed, $max, $field, $code = 'bad_profile') {
+    // 空串按"一个都没选"处理，而不是丢给 coach_pick_many：那边把字符串包成
+    // 单元素数组，'' 就成了"选了一个不存在的 key"，报出来的是一句"选项不对"，
+    // 而人其实什么都没勾。
+    if ($value === null || $value === '') {
+        $value = [];
+    }
+    [$csv, $badField] = coach_pick_many($value, $allowed, 0, $max, $field);
+    return $csv === null ? ['', $field, $code] : [$csv, $field, null];
+}
+
+/**
+ * 一个图片文件名 → 规范名。
+ *
+ * 只认那个形状，不认路径：库里存的就是这一串，取文件时目录由服务端拼
+ * （coach_media/<player_id>/），所以这里放过一个带斜杠或 ".." 的名字，
+ * 就等于把整台主机的文件系统交出去。形状先判死，后面连读都不去读。
+ */
+function coach_image_name($value, $field = 'avatar', $code = 'bad_image') {
+    $name = is_string($value) ? trim($value) : null;
+    if ($name === null || $name === '') {
+        return ['', $field, null];
+    }
+    return preg_match(COACH_IMAGE_PATTERN, $name) ? [$name, $field, null] : ['', $field, $code];
+}
+
+/**
+ * 一串图片文件名（照片）。这里保留发来的顺序，只去重 ——
+ * 第一张是要当封面显示的，顺序是教练自己排的，不像选项那样有"规范次序"可言。
+ */
+function coach_image_list($value, $max, $field = 'photos', $code = 'bad_image', $tooManyCode = 'too_many_photos') {
+    if ($value === null || $value === '') {
+        return ['', $field, null];
+    }
+    if (is_string($value)) {
+        $value = explode(',', $value);
+    }
+    if (!is_array($value)) {
+        return ['', $field, $code];
+    }
+    $kept = [];
+    foreach ($value as $item) {
+        [$name, , $bad] = coach_image_name($item, $field, $code);
+        if ($bad !== null) {
+            return ['', $field, $bad];
+        }
+        if ($name === '' || isset($kept[$name])) {
+            continue;
+        }
+        $kept[$name] = true;
+    }
+    if (count($kept) > $max) {
+        return ['', $field, $tooManyCode];
+    }
+    return [implode(',', array_keys($kept)), $field, null];
+}
+
+/**
+ * 一份资料表单 → 能落库的那一份。
+ *
+ * 覆盖式保存：界面先把当前那一份读回来再整份发回，所以这里不必区分
+ * "没发这个键"和"发了空串" —— 那两种都按"清空"处理。少一套缺省语义，
+ * 就少一处只有真浏览器才能发现的漏存（同页多组控件共用一个 name 那类坑）。
+ */
+function coach_profile_normalize($data) {
+    $fail = static function ($code, $field) {
+        return ['ok' => false, 'profile' => null, 'code' => $code, 'field' => $field];
+    };
+    if (!is_array($data)) {
+        return $fail('bad_profile', null);
+    }
+
+    $out = [];
+
+    [$out['title'], $field, $code] = coach_pick_opt($data['title'] ?? '', COACH_TITLES, 'title');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['elo'], $field, $code] = coach_int_opt($data['elo'] ?? '', COACH_ELO_MIN, COACH_ELO_MAX, 'elo');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['years'], $field, $code] = coach_int_opt($data['years'] ?? '', 0, COACH_YEARS_MAX, 'years');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['tagline'], $field, $code] = coach_text_opt(
+        $data['tagline'] ?? '', COACH_TAGLINE_MAX, 'tagline', 'long_tagline', 'bad_tagline'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['honors'], $field, $code] = coach_text_opt(
+        $data['honors'] ?? '', COACH_HONORS_MAX, 'honors', 'long_honors', 'bad_honors'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['language'], $field, $code] = coach_pick_opt($data['language'] ?? '', COACH_LANGUAGES, 'language');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['timezone'], $field, $code] = coach_pick_opt($data['timezone'] ?? '', COACH_TIMEZONES, 'timezone');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['levels'], $field, $code] = coach_many_opt(
+        $data['levels'] ?? [], COACH_LEVELS, COACH_LEVELS_MAX, 'levels'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['goals'], $field, $code] = coach_many_opt(
+        $data['goals'] ?? [], COACH_GOALS, COACH_GOALS_MAX_COACH, 'goals'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['formats'], $field, $code] = coach_many_opt(
+        $data['formats'] ?? [], COACH_FORMATS, COACH_FORMATS_MAX_COACH, 'formats'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['slots'], $field, $code] = coach_many_opt(
+        $data['slots'] ?? [], COACH_SLOTS, count(COACH_SLOTS), 'slots'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['avatar'], $field, $code] = coach_image_name($data['avatar'] ?? '', 'avatar');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['photos'], $field, $code] = coach_image_list($data['photos'] ?? '', COACH_PHOTOS_MAX, 'photos');
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['certificates'], $field, $code] = coach_image_list(
+        $data['certificates'] ?? '', COACH_CERTIFICATES_MAX, 'certificates', 'bad_image', 'too_many_certificates'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    return ['ok' => true, 'profile' => $out, 'code' => null, 'field' => null];
+}
+
+/** 库里的一行（多选与照片是逗号串）→ 回给界面的形状（数组）。 */
+function coach_profile_public($row) {
+    $list = static function ($value) {
+        $value = trim((string) ($value ?? ''));
+        return $value === '' ? [] : explode(',', $value);
+    };
+    // elo/years 用 isset 而不是 ?:：0 年教龄和没登记是两件事，
+    // 一个要显示"0 年"（刚起步），一个要整行不出现。
+    $num = static function ($value) {
+        return $value === null || $value === '' ? null : (int) $value;
+    };
+    return [
+        'title' => (string) ($row['title'] ?? ''),
+        'elo' => $num($row['elo'] ?? null),
+        'years' => $num($row['years'] ?? null),
+        'tagline' => (string) ($row['tagline'] ?? ''),
+        'honors' => (string) ($row['honors'] ?? ''),
+        'language' => (string) ($row['language'] ?? ''),
+        'timezone' => (string) ($row['timezone'] ?? ''),
+        'levels' => $list($row['levels'] ?? ''),
+        'goals' => $list($row['goals'] ?? ''),
+        'formats' => $list($row['formats'] ?? ''),
+        'slots' => $list($row['slots'] ?? ''),
+        'avatar' => (string) ($row['avatar'] ?? ''),
+        'photos' => $list($row['photos'] ?? ''),
+        'certificates' => $list($row['certificates'] ?? ''),
+        'updated_at' => $row['updated_at'] ?? null,
+    ];
+}
+
+/**
+ * 这份资料填过没有。
+ *
+ * 全空的一行和"根本没这一行"在界面上要说同一句话（"还没填资料"），
+ * 而 chess_profile_ensure() 会因为传了一张照片就先建一行 —— 那时候别的列
+ * 还全是默认值。所以这里判的是内容，不是有没有行。
+ */
+function coach_profile_filled($profile) {
+    foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'avatar'] as $key) {
+        if ((string) ($profile[$key] ?? '') !== '') {
+            return true;
+        }
+    }
+    foreach (['levels', 'goals', 'formats', 'slots', 'photos', 'certificates'] as $key) {
+        if ((array) ($profile[$key] ?? []) !== []) {
+            return true;
+        }
+    }
+    // elo/years 用 isset：0 分、0 年都是填过了，不是没填。
+    return ($profile['elo'] ?? null) !== null || ($profile['years'] ?? null) !== null;
+}
+
+/**
+ * 名录/主页上的一行 → 给界面的形状。
+ *
+ * 🔴 这一行里没有 email，也没有 verified_at：名录是公开页面，
+ * 邮箱进了它就等于把每个教练的邮箱挂在网上。要联系走的是站内那套，不是这里。
+ * intro（申请时写给管理员看的那段经历）也不在这里 —— 界面上那句承诺是
+ * "只有管理员看得到"，把它印到公开主页上就是食言。教练要对外说的话，
+ * 在资料那一份里自己填（tagline / honors）。
+ *
+ * 入参是 chess_coach_rows() 那条 JOIN 出来的扁平行（资料列没建时用 ?? 兜默认值），
+ * 资料那一坨整个交给 coach_profile_public() 整形，界面因此只有一条读路径。
+ */
+function coach_directory_entry($row) {
+    $profile = coach_profile_public($row);
+    $profile['updated_at'] = $row['profile_at'] ?? null;
+    $rating = $row['rating'] ?? null;
+    return [
+        'player_id' => (int) ($row['player_id'] ?? 0),
+        'nickname' => (string) ($row['nickname'] ?? ''),
+        'rating' => $rating === null || $rating === '' ? null : (int) $rating,
+        'profile' => $profile,
+        'has_profile' => coach_profile_filled($profile),
+    ];
+}
+
+/**
+ * 上传的那份临时图 → 该不该收。
+ *
+ * 判据来自 getimagesize()（读文件头，不看人给的 MIME）：浏览器说的
+ * Content-Type 是客户端字段，把 .php 改名成 .jpg 再标 image/jpeg 照样能过。
+ * 这里要的是"它真是这三种图之一，并且尺寸在预算内"。
+ *
+ * 返回 [规范名|null, 错误码|null]；规范名 = 随机 24 位十六进制 + 真类型给的扩展名。
+ */
+function coach_image_store_name($info, $bytes, $randHex) {
+    if (!is_array($info) || $bytes <= 0 || $bytes > COACH_IMAGE_BYTES_MAX) {
+        return [null, 'big_image'];
+    }
+    $ext = COACH_IMAGE_TYPES[$info['mime'] ?? ''] ?? null;
+    if ($ext === null) {
+        return [null, 'bad_image'];
+    }
+    $w = (int) ($info[0] ?? 0);
+    $h = (int) ($info[1] ?? 0);
+    if ($w < 1 || $h < 1 || $w > COACH_IMAGE_SIDE_MAX || $h > COACH_IMAGE_SIDE_MAX) {
+        return [null, 'big_image'];
+    }
+    if (!preg_match('/^[a-f0-9]{24}$/', $randHex)) {
+        return [null, 'bad_image'];
+    }
+    return [$randHex . '.' . $ext, null];
 }
