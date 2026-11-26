@@ -82,6 +82,20 @@ const CHESS_ERRORS = [
     'no_draw_offer' => ['没有待答复的提和', 409],
     'not_your_offer' => ['这是你提的和，要等对方答复', 409],
 
+    // 课堂（P4）。老师和 N 个学生共用一块棋盘，错误文案按 code 出。
+    'bad_class_code' => ['课堂码是 4 位数字', 400],
+    'no_such_class' => ['没有这个课堂码', 404],
+    'class_closed' => ['这个课堂已经结束了', 409],
+    'not_class_member' => ['你不在这个课堂里', 403],
+    'not_teacher' => ['这一步只有老师能做', 403],
+    'teacher_no_hand' => ['老师不用举手', 400],
+    'no_permission' => ['现在轮不到你走，先等老师批准', 403],
+    'already_approved' => ['老师已经让你走了', 409],
+    'bad_action' => ['举手动作不认识', 400],
+    'bad_move' => ['这一步看着不像一步棋', 400],
+    'bad_player_id' => ['请选择课堂里的一位学生', 400],
+    'stale' => ['课堂已经往前走了，请等棋盘同步后再试', 409],
+
     // 教练偏好（P3）。界面按 code + field 出句子，中文只当兜底。
     'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
     'long_note' => ['说明太长了，请缩到 ' . COACH_NOTE_MAX . ' 个字以内', 400],
