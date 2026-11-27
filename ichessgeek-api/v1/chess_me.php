@@ -12,7 +12,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 
 $id = chess_player_id();
 if ($id === 0) {
-    chess_json(['ok' => true, 'signed_in' => false, 'verified' => false, 'player' => null]);
+    chess_json(['ok' => true, 'signed_in' => false, 'verified' => false, 'admin' => false, 'player' => null]);
 }
 
 $conn = chess_db();
@@ -30,7 +30,7 @@ try {
         // 会话还在但账号已经不存在：清掉，别让人带着幽灵身份操作
         $_SESSION = [];
         session_destroy();
-        chess_json(['ok' => true, 'signed_in' => false, 'verified' => false, 'player' => null]);
+        chess_json(['ok' => true, 'signed_in' => false, 'verified' => false, 'admin' => false, 'player' => null]);
     }
 
     $seen = $conn->prepare("UPDATE chess_players SET last_seen_at = NOW() WHERE id = ?");
@@ -42,6 +42,7 @@ try {
         'ok' => true,
         'signed_in' => true,
         'verified' => $player['verified_at'] !== null,
+        'admin' => chess_player_is_admin($conn, $id),
         'player' => chess_public_row($player),
     ]);
 } catch (Throwable $e) {

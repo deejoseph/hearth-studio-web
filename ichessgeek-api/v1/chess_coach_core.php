@@ -10,9 +10,9 @@
  * chess-puter/src/chess/src/game/coachPref.js），两边共用的是 key 不是措辞：
  * 加一个选项要同时改那两处，改中文不用动代码。
  *
- * 教练的资料在下面的"教练资料"一节：那份是学员在名录上看到的门面，
- * 和这里的偏好共用同一批选项 key（水平/目标/形式/时段/语言/时区），
- * 所以"匹配得上"是两边同一套词在比，不是两套近义词。
+ * 教练的资料在下面的"教练资料"一节：那份是学员在名录上看到的门面。
+ * 目标、形式、时段、语言与时区沿用这里的 key；学生水平是"我现在在哪"，
+ * 教练水平是"我接收哪一档"，由 coachMatch.js 显式换算，不能直接比字符串。
  * 打分本身在棋盘那侧（src/chess/src/game/coachMatch.js）：它只决定名录的排序
  * 和卡片上那几行理由，不参与任何资格判定，所以不在这里留一份镜像实现。
  *
@@ -446,8 +446,8 @@ function coach_app_admin($row) {
  * 🔴 每一个字段都可以留空。资料是慢慢补的，不是门槛：什么都还没填的教练
  * 照样出现在名录里，只是卡片上少几行。这里绝不判"填全了没"。
  *
- * 选项 key 全部复用上面偏好那几张白名单（水平/目标/形式/时段/语言/时区）——
- * 学员要的和一个教练能给的，必须是同一套词，否则匹配出来的是近义词。
+ * 目标、形式、时段、语言与时区复用上面的白名单；接收水平另有一张表，
+ * 因为"我现在会走子"和"我接收五级以下"不是同一件事。
  * ------------------------------------------------------------------------ */
 
 /**
@@ -466,9 +466,22 @@ const COACH_ELO_MAX = 2850;
 /** 教龄上限（年）。超过这个数多半是填错了，不是真教了这么久。 */
 const COACH_YEARS_MAX = 60;
 
-/** 一句话简介与荣誉的码点上限。库里那两列按这两个数建，界面上印的也是这两个数。 */
+/** 一句话简介、荣誉与教学补充说明的码点上限，与界面 maxlength 同口径。 */
 const COACH_TAGLINE_MAX = 80;
 const COACH_HONORS_MAX = 300;
+const COACH_TEACHING_FOCUS_MAX = 300;
+
+/** 教练接收的学生水平。旧 key 只在读/写边界换算，不再落库。 */
+const COACH_ACCEPT_LEVELS = ['zero', 'amateur5', 'amateur1', 'master'];
+const COACH_ACCEPT_LEVEL_ALIASES = [
+    'zero' => 'zero',
+    'moves' => 'amateur5',
+    'play' => 'amateur5',
+    'rated' => 'master',
+    'amateur5' => 'amateur5',
+    'amateur1' => 'amateur1',
+    'master' => 'master',
+];
 
 /** 照片上限。三张足够说明"这个人在教棋"，再多就是相册，而这是名录不是网盘。 */
 const COACH_PHOTOS_MAX = 3;
@@ -644,6 +657,32 @@ function coach_many_opt($value, array $allowed, $max, $field, $code = 'bad_profi
     return $csv === null ? ['', $field, $code] : [$csv, $field, null];
 }
 
+/** 接收水平：兼容旧表单发来的 key，返回时只留新白名单里的规范值。 */
+function coach_accept_levels($value) {
+    if ($value === null || $value === '') {
+        return ['', 'levels', null];
+    }
+    if (is_string($value)) {
+        $value = str_contains($value, ',') ? explode(',', $value) : [$value];
+    }
+    if (!is_array($value)) {
+        return ['', 'levels', 'bad_profile'];
+    }
+    $mapped = [];
+    foreach ($value as $item) {
+        $key = coach_key($item);
+        if ($key === null || !isset(COACH_ACCEPT_LEVEL_ALIASES[$key])) {
+            return ['', 'levels', 'bad_profile'];
+        }
+        $mapped[COACH_ACCEPT_LEVEL_ALIASES[$key]] = true;
+    }
+    if (count($mapped) > COACH_LEVELS_MAX) {
+        return ['', 'levels', 'bad_profile'];
+    }
+    $keys = array_values(array_filter(COACH_ACCEPT_LEVELS, static fn ($key) => isset($mapped[$key])));
+    return [implode(',', $keys), 'levels', null];
+}
+
 /**
  * 一个图片文件名 → 规范名。
  *
@@ -736,6 +775,14 @@ function coach_profile_normalize($data) {
         return $fail($code, $field);
     }
 
+    [$out['teaching_focus'], $field, $code] = coach_text_opt(
+        $data['teaching_focus'] ?? '', COACH_TEACHING_FOCUS_MAX, 'teaching_focus',
+        'long_teaching_focus', 'bad_teaching_focus'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
     [$out['enrollment_notes'], $field, $code] = coach_text_opt(
         $data['enrollment_notes'] ?? '', COACH_ENROLLMENT_NOTES_MAX, 'enrollment_notes',
         'long_enrollment_notes', 'bad_enrollment_notes'
@@ -775,9 +822,7 @@ function coach_profile_normalize($data) {
         return $fail($code, $field);
     }
 
-    [$out['levels'], $field, $code] = coach_many_opt(
-        $data['levels'] ?? [], COACH_LEVELS, COACH_LEVELS_MAX, 'levels'
-    );
+    [$out['levels'], $field, $code] = coach_accept_levels($data['levels'] ?? []);
     if ($code !== null) {
         return $fail($code, $field);
     }
@@ -834,19 +879,21 @@ function coach_profile_public($row) {
     $num = static function ($value) {
         return $value === null || $value === '' ? null : (int) $value;
     };
+    $levels = coach_accept_levels($row['levels'] ?? '')[0];
     return [
         'title' => (string) ($row['title'] ?? ''),
         'elo' => $num($row['elo'] ?? null),
         'years' => $num($row['years'] ?? null),
         'tagline' => (string) ($row['tagline'] ?? ''),
         'honors' => (string) ($row['honors'] ?? ''),
+        'teaching_focus' => (string) ($row['teaching_focus'] ?? ''),
         'enrollment_notes' => (string) ($row['enrollment_notes'] ?? ''),
         'tuition_text' => (string) ($row['tuition_text'] ?? ''),
         'schedule_text' => (string) ($row['schedule_text'] ?? ''),
         'hourly_rate_cny' => $num($row['hourly_rate_cny'] ?? null),
         'language' => (string) ($row['language'] ?? ''),
         'timezone' => (string) ($row['timezone'] ?? ''),
-        'levels' => $list($row['levels'] ?? ''),
+        'levels' => $levels === '' ? [] : explode(',', $levels),
         'goals' => $list($row['goals'] ?? ''),
         'formats' => $list($row['formats'] ?? ''),
         'slots' => $list($row['slots'] ?? ''),
@@ -865,7 +912,7 @@ function coach_profile_public($row) {
  * 还全是默认值。所以这里判的是内容，不是有没有行。
  */
 function coach_profile_filled($profile) {
-    foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text',
+    foreach (['title', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'tuition_text',
         'schedule_text', 'language', 'timezone', 'avatar'] as $key) {
         if ((string) ($profile[$key] ?? '') !== '') {
             return true;

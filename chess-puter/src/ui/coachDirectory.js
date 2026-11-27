@@ -59,7 +59,8 @@ function avatarOf(coach, openImage, host = null, big = false) {
   if (!pic) return fallback();
 
   const trigger = coachImageTrigger({
-    src: coachPhotoUrl(coach.player_id, pic),
+    src: coachPhotoUrl(coach.player_id, pic, big ? 320 : 96),
+    fullSrc: coachPhotoUrl(coach.player_id, pic),
     alt: `${name} 的头像`,
     openImage,
     className,
@@ -143,7 +144,12 @@ export function mountCoachDirectory({
   let rows = [];
   let homeCoach = null;
   let homeRequest = 0;
-  let listRequest = 0;
+  let listPending = null;
+  const LIST_TTL = 120000;
+  const HOME_TTL = 300000;
+  let listCachedAt = 0;
+  const homeCache = new Map();
+  const homePending = new Map();
 
   function say(textline) {
     el.state.textContent = textline ?? '';
@@ -200,23 +206,32 @@ export function mountCoachDirectory({
     el.refresh.hidden = scored.length === 0;
   }
 
-  async function load() {
-    const ticket = ++listRequest;
-    const reply = await call('chess_coach_directory.php?n=12', { method: 'GET' });
-    if (ticket !== listRequest) return { ok: false, stale: true };
-    if (!reply.ok) {
-      rows = [];
-      el.list.replaceChildren();
-      el.list.hidden = true;
-      el.empty.hidden = true;
-      el.refresh.hidden = false;
-      say(reply.message ?? '教练名录这会儿没取回来。');
-      return reply;
+  function load({ force = false } = {}) {
+    if (!force && Date.now() - listCachedAt < LIST_TTL && listCachedAt > 0) {
+      render();
+      return Promise.resolve({ ok: true, coaches: rows, cached: true });
     }
-    rows = Array.isArray(reply.coaches) ? reply.coaches : [];
-    say('');
-    render();
-    return reply;
+    if (listPending) return listPending;
+    listPending = call('chess_coach_directory.php?n=12', { method: 'GET' })
+      .then((reply) => {
+        if (!reply.ok) {
+          rows = [];
+          el.list.replaceChildren();
+          el.list.hidden = true;
+          el.empty.hidden = true;
+          el.refresh.hidden = false;
+          say(reply.message ?? '教练名录这会儿没取回来。');
+          return reply;
+        }
+        rows = Array.isArray(reply.coaches) ? reply.coaches : [];
+        homeCache.clear();
+        listCachedAt = Date.now();
+        say('');
+        render();
+        return reply;
+      })
+      .finally(() => { listPending = null; });
+    return listPending;
   }
 
   /** 切换教练时先清空上一页，慢网络下也不能把 A 的资料当成 B 的资料。 */
@@ -242,17 +257,41 @@ export function mountCoachDirectory({
   /** 主页整页取一次：名录卡片只有摘要，荣誉、照片与公开投诉在完整行里。 */
   async function openHome(playerId) {
     const ticket = ++homeRequest;
+    const id = Number(playerId);
     resetHome();
     say('');
     if (!el.home.open) el.home.showModal();
 
-    const reply = await call(`chess_coach_get.php?c=${encodeURIComponent(playerId)}`, { method: 'GET' });
-    if (ticket !== homeRequest) return;
+    const cached = homeCache.get(id);
+    if (cached && Date.now() - cached.at < HOME_TTL) {
+      paintHome(cached.coach);
+      return;
+    }
+    if (homePending.has(id)) {
+      const waiting = homePending.get(id);
+      if (waiting) paintHome(waiting);
+      return;
+    }
+    const fromList = rows.find((one) => Number(one.player_id) === id);
+    if (fromList?.profile) paintHome(fromList);
+
+    const pending = call(`chess_coach_get.php?c=${encodeURIComponent(playerId)}`, { method: 'GET' })
+      .then((reply) => {
+        const coach = reply.ok ? reply.coach ?? null : null;
+        if (coach) {
+          if (homeCache.size >= 50) homeCache.delete(homeCache.keys().next().value);
+          homeCache.set(id, { coach, at: Date.now() });
+        }
+        return { reply, coach };
+      })
+      .finally(() => homePending.delete(id));
+    homePending.set(id, fromList ?? null);
+    const { reply, coach } = await pending;
+    if (ticket !== homeRequest || !el.home.open) return;
     if (!reply.ok) {
       el.homeState.textContent = reply.message ?? '这一页没取回来。';
       return;
     }
-    const coach = reply.coach ?? null;
     if (!coach) {
       el.homeState.textContent = '这位教练还没进名录。';
       return;
@@ -263,7 +302,8 @@ export function mountCoachDirectory({
   function homePhoto(coach, name, at, certificate = false) {
     const imageClass = certificate ? 'coach-home-photo coach-home-certificate' : 'coach-home-photo';
     return coachImageTrigger({
-      src: coachPhotoUrl(coach.player_id, name),
+      src: coachPhotoUrl(coach.player_id, name, certificate ? 960 : 640),
+      fullSrc: coachPhotoUrl(coach.player_id, name),
       alt: `${coach.nickname || '教练'} 的${certificate ? '证书图片' : '照片'} ${at + 1}`,
       openImage,
       className: 'coach-home-photo-trigger',
@@ -342,7 +382,7 @@ export function mountCoachDirectory({
     el.homeComplaint.hidden = !complaints.isStudent();
   }
 
-  el.refresh.addEventListener('click', load);
+  el.refresh.addEventListener('click', () => load({ force: true }));
   el.homeClose.addEventListener('click', () => el.home.close());
   el.home.addEventListener('close', () => {
     homeRequest += 1;
@@ -367,7 +407,8 @@ export function mountCoachDirectory({
   load();
 
   return {
-    refresh: load,
+    refresh: (options) => load(options),
+    rerender: render,
     openHome,
     /** 身份或教练资格变化时只重画门禁，不把公开名录再取一遍。 */
     syncGate: () => {

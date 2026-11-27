@@ -67,9 +67,11 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
     verifyEmail: $('verify-email'),
     resendBtn: $('resend-btn'),
     verifyError: $('verify-error'),
+    adminEntry: $('coach-admin-btn'),
   };
 
   let player = null;
+  let admin = false;
 
   /** Bumped every time the dialog opens. A reply can outlive the panel it was
       asked from, so an old reply may only close the opening it belongs to. */
@@ -105,6 +107,7 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
         : '还没确认 —— 请收一下邮件。'
       : '';
     el.stateLine.classList.toggle('confirmed', !!player?.verified);
+    if (el.adminEntry) el.adminEntry.hidden = !admin;
     // paint() 是这里唯一一处"身份落定"的地方：登录、注册、退出、首屏问到的
     // 四条路都要经过它，所以别的面板挂在这一点上，而不是各自去猜哪儿会改。
     onIdentity();
@@ -189,6 +192,7 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
    */
   function acceptSignIn(reply, epoch, pane) {
     player = reply.player ?? null;
+    admin = reply.admin === true;
     paint();
     el.signinPassword.value = '';
     showToast(`已登录为 ${player?.nickname ?? '你'}。`);
@@ -213,6 +217,7 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
   async function refresh() {
     await run(api.who(), (reply) => {
       player = reply?.ok && reply.signed_in ? reply.player : null;
+      admin = reply?.ok && reply.signed_in && reply.admin === true;
       paint();
     });
   }
@@ -273,6 +278,7 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
           return;
         }
         player = reply.player ?? null;
+        admin = reply.admin === true;
         paint();
         el.signupPassword.value = '';
         if (reply.mail_sent === false) {
@@ -292,6 +298,7 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
   el.signOutBtn.addEventListener('click', () => {
     run(api.signOut(), () => {
       player = null;
+      admin = false;
       paint();
       el.dialog.close();
       showPane('signin');
@@ -340,5 +347,5 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
   paint(); // the chip says 登录 until the server answers
   refresh();
 
-  return { player: () => player, open: (which) => openDialog(which) };
+  return { player: () => player, isAdmin: () => admin, open: (which) => openDialog(which) };
 }

@@ -87,6 +87,7 @@ try {
         'status' => 'created',
         'signed_in' => true,
         'verified' => false,
+        'admin' => false,
         'mail_sent' => $mail_sent,
         'player' => chess_public_row($player),
         'message' => $mail_sent

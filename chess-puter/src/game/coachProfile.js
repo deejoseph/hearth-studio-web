@@ -4,18 +4,26 @@
  * 这里没有 DOM 也没有 fetch，所以能在 vitest 里跑。界面在 ui/coachProfile.js，
  * 名录的排法在 game/coachMatch.js。
  *
- * 🔴 选项的 key 全部复用 game/coachPref.js 那一份（学员填的表和教练填的表共用
- * 同一批 key），匹配因此是"同一列东西对同一列东西"，不会出现两边各数一套口径。
+ * 目标、形式、时段、语言与时区复用 game/coachPref.js 的 key；接收学生水平
+ * 单独定义，因为"我现在什么水平"和"我接收哪一档"不是同一列。
  * key 同时和后端 v1/chess_coach_core.php 的白名单绑住：tests/coachPref.test.js
- * 逐条比对，改一边不改另一边就会红。
+ * 与 tests/coachProfile.test.js 逐条比对，改一边不改另一边就会红。
  */
 
-import { COACH_OPTIONS, coachKeys, coachLabel, formatCny, parseCny } from './coachPref.js';
 import { API_BASE } from '../net/auth.js';
+import { COACH_OPTIONS, coachKeys, coachLabel, formatCny, parseCny } from './coachPref.js';
+
+export const COACH_ACCEPT_LEVELS = [
+  ['zero', '零基础'],
+  ['amateur5', '业余五级以下'],
+  ['amateur1', '业余一级以下'],
+  ['master', '业余大师以上'],
+];
 
 /** 和后端 COACH_TAGLINE_MAX / COACH_HONORS_MAX / COACH_PHOTOS_MAX / COACH_CERTIFICATES_MAX 同一个数。 */
 export const COACH_TAGLINE_MAX = 80;
 export const COACH_HONORS_MAX = 300;
+export const COACH_TEACHING_FOCUS_MAX = 300;
 export const COACH_PHOTOS_MAX = 3;
 export const COACH_CERTIFICATES_MAX = 6;
 export const COACH_ELO_MIN = 600;
@@ -69,8 +77,9 @@ export const COACH_PROFILE_TITLES = {
   hourly_rate_cny: '每小时费率（人民币）',
   tuition_text: '课时费标准',
   schedule_text: '上课时段',
-  levels: '能带到什么水平',
+  levels: '可以接受什么水平的学生',
   goals: '擅长教什么',
+  teaching_focus: '补充说明（选填）',
   formats: '上课形式',
   slots: '方便的时间段',
   language: '授课语言',
@@ -85,19 +94,21 @@ export function coachTitleLabel(key) {
   return COACH_TITLES.find(([one]) => one === key)?.[1] ?? key;
 }
 
-/**
- * 教练那一侧叫 levels，学员那一侧叫 level（复数指"能带好几档"）。
- * key 是同一批，只是名字不同 —— 这里换回 coachPref 那套名字去查说法。
- */
-function prefGroup(group) {
-  return group === 'levels' ? 'level' : group;
+/** 旧档位只在读取时换算，不把过时 key 再写回数据库。 */
+export function normalizeCoachAcceptLevels(value) {
+  const keys = Array.isArray(value) ? value : String(value ?? '').split(',');
+  const legacy = { zero: 'zero', moves: 'amateur5', play: 'amateur5', rated: 'master' };
+  const mapped = keys.map((key) => legacy[String(key).trim()] ?? String(key).trim());
+  return COACH_ACCEPT_LEVELS.map(([key]) => key).filter((key) => mapped.includes(key));
 }
 
 /** 一句人类可读的话：给已选的值找出对应的说法（多选，逗号串或数组都吃）。 */
 export function coachProfileLabels(group, value) {
-  const keys = Array.isArray(value) ? value : String(value ?? '').split(',');
+  const keys = group === 'levels' ? normalizeCoachAcceptLevels(value)
+    : Array.isArray(value) ? value : String(value ?? '').split(',');
+  const labels = group === 'levels' ? COACH_ACCEPT_LEVELS : COACH_OPTIONS[group];
   return keys.map((key) => String(key).trim()).filter(Boolean)
-    .map((key) => coachLabel(prefGroup(group), key));
+    .map((key) => labels.find(([one]) => one === key)?.[1] ?? coachLabel(group, key));
 }
 
 /**
@@ -106,9 +117,10 @@ export function coachProfileLabels(group, value) {
  * 名字是服务端随机生成的 24 位十六进制 + 扩展名，路径里没有任何一段来自人写的
  * 文件名（目录由后端按 (int)player_id 拼），所以这里拼出来的串不可能越界。
  */
-export function coachPhotoUrl(playerId, name) {
+export function coachPhotoUrl(playerId, name, thumb = 0) {
   if (!name) return '';
-  return `${API_BASE}chess_coach_photo.php?c=${encodeURIComponent(playerId)}&f=${encodeURIComponent(name)}`;
+  const size = [96, 160, 320, 640, 960].includes(Number(thumb)) ? `&t=${Number(thumb)}` : '';
+  return `${API_BASE}chess_coach_photo.php?c=${encodeURIComponent(playerId)}&f=${encodeURIComponent(name)}${size}`;
 }
 
 /**
@@ -167,6 +179,8 @@ export function validateCoachProfile(form) {
   if (tagline.error) return fail('tagline', tagline.error);
   const honors = text('honors', COACH_HONORS_MAX);
   if (honors.error) return fail('honors', honors.error);
+  const teachingFocus = text('teaching_focus', COACH_TEACHING_FOCUS_MAX);
+  if (teachingFocus.error) return fail('teaching_focus', teachingFocus.error);
   const enrollmentNotes = text('enrollment_notes', COACH_ENROLLMENT_NOTES_MAX);
   if (enrollmentNotes.error) return fail('enrollment_notes', enrollmentNotes.error);
   const tuitionText = text('tuition_text', COACH_TUITION_TEXT_MAX);
@@ -189,6 +203,7 @@ export function validateCoachProfile(form) {
     years: years.value,
     tagline: tagline.value,
     honors: honors.value,
+    teaching_focus: teachingFocus.value,
     enrollment_notes: enrollmentNotes.value,
     hourly_rate_cny: hourlyRate.value,
     tuition_text: tuitionText.value,
@@ -218,8 +233,9 @@ export function validateCoachProfile(form) {
   /** 多选：去重 + 只留我发出去的 key（别人手改过的 DOM 不该把没见过的值送到服务端）。 */
   function pick(group) {
     const value = source[group];
+    if (group === 'levels') return normalizeCoachAcceptLevels(value);
     const list = Array.isArray(value) ? value : String(value ?? '').split(',');
-    const allowed = coachKeys(group === 'levels' ? 'level' : group);
+    const allowed = coachKeys(group);
     return [...new Set(list.map((key) => String(key).trim()).filter(Boolean))]
       .filter((key) => allowed.includes(key));
   }
@@ -266,13 +282,11 @@ export function coachBadges(coach) {
   return bits;
 }
 
-/** 卡片上的"能带……/教战术……"那一串（最多两样，多了读不完）。 */
+/** 卡片上的"可接收……/擅长……"那一串（最多两样，多了读不完）。 */
 export function coachProfileTags(coach, limit = 2) {
   const profile = coach?.profile ?? {};
   const shown = [
-    // 档位那几句话本身是整句（"能完整下棋，想提高"），直接接在"能带"后面读不通，
-    // 所以套一层书名号当引用。
-    ...coachProfileLabels('levels', profile.levels).map((one) => `能带「${one}」`),
+    ...coachProfileLabels('levels', profile.levels).map((one) => `可接收「${one}」`),
     ...coachProfileLabels('goals', profile.goals),
   ];
   return shown.slice(0, limit);
@@ -290,6 +304,9 @@ export function coachProfileRows(coach) {
   for (const group of COACH_PROFILE_GROUPS) {
     const labels = coachProfileLabels(group, profile[group]);
     if (labels.length) rows.push({ label: COACH_PROFILE_TITLES[group], text: labels.join('、') });
+  }
+  if (String(profile.teaching_focus ?? '').trim()) {
+    rows.push({ label: COACH_PROFILE_TITLES.teaching_focus, text: profile.teaching_focus });
   }
   if (profile.language) {
     rows.push({ label: COACH_PROFILE_TITLES.language, text: coachLabel('language', profile.language) });

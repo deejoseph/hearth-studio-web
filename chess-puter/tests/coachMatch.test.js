@@ -8,7 +8,7 @@ import { matchCoach, matchReasons, rankCoaches } from '../src/game/coachMatch.js
  * 1. 分数只是顺序 —— 一位教练哪怕一样都对不上，也照样出现在名录里（这里没有门禁）；
  * 2. 同分不换序 —— 同一份数据刷新两次，卡片不该自己换位。
  *
- * 权重那几个数字本身不重要（改大改小都不算坏），重要的是"能带你这一档"排在
+ * 权重那几个数字本身不重要（改大改小都不算坏），重要的是"能接收这一档"排在
  * "时区一样"前面。所以用例比的是相对顺序，不是总分。
  */
 
@@ -54,12 +54,12 @@ describe('一位教练对一份偏好值几分', () => {
 
   it('全对上：每一样都留一句理由', () => {
     const match = matchCoach(pref(), coachRow({
-      levels: ['play', 'rated'], goals: ['tactics', 'opening'], formats: ['one'],
+      levels: ['amateur5', 'master'], goals: ['tactics', 'opening'], formats: ['one'],
       slots: ['wkend_am'], timezone: 'Asia/Shanghai', language: 'zh',
     }));
     expect(match.matched).toBe(true);
     expect(match.reasons).toEqual([
-      '能带「能完整下棋，想提高」',
+      '可接收「业余五级以下」',
       '补战术',
       '一对一',
       '在周末上午有空的',
@@ -75,10 +75,24 @@ describe('一位教练对一份偏好值几分', () => {
     expect(match.matched).toBe(false);
   });
 
-  it('能带的水平比时区值钱', () => {
-    const byLevel = matchCoach(pref(), coachRow({ levels: ['play'] })).score;
+  it('能接收的水平比时区值钱', () => {
+    const byLevel = matchCoach(pref(), coachRow({ levels: ['amateur5'] })).score;
     const byZone = matchCoach(pref(), coachRow({ timezone: 'Asia/Shanghai' })).score;
     expect(byLevel).toBeGreaterThan(byZone);
+  });
+
+  it.each([
+    ['zero', 'zero', '零基础'],
+    ['moves', 'amateur5', '业余五级以下'],
+    ['play', 'amateur5', '业余五级以下'],
+    ['rated', 'master', '业余大师以上'],
+  ])('学员当前水平 %s 对应教练接收档位 %s', (level, accepted, label) => {
+    const match = matchCoach(pref({ level }), coachRow({ levels: [accepted] }));
+    expect(match.reasons[0]).toBe(`可接收「${label}」`);
+  });
+
+  it('接收档位是上限，不会把高水平学员推荐给只收零基础的教练', () => {
+    expect(matchCoach(pref({ level: 'rated' }), coachRow({ levels: ['zero'] })).matched).toBe(false);
   });
 
   it('擅长方向对上几项就算几项，时段同理', () => {
@@ -96,7 +110,7 @@ describe('一位教练对一份偏好值几分', () => {
   });
 
   it('多选值存成逗号串也认（库里就是这一列的形状）', () => {
-    expect(matchCoach(pref(), coachRow({ levels: 'moves,play' })).matched).toBe(true);
+    expect(matchCoach(pref(), coachRow({ levels: 'amateur5,amateur1' })).matched).toBe(true);
   });
 });
 
@@ -127,7 +141,7 @@ describe('整页顺序', () => {
   it('分数高的在前', () => {
     const list = rankCoaches([
       coachRow({ goals: ['endgame'] }, { player_id: 1 }),
-      coachRow({ levels: ['play'], goals: ['tactics'] }, { player_id: 2 }),
+      coachRow({ levels: ['amateur5'], goals: ['tactics'] }, { player_id: 2 }),
     ], mine);
     expect(list.map((item) => item.coach.player_id)).toEqual([2, 1]);
   });
@@ -176,11 +190,11 @@ describe('整页顺序', () => {
 describe('卡片上那句"为什么排在这儿"', () => {
   it('最多三条，前几条本来就是分最高的', () => {
     const reasons = matchReasons(matchCoach(pref(), coachRow({
-      levels: ['play'], goals: ['tactics', 'opening'], formats: ['one'],
+      levels: ['amateur5'], goals: ['tactics', 'opening'], formats: ['one'],
       slots: ['wkend_am'], timezone: 'Asia/Shanghai', language: 'zh',
     })));
     expect(reasons).toHaveLength(3);
-    expect(reasons[0]).toBe('能带「能完整下棋，想提高」');
+    expect(reasons[0]).toBe('可接收「业余五级以下」');
   });
 
   it('没理由就是空数组，界面据此换说教练自己标的那两样', () => {
@@ -191,7 +205,7 @@ describe('卡片上那句"为什么排在这儿"', () => {
 
   it('一条理由都不编给教练打广告（只出真对上的字段）', () => {
     const reasons = matchReasons(matchCoach(pref(), coachRow({
-      honors: '带出过世界冠军', tagline: '全网最低价', levels: ['play'],
+      honors: '带出过世界冠军', tagline: '全网最低价', levels: ['amateur5'],
     })));
     expect(reasons.join('')).not.toMatch(/冠军|价格/);
   });

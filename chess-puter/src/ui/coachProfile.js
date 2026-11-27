@@ -21,6 +21,7 @@ import { prepareCoachImage } from '../net/coachImage.js';
 import { coachImageTrigger } from './coachLightbox.js';
 import { COACH_OPTIONS, normalizeCoachText } from '../game/coachPref.js';
 import {
+  COACH_ACCEPT_LEVELS,
   COACH_CERTIFICATES_MAX,
   COACH_ENROLLMENT_NOTES_MAX,
   COACH_HONORS_MAX,
@@ -31,9 +32,11 @@ import {
   COACH_PROFILE_TITLES,
   COACH_SCHEDULE_TEXT_MAX,
   COACH_TAGLINE_MAX,
+  COACH_TEACHING_FOCUS_MAX,
   COACH_TITLES,
   COACH_TUITION_TEXT_MAX,
   coachPhotoUrl,
+  normalizeCoachAcceptLevels,
   validateCoachProfile,
 } from '../game/coachProfile.js';
 
@@ -41,7 +44,7 @@ const $ = (id) => document.getElementById(id);
 
 /** 会亮红框的那些栏：四组多选 + 公开文字与费率 + 三类图片。 */
 const SECTIONS = [
-  ...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors',
+  ...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors', 'teaching_focus',
   'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
   'language', 'timezone', 'avatar', 'photos', 'certificates',
 ];
@@ -75,12 +78,8 @@ function choiceInput(group, [key, label]) {
 
 /** 一组多选 → chips。教练那一侧叫 levels，选项表在学员那一侧叫 level。 */
 function buildChoices(container, group) {
-  const options = COACH_OPTIONS[prefSide(group)];
+  const options = group === 'levels' ? COACH_ACCEPT_LEVELS : COACH_OPTIONS[group];
   container.append(...options.map((option) => choiceInput(group, option)));
-}
-
-function prefSide(group) {
-  return group === 'levels' ? 'level' : group;
 }
 
 function buildSelect(container, id, options, blankText, group) {
@@ -127,7 +126,8 @@ function hintOf(group) {
   const hint = document.createElement('span');
   hint.className = 'pref-hint';
   // 上限就是这一组全部选项时不用报数字（"最多 4 项"面对四个选项是废话）
-  hint.textContent = max >= COACH_OPTIONS[prefSide(group)].length ? '可不填' : `可不填，最多 ${max} 项`;
+  hint.textContent = max >= (group === 'levels' ? COACH_ACCEPT_LEVELS : COACH_OPTIONS[group]).length
+    ? '可多选' : `可不填，最多 ${max} 项`;
   return hint;
 }
 
@@ -160,10 +160,10 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   }
   // 自由填写那几栏的标题同样只有一处出处（COACH_PROFILE_TITLES）。
   for (const key of [
-    'elo', 'years', 'tagline', 'honors', 'enrollment_notes', 'hourly_rate_cny',
+    'elo', 'years', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'hourly_rate_cny',
     'tuition_text', 'schedule_text', 'avatar', 'photos', 'certificates',
   ]) {
-    const legend = $(`cp-${key}-legend`);
+    const legend = $(`cp-${key.replaceAll('_', '-')}-legend`);
     if (legend) legend.textContent = COACH_PROFILE_TITLES[key];
   }
 
@@ -178,6 +178,8 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     taglineCount: $('cp-tagline-count'),
     honors: $('cp-honors'),
     honorsCount: $('cp-honors-count'),
+    teachingFocus: $('cp-teaching-focus'),
+    teachingFocusCount: $('cp-teaching-focus-count'),
     enrollmentNotes: $('cp-enrollment-notes'),
     enrollmentNotesCount: $('cp-enrollment-notes-count'),
     hourlyRate: $('cp-hourly-rate-cny'),
@@ -265,6 +267,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   function paintCounters() {
     counterOf(el.tagline, el.taglineCount, COACH_TAGLINE_MAX);
     counterOf(el.honors, el.honorsCount, COACH_HONORS_MAX);
+    counterOf(el.teachingFocus, el.teachingFocusCount, COACH_TEACHING_FOCUS_MAX);
     counterOf(el.enrollmentNotes, el.enrollmentNotesCount, COACH_ENROLLMENT_NOTES_MAX);
     counterOf(el.tuitionText, el.tuitionTextCount, COACH_TUITION_TEXT_MAX);
     counterOf(el.scheduleText, el.scheduleTextCount, COACH_SCHEDULE_TEXT_MAX);
@@ -280,7 +283,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
 
     el.avatarBox.replaceChildren();
     if (avatar) {
-      el.avatarBox.append(image(el.avatarBox, coachPhotoUrl(id, avatar), '教练头像'), removeButton('avatar', null));
+      el.avatarBox.append(image(el.avatarBox, coachPhotoUrl(id, avatar, 320), '教练头像', '', coachPhotoUrl(id, avatar)), removeButton('avatar', null));
     } else {
       const none = document.createElement('span');
       none.className = 'coach-photo-empty';
@@ -307,7 +310,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       const cell = document.createElement('div');
       cell.className = 'coach-photo-cell';
       const fit = kind === 'certificates' ? 'coach-certificate-photo' : '';
-      cell.append(image(cell, coachPhotoUrl(id, name), alt, fit), removeButton(kind, name));
+      cell.append(image(cell, coachPhotoUrl(id, name, 640), alt, fit, coachPhotoUrl(id, name)), removeButton(kind, name));
       box.append(cell);
     }
     if (!names.length) {
@@ -318,9 +321,10 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     }
   }
 
-  function image(box, src, alt, fit = '') {
+  function image(box, src, alt, fit = '', fullSrc = '') {
     const trigger = coachImageTrigger({
       src,
+      fullSrc,
       alt,
       openImage,
       imageClassName: fit ? `coach-photo ${fit}` : 'coach-photo',
@@ -351,6 +355,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       years: el.years.value,
       tagline: el.tagline.value,
       honors: el.honors.value,
+      teaching_focus: el.teachingFocus.value,
       enrollment_notes: el.enrollmentNotes.value,
       hourly_rate_cny: el.hourlyRate.value,
       tuition_text: el.tuitionText.value,
@@ -372,13 +377,16 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     el.years.value = one.years ?? '';
     el.tagline.value = one.tagline ?? '';
     el.honors.value = one.honors ?? '';
+    el.teachingFocus.value = one.teaching_focus ?? '';
     el.enrollmentNotes.value = one.enrollment_notes ?? '';
     el.hourlyRate.value = one.hourly_rate_cny ?? '';
     el.tuitionText.value = one.tuition_text ?? '';
     el.scheduleText.value = one.schedule_text ?? '';
     el.language.value = one.language ?? '';
     el.timezone.value = one.timezone ?? '';
-    for (const group of MULTI) setChosen(group, one[group]);
+    for (const group of MULTI) {
+      setChosen(group, group === 'levels' ? normalizeCoachAcceptLevels(one[group]) : one[group]);
+    }
     paintCounters();
     paintPhotos();
   }
@@ -560,10 +568,12 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     paintCounters();
     if (!el.error.hidden) clearError();
   });
-  el.honors.addEventListener('input', () => {
-    paintCounters();
-    if (!el.error.hidden) clearError();
-  });
+  for (const input of [el.honors, el.teachingFocus]) {
+    input.addEventListener('input', () => {
+      paintCounters();
+      if (!el.error.hidden) clearError();
+    });
+  }
   for (const input of [el.enrollmentNotes, el.tuitionText, el.scheduleText]) {
     input.addEventListener('input', () => {
       paintCounters();

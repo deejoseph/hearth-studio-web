@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COACH_CERTIFICATES_MAX,
+  COACH_ACCEPT_LEVELS,
   COACH_ELO_MAX,
   COACH_ELO_MIN,
   COACH_HONORS_MAX,
@@ -12,6 +13,7 @@ import {
   COACH_PROFILE_RULES,
   COACH_PROFILE_TITLES,
   COACH_TAGLINE_MAX,
+  COACH_TEACHING_FOCUS_MAX,
   COACH_TITLES,
   COACH_YEARS_MAX,
   coachBadges,
@@ -27,7 +29,7 @@ import {
  * 教练资料的数据层（src/game/coachProfile.js）+ 名录的隐私底线。
  *
  * 盯四件事：
- * 1. 一份表单发出去的形状（十四个键）和后端 coach_profile_normalize 一致；
+ * 1. 一份表单发出去的形状（十九个键）和后端 coach_profile_normalize 一致；
  * 2. 数字和字数的口径 —— 空、0、超一个字的边界，这三样最容易各写一套；
  * 3. 界面要的元素 id 在 index.html 里都在（两边只改一边就会"打开面板就报错"）；
  * 4. 🔴 公开那一行永远不带 email、也不带申请时写给管理员看的 intro。
@@ -58,9 +60,10 @@ const good = (over = {}) => ({
   years: '9',
   tagline: '把战术讲成人话',
   honors: '带出过三位省赛冠军',
+  teaching_focus: '擅长把战术题拆成几步提问',
   language: 'zh',
   timezone: 'Asia/Shanghai',
-  levels: ['moves', 'play'],
+  levels: ['amateur5', 'amateur1'],
   goals: ['tactics'],
   formats: ['one', 'review'],
   slots: ['wkend_am'],
@@ -89,6 +92,7 @@ describe('一份教练资料能不能发出去', () => {
       'schedule_text',
       'slots',
       'tagline',
+      'teaching_focus',
       'timezone',
       'title',
       'tuition_text',
@@ -161,18 +165,20 @@ describe('一份教练资料能不能发出去', () => {
     }
   });
 
-  it('重复勾选只算一项，别组/编出来的 key 不带出门', () => {
+  it('旧档位在发出去前换算，重复项只算一项', () => {
     expect(validateCoachProfile(good({ levels: ['play', 'play'] })).payload.levels).toEqual([
-      'play',
+      'amateur5',
     ]);
+    expect(validateCoachProfile(good({ levels: ['moves', 'play', 'rated'] })).payload.levels)
+      .toEqual(['amateur5', 'master']);
     // 'review' 是「上课形式」的选项，出现在「擅长教什么」里只能来自漏删的旧控件
     expect(validateCoachProfile(good({ goals: ['tactics', 'review', 'made-up'] })).payload.goals)
       .toEqual(['tactics']);
   });
 
   it('多选也吃逗号串：库里读回来直接再发一次不用先拆', () => {
-    expect(validateCoachProfile(good({ levels: 'zero,moves' })).payload.levels)
-      .toEqual(['zero', 'moves']);
+    expect(validateCoachProfile(good({ levels: 'zero,amateur5' })).payload.levels)
+      .toEqual(['zero', 'amateur5']);
   });
 
   it('照片名不对就当场说一句，不悄悄少存一张（保存是整份覆盖）', () => {
@@ -244,6 +250,17 @@ describe('字数按码点量', () => {
     });
   });
 
+  it('教学补充说明可留空，也按码点量限制', () => {
+    expect(validateCoachProfile(good({ teaching_focus: '' })).payload.teaching_focus).toBe('');
+    const text = '马'.repeat(COACH_TEACHING_FOCUS_MAX);
+    expect(validateCoachProfile(good({ teaching_focus: text })).ok).toBe(true);
+    expect(validateCoachProfile(good({ teaching_focus: `${text}马` }))).toEqual({
+      ok: false,
+      field: 'teaching_focus',
+      text: `补充说明（选填）请写在 ${COACH_TEACHING_FOCUS_MAX} 个字以内（现在 ${COACH_TEACHING_FOCUS_MAX + 1} 个字）。`,
+    });
+  });
+
   it('全角空格、nbsp、换行都归成一个空格再算', () => {
     const payload = validateCoachProfile(good({ honors: ' 省赛\u3000冠军 \n 八强 ' })).payload;
     expect(payload.honors).toBe('省赛 冠军 八强');
@@ -273,21 +290,25 @@ describe('名录卡片与主页上那几句话', () => {
     expect(coachBadges(coach({ elo: 1500 }, { rating: 2210 }))).toContain('等级分 1500');
   });
 
-  it('卡片上的方向标签最多两样，多了读不完', () => {
-    expect(coachProfileTags(coach({ levels: ['zero', 'moves'], goals: ['tactics', 'opening'] })))
-      .toEqual(['能带「完全零基础」', '能带「会走子，想下完整一盘」']);
+  it('卡片上的接收档位与方向标签最多两样，多了读不完', () => {
+    expect(coachProfileTags(coach({ levels: ['zero', 'amateur5'], goals: ['tactics', 'opening'] })))
+      .toEqual(['可接收「零基础」', '可接收「业余五级以下」']);
+    expect(coachProfileTags(coach({ levels: ['moves', 'rated'] })))
+      .toEqual(['可接收「业余五级以下」', '可接收「业余大师以上」']);
     expect(coachProfileTags(coach({}))).toEqual([]);
   });
 
   it('主页那几行：空的组整行不出，标题和表单里的 legend 同一句', () => {
     const rows = coachProfileRows(coach({
-      levels: ['play'], goals: [], formats: ['one', 'group'], slots: ['wkend_am'],
+      levels: ['amateur5'], teaching_focus: '擅长带入门学员建立规则感',
+      goals: [], formats: ['one', 'group'], slots: ['wkend_am'],
       language: 'zh_en', timezone: 'Asia/Shanghai',
     }));
     expect(rows).toEqual([
-      { label: COACH_PROFILE_TITLES.levels, text: '能完整下棋，想提高' },
+      { label: COACH_PROFILE_TITLES.levels, text: '业余五级以下' },
       { label: COACH_PROFILE_TITLES.formats, text: '一对一、小组课' },
       { label: COACH_PROFILE_TITLES.slots, text: '周末上午' },
+      { label: COACH_PROFILE_TITLES.teaching_focus, text: '擅长带入门学员建立规则感' },
       { label: COACH_PROFILE_TITLES.language, text: '中英都行' },
       { label: COACH_PROFILE_TITLES.timezone, text: '中国（UTC+8）' },
     ]);
@@ -307,6 +328,8 @@ describe('名录卡片与主页上那几句话', () => {
     expect(url).not.toContain('coach_media');
     expect(coachPhotoUrl(7, '')).toBe('');
     expect(coachPhotoUrl(7, '../x.jpg')).not.toContain('../');
+    expect(coachPhotoUrl(7, PIC, 320)).toContain('&t=320');
+    expect(coachPhotoUrl(7, PIC, 123)).not.toContain('&t=');
   });
 });
 
@@ -337,6 +360,10 @@ describe('界面与后端的契约', () => {
     expect(COACH_TITLES.map(([key]) => key)).toEqual(phpList('COACH_TITLES'));
   });
 
+  it('接收档位的 key 和后端白名单一字不差（顺序也要一样）', () => {
+    expect(COACH_ACCEPT_LEVELS.map(([key]) => key)).toEqual(phpList('COACH_ACCEPT_LEVELS'));
+  });
+
   it('四个数字上限两边取同一个数', () => {
     expect(COACH_ELO_MIN).toBe(phpNum('COACH_ELO_MIN'));
     expect(COACH_ELO_MAX).toBe(phpNum('COACH_ELO_MAX'));
@@ -347,6 +374,7 @@ describe('界面与后端的契约', () => {
   it('文本、照片与证书的上限两边取同一个数', () => {
     expect(COACH_TAGLINE_MAX).toBe(phpNum('COACH_TAGLINE_MAX'));
     expect(COACH_HONORS_MAX).toBe(phpNum('COACH_HONORS_MAX'));
+    expect(COACH_TEACHING_FOCUS_MAX).toBe(phpNum('COACH_TEACHING_FOCUS_MAX'));
     expect(COACH_PHOTOS_MAX).toBe(phpNum('COACH_PHOTOS_MAX'));
     expect(COACH_CERTIFICATES_MAX).toBe(phpNum('COACH_CERTIFICATES_MAX'));
   });
@@ -376,7 +404,7 @@ describe('界面与后端的契约', () => {
 
   it('每一栏都有中文标题，报错时点名点得出', () => {
     for (const key of [...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors',
-      'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
+      'teaching_focus', 'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
       'language', 'timezone', 'avatar', 'photos', 'certificates']) {
       expect(COACH_PROFILE_TITLES[key], key).toBeTruthy();
     }

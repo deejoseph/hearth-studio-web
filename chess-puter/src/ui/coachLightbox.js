@@ -38,7 +38,7 @@ export function mountCoachLightbox() {
 }
 
 /** 图片本身是可聚焦按钮；外层卡片按钮不再包它，避免嵌套交互元素。 */
-export function coachImageTrigger({ src, alt, openImage, className = '', imageClassName = '', onError }) {
+export function coachImageTrigger({ src, fullSrc = '', alt, openImage, className = '', imageClassName = '', onError }) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = `coach-lightbox-trigger${className ? ` ${className}` : ''}`;
@@ -56,7 +56,7 @@ export function coachImageTrigger({ src, alt, openImage, className = '', imageCl
     if (onError) onError(button, image);
     else button.remove();
   });
-  button.addEventListener('click', () => openImage(src, alt));
+  button.addEventListener('click', () => openImage(fullSrc || src, alt));
   button.append(image);
   return button;
 }

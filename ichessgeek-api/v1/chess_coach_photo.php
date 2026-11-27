@@ -11,8 +11,9 @@
  * 不判登录：名录页上每张头像都要能显示，而一个没登录的人本来就看得到名录。
  * 但教练必须仍在名录，资格撤销后连媒体直链也一起失效。
  *
- * 文件名本身是一道口令（服务端随机生成，没人能猜），但资格撤销必须立刻生效，
- * 所以这里仍然先问"这位教练现在还在名录吗"，且不留下可绕过撤销检查的公共缓存。
+ * 文件名本身是一道口令（服务端随机生成，没人能猜），但资格撤销仍先查。
+ * 原图不缓存；?t= 只返回缩小副本，允许浏览器私有缓存 5 分钟，减少主页重复下载。
+ * 撤销后的新请求仍会立即 404，已经缓存的小图最多保留到缓存到期。
  */
 require_once __DIR__ . '/chess_guard.php';
 
@@ -43,6 +44,40 @@ try {
         default => 'image/jpeg',
     };
     $size = (int) (@filesize($path) ?: 0);
+    $thumb = isset($_GET['t']) && in_array((string) $_GET['t'], ['96', '160', '320', '640', '960'], true)
+        ? (int) $_GET['t'] : 0;
+
+    if ($thumb > 0 && function_exists('imagecreatetruecolor')) {
+        $ext = strtolower((string) pathinfo($name, PATHINFO_EXTENSION));
+        $src = match ($ext) {
+            'png' => function_exists('imagecreatefrompng') ? @imagecreatefrompng($path) : false,
+            'webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($path) : false,
+            default => function_exists('imagecreatefromjpeg') ? @imagecreatefromjpeg($path) : false,
+        };
+        if ($src) {
+            [$width, $height] = getimagesize($path);
+            $scale = min(1, $thumb / max($width, $height));
+            $outWidth = max(1, (int) round($width * $scale));
+            $outHeight = max(1, (int) round($height * $scale));
+            $out = imagecreatetruecolor($outWidth, $outHeight);
+            imagefill($out, 0, 0, imagecolorallocate($out, 255, 255, 255));
+            imagecopyresampled($out, $src, 0, 0, 0, 0, $outWidth, $outHeight, $width, $height);
+            imagedestroy($src);
+            ob_start();
+            imagejpeg($out, null, 78);
+            $bytes = (string) ob_get_clean();
+            imagedestroy($out);
+            if ($bytes !== '') {
+                header('Content-Type: image/jpeg');
+                header('Content-Length: ' . strlen($bytes));
+                header('Cache-Control: private, max-age=300');
+                header('X-Content-Type-Options: nosniff');
+                header('X-Frame-Options: DENY');
+                echo $bytes;
+                return;
+            }
+        }
+    }
 
     header('Content-Type: ' . $type);
     header('Content-Length: ' . $size);

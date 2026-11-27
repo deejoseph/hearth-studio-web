@@ -67,6 +67,7 @@ try {
         'ok' => true,
         'signed_in' => true,
         'verified' => $player['verified_at'] !== null,
+        'admin' => chess_player_is_admin($conn, $id),
         'player' => chess_public_row($player),
         'message' => '登录成功',
     ]);

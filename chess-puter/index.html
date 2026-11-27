@@ -459,17 +459,24 @@
           </section>
 
           <!-- 偏好说明永远在折叠区外面：先说明平台做什么、隐私怎么用，再给入口。 -->
+          <section class="card coach-presence" aria-label="社区在线人数（初期展示数据）">
+            <div><strong>128</strong><span>在线学员</span></div>
+            <div><strong>12</strong><span>在线教练</span></div>
+            <p>初期展示数据</p>
+          </section>
+
+          <button class="btn btn-ghost btn-sm coach-admin-btn" id="coach-admin-btn" type="button" hidden>
+            <i data-lucide="badge-check"></i>教练管理
+          </button>
+
           <section class="card coach-market-banner" id="coach-market-banner" aria-labelledby="coach-market-title">
             <div class="coach-market-copy">
-              <h2 class="coach-market-title" id="coach-market-title">自学遇到卡点，可以找教练一起拆</h2>
-              <p>
-                平台把自学、复盘和分析棋谱的同学与认证教练连接起来。匹配偏好只用于推荐，不公开展示；
-                只有你主动提交预约，平台才会把留言、账号邮箱和预约所需偏好转交教练。
-              </p>
+              <h2 class="coach-market-title" id="coach-market-title">自学遇到卡点？找教练一起拆</h2>
+              <p>偏好仅用于推荐；预约时由平台转交留言与邮箱。</p>
             </div>
-            <button class="btn btn-primary btn-block coach-pref-quick-btn" id="coach-pref-quick-btn" type="button"
+            <button class="btn btn-primary btn-sm coach-pref-quick-btn" id="coach-pref-quick-btn" type="button"
                     aria-haspopup="dialog" aria-controls="coach-pref-dialog">
-              <i data-lucide="target"></i><span class="coach-pref-quick-label">填写偏好，匹配教练</span>
+              <i data-lucide="target"></i><span class="coach-pref-quick-label">匹配教练</span>
             </button>
           </section>
 
@@ -485,10 +492,7 @@
               </span>
             </summary>
             <div class="coach-card-body">
-              <p class="coach-note">
-                这里最多展示三位营地认证教练，按你的水平、目标与预算偏好排序；价格未知不扣分，
-                高于预算也会保留并提醒。展开后点【我想找什么样的教练】可随时修改偏好。
-              </p>
+              <p class="coach-note">按你的偏好推荐三位认证教练；可随时修改偏好。</p>
 
               <div class="coach-list" id="coach-list" hidden></div>
               <p class="coach-coming-soon" id="coach-empty">教练入驻中，敬请期待。</p>
@@ -939,6 +943,15 @@
         </span>
         <textarea class="pref-note" id="cp-honors" rows="4" maxlength="380"
                   placeholder="带出过什么成绩、教龄里的例子……写你愿意公开的那部分"></textarea>
+      </label>
+
+      <label class="field pref-group pref-note-block" id="cp-teaching-focus-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-teaching-focus-legend"></span>
+          <span class="pref-counter" id="cp-teaching-focus-count">0 / 300</span>
+        </span>
+        <textarea class="pref-note" id="cp-teaching-focus" rows="3" maxlength="380"
+                  placeholder="例如：擅长带零基础学员建立规则感，也陪准备市赛的选手做赛前复盘"></textarea>
       </label>
 
       <label class="field pref-group pref-note-block" id="cp-enrollment-notes-group">

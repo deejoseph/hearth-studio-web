@@ -14,6 +14,7 @@
  */
 
 import { coachLabel, formatCny, parseCny } from './coachPref.js';
+import { coachProfileLabels } from './coachProfile.js';
 
 /** 各项值多少分。数字本身不重要，重要的是"能带你这一档"比"时区一样"重要。 */
 const WEIGHT = {
@@ -35,6 +36,14 @@ const asList = (value) => (Array.isArray(value)
   : String(value ?? '').split(',').map((one) => one.trim()).filter(Boolean));
 
 const overlap = (a, b) => asList(a).filter((one) => asList(b).includes(one));
+
+/** 学员报的是当前水平，教练选的是接收档位；旧偏好 key 在这里换算。 */
+const STUDENT_TO_ACCEPT_LEVEL = {
+  zero: 'zero',
+  moves: 'amateur5',
+  play: 'amateur5',
+  rated: 'master',
+};
 
 /**
  * 授课语言合不合。
@@ -90,12 +99,12 @@ export function matchCoach(pref, coach) {
   const budget = budgetMatch(pref, coach);
   let score = budget.score;
 
-  // 学员那一侧是单选（level：我现在什么水平），教练那一侧是多选（levels：我能带哪几档）。
-  // 措辞和 coachProfileTags 同一句（那一行没填偏好时也会印）。
-  const level = overlap(profile.levels, pref.level);
-  if (level.length) {
+  // 两边不是同一列：把学员当前水平换算成教练的接收档位再比。
+  const acceptLevel = STUDENT_TO_ACCEPT_LEVEL[pref.level] ?? pref.level;
+  if (asList(profile.levels).includes(acceptLevel)) {
     score += WEIGHT.level;
-    reasons.push(`能带「${coachLabel('level', level[0])}」`);
+    const label = coachProfileLabels('levels', [acceptLevel])[0] ?? acceptLevel;
+    reasons.push(`可接收「${label}」`);
   }
 
   const goals = overlap(profile.goals, pref.goals);

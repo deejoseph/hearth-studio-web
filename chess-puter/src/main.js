@@ -4609,8 +4609,11 @@ const account = mountAccount({
     // 退出之后【填我的教练资料】要立刻收掉，名录上"这是我"那一枚也一样；
     // 登录之后问一次资料，那颗按钮才知道该说"填"还是"改"。
     coachProfile?.refresh();
-    coachDirectory?.refresh();
   },
+});
+
+$('coach-admin-btn')?.addEventListener('click', () => {
+  window.location.assign('/coach-admin');
 });
 
 coachLightbox = mountCoachLightbox();
@@ -4637,7 +4640,7 @@ coachPref = mountCoachPref({
   player: () => account.player(),
   openAccount: (which) => account.open(which),
   // 偏好一改，名录那一列的顺序就得重算（排序在界面这一侧，见 game/coachMatch.js）。
-  onPrefChange: () => coachDirectory?.refresh(),
+  onPrefChange: () => coachDirectory?.rerender(),
 });
 
 /** 预约与投诉都先在前端确认邮箱验证；服务端仍从会话重新判定身份。 */
@@ -4651,7 +4654,7 @@ coachComplaint = mountCoachComplaint({
   player: () => account.player(),
   openAccount: (which) => account.open(which),
   wasTeacher: coachWasTeacher,
-  onChanged: () => coachDirectory?.refresh(),
+  onChanged: () => coachDirectory?.refresh({ force: true }),
 });
 
 /**
@@ -4664,7 +4667,7 @@ coachProfile = mountCoachProfile({
   player: () => account.player(),
   openAccount: (which) => account.open(which),
   canTeach: coachTeachState,
-  onChanged: () => coachDirectory?.refresh(),
+  onChanged: () => coachDirectory?.refresh({ force: true }),
   openImage: openCoachImage,
 });
 

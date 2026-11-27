@@ -136,6 +136,8 @@ const CHESS_ERRORS = [
     'bad_tagline' => ['简介里有打不出来的字符，重写一遍就好', 400],
     'long_honors' => ['荣誉写得太长了，请缩到 ' . COACH_HONORS_MAX . ' 个字以内', 400],
     'bad_honors' => ['荣誉里有打不出来的字符，重写一遍就好', 400],
+    'long_teaching_focus' => ['补充说明太长了，请缩到 ' . COACH_TEACHING_FOCUS_MAX . ' 个字以内', 400],
+    'bad_teaching_focus' => ['补充说明里有打不出来的字符，重写一遍就好', 400],
     'long_enrollment_notes' => ['招生要求太长了，请缩到 ' . COACH_ENROLLMENT_NOTES_MAX . ' 个字以内', 400],
     'bad_enrollment_notes' => ['招生要求里有打不出来的字符，重写一遍就好', 400],
     'long_tuition' => ['收费说明太长了，请缩到 ' . COACH_TUITION_TEXT_MAX . ' 个字以内', 400],
@@ -2288,6 +2290,7 @@ function chess_profile_schema($conn) {
         years TINYINT NULL,
         tagline VARCHAR(" . COACH_TAGLINE_MAX . ") NOT NULL DEFAULT '',
         honors VARCHAR(" . COACH_HONORS_MAX . ") NOT NULL DEFAULT '',
+        teaching_focus VARCHAR(" . COACH_TEACHING_FOCUS_MAX . ") NOT NULL DEFAULT '',
         enrollment_notes VARCHAR(" . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT '',
         tuition_text VARCHAR(" . COACH_TUITION_TEXT_MAX . ") NOT NULL DEFAULT '',
         schedule_text VARCHAR(" . COACH_SCHEDULE_TEXT_MAX . ") NOT NULL DEFAULT '',
@@ -2308,8 +2311,10 @@ function chess_profile_schema($conn) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // CREATE IF NOT EXISTS 不会给已经建好的表补列；两个请求同时迁移时，
     // 后一个可能只撞到 1060（列已存在），那不是故障。
+    chess_schema_column($conn, 'chess_coach_profiles', 'teaching_focus',
+        'VARCHAR(' . COACH_TEACHING_FOCUS_MAX . ") NOT NULL DEFAULT ''", 'honors');
     chess_schema_column($conn, 'chess_coach_profiles', 'enrollment_notes',
-        'VARCHAR(' . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT ''", 'honors');
+        'VARCHAR(' . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT ''", 'teaching_focus');
     chess_schema_column($conn, 'chess_coach_profiles', 'tuition_text',
         'VARCHAR(' . COACH_TUITION_TEXT_MAX . ") NOT NULL DEFAULT ''", 'enrollment_notes');
     chess_schema_column($conn, 'chess_coach_profiles', 'schedule_text',
@@ -2323,7 +2328,7 @@ function chess_profile_schema($conn) {
 /** 这个人的资料行；没建过返回 null。 */
 function chess_profile_row($conn, $playerId, $lock = false) {
     chess_profile_schema($conn);
-    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors,
+    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors, teaching_focus,
             enrollment_notes, tuition_text, schedule_text, hourly_rate_cny,
             language, timezone, levels, goals, formats, slots, avatar, photos, certificates, updated_at
         FROM chess_coach_profiles WHERE player_id = ? LIMIT 1" . ($lock ? ' FOR UPDATE' : ''));
@@ -2366,12 +2371,13 @@ function chess_profile_ensure($conn, $playerId) {
 function chess_profile_write($conn, $playerId, array $profile) {
     chess_profile_schema($conn);
     $stmt = $conn->prepare("INSERT INTO chess_coach_profiles
-        (player_id, title, elo, years, tagline, honors, enrollment_notes, tuition_text,
+        (player_id, title, elo, years, tagline, honors, teaching_focus, enrollment_notes, tuition_text,
          schedule_text, hourly_rate_cny, language, timezone, levels, goals, formats, slots,
          avatar, photos, certificates, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE title = VALUES(title), elo = VALUES(elo),
             years = VALUES(years), tagline = VALUES(tagline), honors = VALUES(honors),
+            teaching_focus = VALUES(teaching_focus),
             enrollment_notes = VALUES(enrollment_notes), tuition_text = VALUES(tuition_text),
             schedule_text = VALUES(schedule_text), hourly_rate_cny = VALUES(hourly_rate_cny),
             language = VALUES(language), timezone = VALUES(timezone),
@@ -2385,13 +2391,14 @@ function chess_profile_write($conn, $playerId, array $profile) {
     // elo/years/rate 绑成 i 时 PHP 的 null 会作为 SQL NULL 下发（不是 0），
     // 这正是规则层要区分"没登记"和"0"的那一处。
     $stmt->bind_param(
-        "isiissssssissssssss",
+        "isiissssssisssssssss",
         $playerId,
         $profile['title'],
         $profile['elo'],
         $profile['years'],
         $profile['tagline'],
         $profile['honors'],
+        $profile['teaching_focus'],
         $profile['enrollment_notes'],
         $profile['tuition_text'],
         $profile['schedule_text'],
