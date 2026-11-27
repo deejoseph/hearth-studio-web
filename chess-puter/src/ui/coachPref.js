@@ -15,18 +15,21 @@ import {
   COACH_GROUP_TITLES,
   COACH_RULES,
   COACH_NOTE_MAX,
+  COACH_SCHEDULE_NOTE_MAX,
   COACH_OPTIONS,
   coachPrefSummary,
+  normalizeCoachText,
   validateCoachForm,
 } from '../game/coachPref.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** 面板上会亮红框的区块：六组选项，加上那个自由填写的说明。 */
-const SECTIONS = [...COACH_GROUPS, 'note'];
+/** 面板上会亮红框的区块：六组选项，加自我介绍、预算与详细时间说明。 */
+const SECTIONS = [...COACH_GROUPS, 'note', 'budget', 'schedule_note'];
 
 /** 哪些组是"只能选一个"（radio），哪些是"可选几个"（checkbox）。 */
 const SINGLE = new Set(['level', 'language']);
+const sectionId = (field) => `pref-${field.replaceAll('_', '-')}-group`;
 
 function optionInput(group, [key, label]) {
   const wrap = document.createElement('label');
@@ -115,11 +118,16 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
 
   const el = {
     trigger: $('coach-pref-btn'),
+    quickTrigger: $('coach-pref-quick-btn'),
     state: $('coach-pref-state'),
     dialog: $('coach-pref-dialog'),
     error: $('coach-pref-error'),
     note: $('pref-note'),
     counter: $('pref-note-count'),
+    budgetMin: $('pref-budget-min'),
+    budgetMax: $('pref-budget-max'),
+    scheduleNote: $('pref-schedule-note'),
+    scheduleCount: $('pref-schedule-note-count'),
     contact: $('pref-contact'),
     timezone: $('pref-timezone'),
     saveBtn: $('coach-pref-save-btn'),
@@ -129,15 +137,34 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
   /** 服务端那份（或 null：还没填过）。保存成功后换成服务端回的形状。 */
   let current = null;
   let busy = false;
+  let request = 0;
+  let dialogAccount = null;
+
+  function idleSave() {
+    busy = false;
+    el.saveBtn.disabled = false;
+    el.saveBtn.textContent = '保存';
+  }
+
+  function isCurrent(ticket, whoId) {
+    return ticket === request && player()?.id === whoId;
+  }
 
   function showError(text, field) {
+    // 后端把预算错误挂到具体列，界面是一组两个输入框；归一到同一组再标红。
+    const budgetField = field;
+    if (field === 'budget_min_cny' || field === 'budget_max_cny') field = 'budget';
     el.error.textContent = text;
     el.error.hidden = false;
     for (const section of SECTIONS) {
-      $(`pref-${section}-group`)?.classList.toggle('invalid', section === field);
+      $(sectionId(section))?.classList.toggle('invalid', section === field);
     }
     if (field === 'note') {
       el.note.focus();
+    } else if (field === 'schedule_note') {
+      el.scheduleNote.focus();
+    } else if (field === 'budget') {
+      (budgetField === 'budget_max_cny' ? el.budgetMax : el.budgetMin).focus();
     } else if (field) {
       $(`pref-${field}-choices`)?.scrollIntoView({ block: 'nearest' });
     }
@@ -147,14 +174,17 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
     el.error.hidden = true;
     el.error.textContent = '';
     for (const section of SECTIONS) {
-      $(`pref-${section}-group`)?.classList.remove('invalid');
+      $(sectionId(section))?.classList.remove('invalid');
     }
   }
 
   function paintCounter() {
-    const n = [...el.note.value].length;
+    const n = [...normalizeCoachText(el.note.value)].length;
     el.counter.textContent = `${n} / ${COACH_NOTE_MAX}`;
     el.counter.classList.toggle('over', n > COACH_NOTE_MAX);
+    const scheduleLength = [...normalizeCoachText(el.scheduleNote.value)].length;
+    el.scheduleCount.textContent = `${scheduleLength} / ${COACH_SCHEDULE_NOTE_MAX}`;
+    el.scheduleCount.classList.toggle('over', scheduleLength > COACH_SCHEDULE_NOTE_MAX);
   }
 
   function formState() {
@@ -167,6 +197,9 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
       language: chosen('language'),
       note: el.note.value,
       contactOk: el.contact.checked,
+      budgetMinCny: el.budgetMin.value,
+      budgetMaxCny: el.budgetMax.value,
+      scheduleNote: el.scheduleNote.value,
     };
   }
 
@@ -178,6 +211,9 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
     }
     el.timezone.value = pref?.timezone ?? '';
     el.note.value = pref?.note ?? '';
+    el.budgetMin.value = pref?.budget_min_cny ?? '';
+    el.budgetMax.value = pref?.budget_max_cny ?? '';
+    el.scheduleNote.value = pref?.schedule_note ?? '';
     el.contact.checked = pref?.contact_ok === true;
     paintCounter();
   }
@@ -188,14 +224,17 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
     el.trigger.querySelector('.coach-pref-btn-label').textContent = current
       ? '改我想找的教练'
       : '我想找什么样的教练';
+    el.quickTrigger.querySelector('.coach-pref-quick-label').textContent = current
+      ? '更新我的匹配偏好'
+      : '填写偏好，匹配教练';
   }
 
-  async function load() {
+  async function load(ticket = ++request, whoId = player()?.id) {
     const reply = await call('chess_coach_pref_get.php', { method: 'GET' });
+    if (!isCurrent(ticket, whoId)) return { ok: false, stale: true };
     if (!reply.ok) {
-      // 会话在别处过期了、或后端临时不响应：让面板照旧打开成空白，
-      // 但先说清楚 —— 不能让人对着一个空表以为自己的填过的没了。
       current = null;
+      paintCard();
       return { ok: false, text: reply.message };
     }
     current = reply.pref ?? null;
@@ -209,15 +248,18 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
       showToast('先登录再填这张表 —— 偏好是记在账号上的。');
       return;
     }
+    const ticket = ++request;
+    const whoId = player()?.id;
+    dialogAccount = whoId;
     clearError();
+    $('coach-card').open = true;
     el.saveBtn.disabled = true;
     el.dialog.showModal();
-    const loaded = await load();
+    const loaded = await load(ticket, whoId);
+    if (!isCurrent(ticket, whoId) || !el.dialog.open) return;
     fill(current);
     el.saveBtn.disabled = false;
     if (!loaded.ok && current === null) {
-      // 焦点不能被挪到模态框外面（那样对话框就锁不住键盘了），
-      // 停在"关闭"上最实在：取不回来，人能做的下一步就是关掉再试。
       showError(loaded.text ?? '这份偏好没能取回来，请再试一次。', null);
       el.closeBtn.focus();
       return;
@@ -226,21 +268,25 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
   }
 
   async function save() {
-    if (busy) return;
+    if (busy || !player()) return;
     const checked = validateCoachForm(formState());
     if (!checked.ok) {
       showError(checked.text, checked.field);
       return;
     }
+    const ticket = ++request;
+    const whoId = player()?.id;
     clearError();
     busy = true;
     el.saveBtn.disabled = true;
     el.saveBtn.textContent = '保存中…';
 
     const reply = await call('chess_coach_pref_save.php', { body: checked.payload });
+    if (!isCurrent(ticket, whoId)) {
+      if (player()?.id !== whoId) idleSave();
+      return;
+    }
     if (reply.ok) {
-      // 用服务端回的那一份刷新，而不是把刚发出去的形状留下：
-      // 多选被后端按白名单顺序重排过，卡片上那行要和库里一致。
       current = reply.pref ?? null;
       paintCard();
       fill(current);
@@ -250,16 +296,29 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
     } else {
       showError(reply.message ?? '没能存上，请再试一次。', reply.field ?? null);
     }
-
-    busy = false;
-    el.saveBtn.disabled = false;
-    el.saveBtn.textContent = '保存';
+    idleSave();
   }
 
   el.trigger.addEventListener('click', open);
+  el.quickTrigger.addEventListener('click', open);
   el.saveBtn.addEventListener('click', save);
   el.closeBtn.addEventListener('click', () => el.dialog.close());
+  el.dialog.addEventListener('close', () => {
+    request += 1;
+    dialogAccount = null;
+    idleSave();
+    clearError();
+  });
   el.note.addEventListener('input', paintCounter);
+  el.scheduleNote.addEventListener('input', () => {
+    paintCounter();
+    if (!el.error.hidden) clearError();
+  });
+  for (const input of [el.budgetMin, el.budgetMax]) {
+    input.addEventListener('input', () => {
+      if (!el.error.hidden) clearError();
+    });
+  }
   // 改任何一项就把红字收掉：留着一句"要选一项"在人已选好之后，比不提示更烦人。
   for (const group of COACH_GROUPS) {
     $(`pref-${group}-choices`).addEventListener('change', () => {
@@ -270,17 +329,22 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
     if (!el.error.hidden) clearError();
   });
 
-  /** 登录/退出之后由账号面板叫一声：卡片上那行不能是上个账号的。 */
   function refresh() {
-    if (!player()) {
-      current = null;
-      paintCard();
+    const whoId = player()?.id;
+    const accountChanged = dialogAccount !== null && dialogAccount !== whoId;
+    current = null;
+    idleSave();
+    paintCard();
+    if (accountChanged && el.dialog.open) el.dialog.close();
+    const ticket = ++request;
+    if (!whoId) {
+      dialogAccount = null;
       onPrefChange?.();
-      return;
+      return Promise.resolve(null);
     }
-    load().then(() => {
-      paintCard();
-      onPrefChange?.();
+    return load(ticket, whoId).then((result) => {
+      if (!result.stale) onPrefChange?.();
+      return result;
     });
   }
 

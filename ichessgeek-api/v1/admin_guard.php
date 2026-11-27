@@ -22,7 +22,7 @@ function gb_client_ip() {
     return substr($ip, 0, 45);
 }
 
-function gb_start_admin_session() {
+function gb_start_admin_session($conn = null) {
     session_name('gbadmin');
     session_set_cookie_params([
         'lifetime' => 0,
@@ -32,7 +32,29 @@ function gb_start_admin_session() {
         'samesite' => 'Lax',
     ]);
     session_start();
-    return isset($_SESSION['gb_admin_id']);
+    if (!isset($_SESSION['gb_admin_id'])) {
+        return false;
+    }
+    $db = $conn ?? ($GLOBALS['conn'] ?? null);
+    if (!$db) {
+        return true;
+    }
+    try {
+        $stmt = $db->prepare("SELECT id FROM admin_users WHERE id = ? LIMIT 1");
+        $stmt->bind_param('i', $_SESSION['gb_admin_id']);
+        $stmt->execute();
+        $valid = $stmt->get_result()->fetch_assoc() !== null;
+        $stmt->close();
+    } catch (Throwable $e) {
+        error_log('admin guard: session revalidation failed: ' . $e->getMessage());
+        return false;
+    }
+    if (!$valid) {
+        $_SESSION = [];
+        session_destroy();
+        return false;
+    }
+    return true;
 }
 
 /**

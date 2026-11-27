@@ -458,6 +458,21 @@
             <p class="controls-hint" id="controls-hint">颜色和时限在开始新的一局时生效。</p>
           </section>
 
+          <!-- 偏好说明永远在折叠区外面：先说明平台做什么、隐私怎么用，再给入口。 -->
+          <section class="card coach-market-banner" id="coach-market-banner" aria-labelledby="coach-market-title">
+            <div class="coach-market-copy">
+              <h2 class="coach-market-title" id="coach-market-title">自学遇到卡点，可以找教练一起拆</h2>
+              <p>
+                平台把自学、复盘和分析棋谱的同学与认证教练连接起来。匹配偏好只用于推荐，不公开展示；
+                只有你主动提交预约，平台才会把留言、账号邮箱和预约所需偏好转交教练。
+              </p>
+            </div>
+            <button class="btn btn-primary btn-block coach-pref-quick-btn" id="coach-pref-quick-btn" type="button"
+                    aria-haspopup="dialog" aria-controls="coach-pref-dialog">
+              <i data-lucide="target"></i><span class="coach-pref-quick-label">填写偏好，匹配教练</span>
+            </button>
+          </section>
+
           <!-- 默认收起，名录变长也不会把上面的下棋功能键推远。 -->
           <details class="card coach-card" id="coach-card">
             <summary class="coach-head" id="coach-title" aria-label="推荐教练">
@@ -471,7 +486,8 @@
             </summary>
             <div class="coach-card-body">
               <p class="coach-note">
-                想找人带一带？这里列出营地认证的国际象棋教练，按你填的水平和目标排序。
+                这里最多展示三位营地认证教练，按你的水平、目标与预算偏好排序；价格未知不扣分，
+                高于预算也会保留并提醒。展开后点【我想找什么样的教练】可随时修改偏好。
               </p>
 
               <div class="coach-list" id="coach-list" hidden></div>
@@ -487,6 +503,11 @@
               <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-profile-btn" type="button" hidden
                       aria-haspopup="dialog" aria-controls="coach-profile-dialog">
                 <i data-lucide="badge-check"></i><span class="coach-profile-btn-label">填我的教练资料</span>
+              </button>
+
+              <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-complaints-btn" type="button" hidden
+                      aria-haspopup="dialog" aria-controls="coach-complaints-dialog">
+                <i data-lucide="message-square"></i><span class="coach-complaints-label">我的投诉记录</span>
               </button>
 
               <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-refresh-btn" type="button" hidden>
@@ -682,13 +703,39 @@
 
       <label class="field pref-group pref-note-block" id="pref-note-group">
         <span class="field-label pref-note-head">
-          <span>补充说明</span>
+          <span>自我介绍</span>
           <span class="pref-counter" id="pref-note-count">0 / 240</span>
         </span>
         <!-- maxlength 故意放宽到 300（真上限是 240 个字）：卡死在 240 的话，人只
              会觉得"打字打不上去"，看不到自己超了。计数变红再说清一次更好懂。 -->
         <textarea class="pref-note" id="pref-note" rows="3" maxlength="300"
-                  placeholder="想解决什么问题、孩子多大、上过什么课……都可以写"></textarea>
+                  placeholder="说说你的学棋经历、目前卡在哪里，方便教练先了解你"></textarea>
+      </label>
+
+      <fieldset class="pref-group pref-budget-group" id="pref-budget-group">
+        <legend class="pref-legend">预算（人民币）</legend>
+        <p class="pref-field-hint">按每 60 分钟计算。只填一项也可以，不确定的留空。</p>
+        <div class="coach-budget-fields">
+          <label class="field">
+            <span class="field-label">最低预算（元）</span>
+            <input type="text" id="pref-budget-min" inputmode="numeric" maxlength="6"
+                   autocomplete="off" placeholder="例如 100">
+          </label>
+          <label class="field">
+            <span class="field-label">最高预算（元）</span>
+            <input type="text" id="pref-budget-max" inputmode="numeric" maxlength="6"
+                   autocomplete="off" placeholder="例如 300">
+          </label>
+        </div>
+      </fieldset>
+
+      <label class="field pref-group pref-note-block" id="pref-schedule-note-group">
+        <span class="field-label pref-note-head">
+          <span>详细时间说明</span>
+          <span class="pref-counter" id="pref-schedule-note-count">0 / 240</span>
+        </span>
+        <textarea class="pref-note" id="pref-schedule-note" rows="3" maxlength="290"
+                  placeholder="例如：每周二、四晚上 8 点后，北京时间；节假日提前一天说明"></textarea>
       </label>
 
       <label class="pref-contact" id="pref-contact-group">
@@ -714,7 +761,7 @@
     <dialog class="dialog coach-pref-dialog coach-home-dialog" id="coach-home-dialog"
             aria-labelledby="coach-home-name">
       <div class="coach-home-head">
-        <span class="coach-avatar big" id="coach-home-avatar"></span>
+        <span id="coach-home-avatar"></span>
         <div class="coach-home-id">
           <h2 class="dialog-title" id="coach-home-name"></h2>
           <p class="coach-home-badges" id="coach-home-badges" hidden></p>
@@ -723,22 +770,126 @@
 
       <p class="coach-home-tagline" id="coach-home-tagline" hidden></p>
       <div class="coach-home-rows" id="coach-home-rows" hidden></div>
+      <div class="coach-home-enrollment" id="coach-home-enrollment"></div>
       <p class="coach-home-label" id="coach-home-honors-label" hidden></p>
       <p class="coach-home-honors" id="coach-home-honors" hidden></p>
       <p class="coach-home-label" id="coach-home-certificates-label" hidden></p>
       <div class="coach-home-photos" id="coach-home-certificates" hidden></div>
       <div class="coach-home-photos" id="coach-home-photos" hidden></div>
+
+      <section class="coach-public-complaints" id="coach-home-public-complaints"
+               aria-labelledby="coach-home-complaints-label" hidden>
+        <h3 class="coach-home-label" id="coach-home-complaints-label">平台核实并发表的投诉</h3>
+        <p class="pref-privacy" id="coach-home-complaints-note">
+          以下内容经平台核实并由管理员决定发表，不包含投诉人身份；未核实或待处理的投诉不会公开。
+        </p>
+        <div class="coach-public-complaint-list" id="coach-home-complaints"></div>
+      </section>
       <p class="coach-home-state" id="coach-home-state" role="status" hidden></p>
 
       <p class="pref-privacy">
-        名录上不写邮箱。想约课就请教练在【课堂】里给你发一个课堂码，不用离开这个网站。
+        公开主页不写教练邮箱。邮件预约由平台转交留言，教练通过平台私下回复你的账号邮箱。
       </p>
 
-      <div class="dialog-buttons">
-        <button class="btn btn-ghost" id="coach-home-close-btn" type="button">关闭</button>
-        <button class="btn btn-primary" id="coach-home-edit-btn" type="button" hidden
+      <div class="coach-home-actions">
+        <button class="btn btn-primary" id="coach-home-enroll-btn" type="button"
+                aria-haspopup="dialog" aria-controls="coach-enroll-dialog">邮件预约</button>
+        <button class="btn btn-ghost" id="coach-home-complaint-btn" type="button" hidden
+                aria-haspopup="dialog" aria-controls="coach-complaint-dialog">投诉</button>
+        <button class="btn btn-ghost" id="coach-home-edit-btn" type="button" hidden
                 aria-haspopup="dialog" aria-controls="coach-profile-dialog">改我的资料</button>
+        <button class="btn btn-ghost" id="coach-home-close-btn" type="button">关闭</button>
       </div>
+    </dialog>
+
+    <!-- 某一位教练的邮件预约。留言与明确许可缺一不可；身份由服务端从会话读取。 -->
+    <dialog class="dialog coach-pref-dialog coach-enroll-dialog" id="coach-enroll-dialog"
+            aria-labelledby="coach-enroll-title">
+      <form id="coach-enroll-form" novalidate>
+        <h2 class="dialog-title" id="coach-enroll-title">邮件预约</h2>
+        <p class="dialog-sub">预约对象：<strong id="coach-enroll-name"></strong></p>
+        <div class="coach-enrollment" id="coach-enroll-rows"></div>
+
+        <label class="field pref-group pref-note-block" id="coach-enroll-message-group">
+          <span class="field-label pref-note-head">
+            <span>预约留言</span>
+            <span class="pref-counter" id="coach-enroll-count">0 / 2000</span>
+          </span>
+          <textarea class="pref-note" id="coach-enroll-message" rows="6" minlength="20" maxlength="2050"
+                    required aria-describedby="coach-enroll-hint coach-enroll-error"
+                    placeholder="说说你的水平、想约的课程，以及方便的时间（至少 20 个字）"></textarea>
+        </label>
+        <p class="pref-field-hint" id="coach-enroll-hint">至少 20 个字，最多 2000 个字。</p>
+
+        <label class="pref-contact" id="coach-enroll-contact-group">
+          <input type="checkbox" id="coach-enroll-contact" required
+                 aria-describedby="coach-enroll-privacy coach-enroll-error">
+          <span>我同意平台把这次留言、账号邮箱和已填写的匹配偏好交给这位教练，仅用于本次预约与回复。</span>
+        </label>
+        <p class="pref-privacy" id="coach-enroll-privacy">
+          平台代转你的留言、账号邮箱和已填写的匹配偏好，不公开教练邮箱。教练会直接回复你的账号邮箱，
+          请勿在留言中填写与预约无关的敏感信息。
+        </p>
+
+        <p class="online-error" id="coach-enroll-error" role="alert" hidden></p>
+        <div class="dialog-buttons">
+          <button class="btn btn-ghost" id="coach-enroll-close-btn" type="button">关闭</button>
+          <button class="btn btn-primary" id="coach-enroll-submit" type="submit">邮件预约</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- 学员投诉入口只对已确认邮箱的非教练账号渲染；服务端仍会再次判定身份。 -->
+    <dialog class="dialog coach-pref-dialog coach-complaint-dialog" id="coach-complaint-dialog"
+            aria-labelledby="coach-complaint-title">
+      <form id="coach-complaint-form" novalidate>
+        <h2 class="dialog-title" id="coach-complaint-title">投诉教练</h2>
+        <p class="dialog-sub">投诉对象：<strong id="coach-complaint-name"></strong></p>
+        <p class="dialog-sub">请写清时间、经过和具体情况。投诉由平台私下核实，不会自动公开。</p>
+
+        <label class="field pref-group pref-note-block" id="coach-complaint-text-group">
+          <span class="field-label pref-note-head">
+            <span>投诉内容</span>
+            <span class="pref-counter" id="coach-complaint-count">0 / 3000</span>
+          </span>
+          <textarea class="pref-note" id="coach-complaint-text" rows="7" minlength="20" maxlength="3050"
+                    required aria-describedby="coach-complaint-hint coach-complaint-error"
+                    placeholder="至少 20 个字。请勿填写与核实无关的个人敏感信息。"></textarea>
+        </label>
+        <p class="pref-field-hint" id="coach-complaint-hint">至少 20 个字，最多 3000 个字。</p>
+        <p class="pref-privacy">
+          公开主页只会显示平台核实并批准发表的内容，不显示投诉人身份。同一教练有待处理投诉时不能重复提交。
+        </p>
+
+        <p class="online-error" id="coach-complaint-error" role="alert" hidden></p>
+        <div class="dialog-buttons">
+          <button class="btn btn-ghost" id="coach-complaint-close-btn" type="button">关闭</button>
+          <button class="btn btn-primary" id="coach-complaint-submit" type="submit">提交投诉</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="dialog coach-pref-dialog" id="coach-complaints-dialog"
+            aria-labelledby="coach-complaints-title">
+      <h2 class="dialog-title" id="coach-complaints-title">我的投诉记录</h2>
+      <p class="pref-privacy">
+        学员查看自己提交的记录；教练查看关于自己的匿名记录。两端都不会显示投诉人身份。
+      </p>
+      <button class="btn btn-ghost btn-sm" id="coach-complaints-history-refresh" type="button">刷新记录</button>
+      <p class="coach-complaint-history-state" id="coach-complaints-history-state" role="status" hidden></p>
+      <div class="coach-complaint-history-list" id="coach-complaints-history-list"></div>
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="coach-complaints-close-btn" type="button">关闭</button>
+      </div>
+    </dialog>
+
+    <!-- 头像、照片与证书共用的原生灯箱。Esc 与关闭按钮均走浏览器原生焦点管理。 -->
+    <dialog class="dialog coach-lightbox-dialog" id="coach-lightbox-dialog"
+            aria-labelledby="coach-lightbox-caption">
+      <button class="btn btn-ghost coach-lightbox-close" id="coach-lightbox-close-btn"
+              type="button" aria-label="关闭大图">关闭</button>
+      <img class="coach-lightbox-image" id="coach-lightbox-image" alt="">
+      <p class="coach-lightbox-caption" id="coach-lightbox-caption"></p>
     </dialog>
 
     <!-- 教练自己那份公开资料。多选那四组的控件、各组标题和"选几项"那句都由
@@ -788,6 +939,40 @@
         </span>
         <textarea class="pref-note" id="cp-honors" rows="4" maxlength="380"
                   placeholder="带出过什么成绩、教龄里的例子……写你愿意公开的那部分"></textarea>
+      </label>
+
+      <label class="field pref-group pref-note-block" id="cp-enrollment-notes-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-enrollment-notes-legend"></span>
+          <span class="pref-counter" id="cp-enrollment-notes-count">0 / 2000</span>
+        </span>
+        <textarea class="pref-note" id="cp-enrollment-notes" rows="4" maxlength="2050"
+                  placeholder="适合什么样的学生、需要先准备什么、试听或退费规则等"></textarea>
+      </label>
+
+      <label class="field pref-group" id="cp-hourly-rate-cny-group">
+        <span class="field-label" id="cp-hourly-rate-cny-legend"></span>
+        <input type="text" id="cp-hourly-rate-cny" inputmode="numeric" maxlength="6"
+               autocomplete="off" placeholder="例如 200；按每 60 分钟计算，不确定就留空">
+        <span class="pref-field-hint">人民币元，0 到 100000 的非负整数；0 元与未填是两回事。</span>
+      </label>
+
+      <label class="field pref-group pref-note-block" id="cp-tuition-text-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-tuition-text-legend"></span>
+          <span class="pref-counter" id="cp-tuition-text-count">0 / 1000</span>
+        </span>
+        <textarea class="pref-note" id="cp-tuition-text" rows="3" maxlength="1050"
+                  placeholder="例如：一对一 200 元 / 60 分钟，小组课 100 元 / 60 分钟"></textarea>
+      </label>
+
+      <label class="field pref-group pref-note-block" id="cp-schedule-text-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-schedule-text-legend"></span>
+          <span class="pref-counter" id="cp-schedule-text-count">0 / 1000</span>
+        </span>
+        <textarea class="pref-note" id="cp-schedule-text" rows="3" maxlength="1050"
+                  placeholder="例如：北京时间每周二、四 19:00 后，周末上午可预约"></textarea>
       </label>
 
       <fieldset class="pref-group" id="cp-levels-group">

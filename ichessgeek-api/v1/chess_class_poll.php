@@ -32,7 +32,12 @@ try {
 
     chess_json([
         'ok' => true,
-        'class' => chess_class_public($class, chess_class_members($conn, $class['id']), $id),
+        'class' => chess_class_public(
+            $class,
+            chess_class_members($conn, $class['id']),
+            $id,
+            chess_player_can_teach($conn, $class['teacher_id'])
+        ),
         'events' => $events,
     ]);
 } catch (Throwable $e) {

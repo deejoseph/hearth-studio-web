@@ -55,14 +55,26 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
   /** 服务端算出来的那一态；null = 这一趟没问到（没登录，或取回来失败）。 */
   let state = null;
   let app = null;
+  let identity = null;
   let busy = false;
+  let request = 0;
+  let saveRequest = 0;
+  let dialogAccount = null;
+
+  function idleSave() {
+    busy = false;
+    el.saveBtn.disabled = false;
+    el.saveBtn.textContent = '提交申请';
+  }
 
   function paintNote() {
     // 没登录/没取到就把那一行收掉，而不是默认"你还不够格"：
     // 一个拿不到的值不该在界面上变成一句结论。
-    el.note.textContent = state === null ? '' : coachAppNote(state);
-    el.note.hidden = state === null;
-    el.applyLabel.textContent = coachAppBtnLabel(state ?? 'none');
+    el.note.textContent = identity?.revoked
+      ? '教练资格已被管理员撤销，恢复前不能开课堂或提交申请。'
+      : state === null ? '' : coachAppNote(state);
+    el.note.hidden = state === null && !identity?.revoked;
+    el.applyLabel.textContent = identity?.revoked ? '我的教练资格' : coachAppBtnLabel(state ?? 'none');
     onStateChange(state);
   }
 
@@ -80,12 +92,14 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
   /** 对话框摆成当前这一态：已批准的是读、不是改；别的把原文放回去让人接着写。 */
   function fillDialog() {
     const shown = state ?? 'none';
-    el.hint.textContent = coachAppDialogHint(shown);
+    el.hint.textContent = identity?.revoked
+      ? '资格已被管理员撤销。你仍可查看匿名投诉记录；恢复由管理员处理。'
+      : coachAppDialogHint(shown);
     const at = coachAppWhen(shown, app);
     el.when.textContent = at ? `${shown === 'rejected' ? '上次答复于' : '提交于'} ${at}` : '';
     el.when.hidden = !at;
     el.intro.value = coachAppIntro(app);
-    const locked = state === 'approved';
+    const locked = state === 'approved' || identity?.revoked === true;
     el.intro.readOnly = locked;
     // 提交按钮直接收掉而不是禁用：已批准的人按下去只会换来一句 409，
     // 而那句"你已经能开课堂了"读起来像是出了错。
@@ -95,17 +109,26 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
   }
 
   async function load() {
+    const who = player();
+    const ticket = ++request;
     const reply = await call('chess_coach_app_get.php', { method: 'GET' });
+    if (ticket !== request || player()?.id !== who?.id) return reply;
     if (!reply.ok) {
       // 会话在别处过期了、或后端这会儿不响应：那一行收掉、【开课堂】照旧能点，
       // 让服务端在那一次点击上说话。
       state = null;
       app = null;
+      identity = null;
       paintNote();
       return reply;
     }
     state = coachAppState(reply);
     app = reply.app ?? null;
+    identity = {
+      canTeach: reply.can_teach === true,
+      wasTeacher: reply.was_teacher === true,
+      revoked: reply.revoked === true,
+    };
     paintNote();
     return reply;
   }
@@ -116,41 +139,51 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
       showToast('先登录再申请 —— 教练资格是记在账号上的。');
       return;
     }
+    const whoId = player()?.id;
+    dialogAccount = whoId;
     fillDialog();
     el.dialog.showModal();
     if (state === null) {
-      // 还没问到这一态：先把框打开，取回来再重摆一次
-      load().then(() => {
-        if (el.dialog.open) fillDialog();
+      load().then((result) => {
+        if (el.dialog.open && !result.stale && player()?.id === whoId) fillDialog();
       });
     }
     (state === 'approved' ? el.closeBtn : el.intro)?.focus();
   }
 
   async function save() {
-    if (busy || state === 'approved') return;
+    if (busy || state === 'approved' || identity?.revoked || !player()) return;
     const checked = validateCoachIntro(el.intro.value);
     if (!checked.ok) {
       showError(checked.text);
       el.intro.focus();
       return;
     }
+    const whoId = player()?.id;
+    const ticket = ++saveRequest;
+    request += 1;
     busy = true;
     el.saveBtn.disabled = true;
     el.saveBtn.textContent = '提交中…';
     showError('');
 
     const reply = await call('chess_coach_app_save.php', { body: checked.payload });
+    if (ticket !== saveRequest || player()?.id !== whoId) return;
     if (reply.ok) {
       state = coachAppState(reply);
       app = reply.app ?? null;
+      identity = {
+        canTeach: reply.can_teach === true,
+        wasTeacher: reply.was_teacher === true,
+        revoked: reply.revoked === true,
+      };
       paintNote();
       fillDialog();
       el.dialog.close();
       showToast('交上去了，管理员看过就能开课堂。');
     } else if (reply.code === 'already_teacher') {
-      // 他其实已经批过了（多半是另一个标签里刚批的）：别让人对着 409 猜
       await load();
+      if (ticket !== saveRequest || player()?.id !== whoId) return;
       fillDialog();
       showError('这份申请已经通过了，不用再交一遍。现在就能开课堂。');
       el.closeBtn.focus();
@@ -158,14 +191,19 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
       showError(reply.message || '没能交上去，请再试一次。');
     }
 
-    busy = false;
-    el.saveBtn.disabled = false;
-    el.saveBtn.textContent = '提交申请';
+    idleSave();
   }
 
   el.applyBtn.addEventListener('click', open);
   el.saveBtn.addEventListener('click', save);
   el.closeBtn.addEventListener('click', () => el.dialog.close());
+  el.dialog.addEventListener('close', () => {
+    request += 1;
+    saveRequest += 1;
+    dialogAccount = null;
+    idleSave();
+    showError('');
+  });
   el.intro.addEventListener('input', () => {
     paintCounter();
     showError('');
@@ -177,14 +215,22 @@ export function mountCoachApp({ showToast, player, openAccount, onStateChange })
      * 否则退出登录后【开课堂】还按别人的资格亮着。
      */
     refresh: () => {
-      if (player()) return load();
+      const whoId = player()?.id;
+      const accountChanged = dialogAccount !== null && dialogAccount !== whoId;
+      request += 1;
+      saveRequest += 1;
+      idleSave();
       state = null;
       app = null;
+      identity = null;
       paintNote();
+      if (accountChanged && el.dialog.open) el.dialog.close();
+      if (player()) return load();
       return Promise.resolve(null);
     },
     open,
     state: () => state,
+    identity: () => identity ? { ...identity } : null,
     /** 服务端在【开课堂】那一步回了 teacher_only：把人送去申请，而不是让他读一句 403。 */
     noteBlocked() {
       if (state === null || state === 'approved') state = 'none';

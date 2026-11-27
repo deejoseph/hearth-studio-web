@@ -262,6 +262,14 @@ $assert($teacherView['seq'] === 5, 'the view carries seq');
 $assert($teacherView['you']['role'] === CHESS_CLASS_TEACHER, 'the teacher sees their role');
 $assert($teacherView['you']['hand'] === CHESS_HAND_NONE, 'the teacher has no hand status');
 $assert($teacherView['you']['can_move'] === true, 'the teacher can always move');
+$ineligibleTeacherView = chess_class_public($class, $memberList, 1, false);
+$assert($ineligibleTeacherView['you']['role'] === CHESS_CLASS_TEACHER,
+    'an ineligible teacher still sees the historical teacher role');
+$assert($ineligibleTeacherView['you']['can_move'] === false,
+    'an ineligible or revoked teacher cannot move');
+$approvedStudentView = chess_class_public($class, $memberList, 3, false);
+$assert($approvedStudentView['you']['can_move'] === true,
+    'teacher ineligibility does not revoke an already approved student move');
 $assert(count($teacherView['members']) === 4, 'the view lists all members');
 $assert($teacherView['members'][0]['id'] === 1 && $teacherView['members'][0]['nickname'] === 'Teacher', 'the view names the teacher');
 $assert($teacherView['members'][1]['role'] === CHESS_CLASS_STUDENT && $teacherView['members'][1]['hand'] === CHESS_HAND_RAISED, 'the view shows Alice raised');

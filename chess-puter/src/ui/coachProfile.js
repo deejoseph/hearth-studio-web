@@ -18,28 +18,37 @@
 
 import { call, upload } from '../net/auth.js';
 import { prepareCoachImage } from '../net/coachImage.js';
-import { COACH_OPTIONS } from '../game/coachPref.js';
+import { coachImageTrigger } from './coachLightbox.js';
+import { COACH_OPTIONS, normalizeCoachText } from '../game/coachPref.js';
 import {
   COACH_CERTIFICATES_MAX,
+  COACH_ENROLLMENT_NOTES_MAX,
   COACH_HONORS_MAX,
   COACH_IMAGE_BYTES_MAX,
   COACH_PHOTOS_MAX,
   COACH_PROFILE_GROUPS,
   COACH_PROFILE_RULES,
   COACH_PROFILE_TITLES,
+  COACH_SCHEDULE_TEXT_MAX,
   COACH_TAGLINE_MAX,
   COACH_TITLES,
+  COACH_TUITION_TEXT_MAX,
   coachPhotoUrl,
   validateCoachProfile,
 } from '../game/coachProfile.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** 会亮红框的那些栏：四组多选 + 五个自由填写的 + 三类图片。 */
-const SECTIONS = [...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors', 'language', 'timezone', 'avatar', 'photos', 'certificates'];
+/** 会亮红框的那些栏：四组多选 + 公开文字与费率 + 三类图片。 */
+const SECTIONS = [
+  ...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors',
+  'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
+  'language', 'timezone', 'avatar', 'photos', 'certificates',
+];
 
 /** 这四处用 chips 多选，其余（语言/时区）用 select —— 时区九项，摊开太长。 */
 const MULTI = COACH_PROFILE_GROUPS;
+const sectionId = (field) => `cp-${field.replaceAll('_', '-')}-group`;
 
 /** 单选项（select）：[元素 id, 选项表, 那句"不填"的说法, 标题取自哪一栏]。 */
 const SELECTS = [
@@ -123,7 +132,7 @@ function hintOf(group) {
 }
 
 function counterOf(el, counter, max) {
-  const n = [...el.value].length;
+  const n = [...normalizeCoachText(el.value)].length;
   counter.textContent = `${n} / ${max}`;
   counter.classList.toggle('over', n > max);
 }
@@ -135,10 +144,11 @@ function counterOf(el, counter, max) {
  *   openAccount(which?: string): void,
  *   canTeach(): boolean,          // 教练申请那一态（approved / 管理员）
  *   onChanged(profile: object|null): void,  // 名录要重画，主页要跟着变
+ *   openImage(src: string, alt: string): void, // 原生灯箱
  * }} deps
- * @returns {{open(): Promise<void>, refresh(): Promise<any>, syncGate(): void, hasProfile(): boolean}}
+ * @returns {{open(): Promise<void>, refresh(): Promise<any>, syncGate(): void, value(): object|null}}
  */
-export function mountCoachProfile({ showToast, player, openAccount, canTeach, onChanged }) {
+export function mountCoachProfile({ showToast, player, openAccount, canTeach, onChanged, openImage }) {
   // 控件先生成，再取引用 —— 和 ui/coachPref.js 同一个理由：反过来做的话
   // 那些 select 会是 null，而"打开面板就报错"只在真浏览器里看得见。
   for (const group of MULTI) {
@@ -149,7 +159,10 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     buildSelect($(`${id}-box`), id, options, blankText, group);
   }
   // 自由填写那几栏的标题同样只有一处出处（COACH_PROFILE_TITLES）。
-  for (const key of ['elo', 'years', 'tagline', 'honors', 'avatar', 'photos', 'certificates']) {
+  for (const key of [
+    'elo', 'years', 'tagline', 'honors', 'enrollment_notes', 'hourly_rate_cny',
+    'tuition_text', 'schedule_text', 'avatar', 'photos', 'certificates',
+  ]) {
     const legend = $(`cp-${key}-legend`);
     if (legend) legend.textContent = COACH_PROFILE_TITLES[key];
   }
@@ -165,6 +178,13 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     taglineCount: $('cp-tagline-count'),
     honors: $('cp-honors'),
     honorsCount: $('cp-honors-count'),
+    enrollmentNotes: $('cp-enrollment-notes'),
+    enrollmentNotesCount: $('cp-enrollment-notes-count'),
+    hourlyRate: $('cp-hourly-rate-cny'),
+    tuitionText: $('cp-tuition-text'),
+    tuitionTextCount: $('cp-tuition-text-count'),
+    scheduleText: $('cp-schedule-text'),
+    scheduleTextCount: $('cp-schedule-text-count'),
     language: $('cp-language'),
     timezone: $('cp-timezone'),
     avatarBox: $('cp-avatar-box'),
@@ -189,27 +209,65 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   let profile = null;
   let hasFilled = false;
   let busy = false;
+  let loading = false;
+  let request = 0;
+  let mutation = 0;
+  let gateContext = null;
+  let dialogContext = null;
+
+  function context() {
+    return { id: player()?.id ?? null, teach: canTeach() };
+  }
+
+  function sameContext(who) {
+    const now = context();
+    return now.id === who.id && now.teach === who.teach;
+  }
+
+  function idleSave() {
+    el.saveBtn.disabled = loading;
+  }
+
+  function finishMutation(ticket) {
+    if (ticket !== mutation) return;
+    busy = false;
+    idleSave();
+  }
+
+  function reset() {
+    request += 1;
+    mutation += 1;
+    loading = false;
+    busy = false;
+    profile = null;
+    hasFilled = false;
+    fill();
+    idleSave();
+  }
 
   function showError(text, field) {
     el.error.textContent = text;
     el.error.hidden = false;
     for (const section of SECTIONS) {
-      $(`cp-${section}-group`)?.classList.toggle('invalid', section === field);
+      $(sectionId(section))?.classList.toggle('invalid', section === field);
     }
-    if (field) ($(`cp-${field}-box`) ?? $(`cp-${field}-group`))?.scrollIntoView({ block: 'nearest' });
+    if (field) ($(`cp-${field.replaceAll('_', '-')}-box`) ?? $(sectionId(field)))?.scrollIntoView({ block: 'nearest' });
   }
 
   function clearError() {
     el.error.hidden = true;
     el.error.textContent = '';
     for (const section of SECTIONS) {
-      $(`cp-${section}-group`)?.classList.remove('invalid');
+      $(sectionId(section))?.classList.remove('invalid');
     }
   }
 
   function paintCounters() {
     counterOf(el.tagline, el.taglineCount, COACH_TAGLINE_MAX);
     counterOf(el.honors, el.honorsCount, COACH_HONORS_MAX);
+    counterOf(el.enrollmentNotes, el.enrollmentNotesCount, COACH_ENROLLMENT_NOTES_MAX);
+    counterOf(el.tuitionText, el.tuitionTextCount, COACH_TUITION_TEXT_MAX);
+    counterOf(el.scheduleText, el.scheduleTextCount, COACH_SCHEDULE_TEXT_MAX);
   }
 
   /** 头像、照片和证书那一坨。达到上限就把对应的添加按钮收掉。 */
@@ -261,17 +319,20 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   }
 
   function image(box, src, alt, fit = '') {
-    const img = document.createElement('img');
-    img.className = fit ? `coach-photo ${fit}` : 'coach-photo';
-    img.src = src;
-    img.alt = alt;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    // 图挂了（文件被删、网络断了）就把整个格子收掉：一个碎图标占在那儿，
-    // 读起来像是资料本身坏了。
-    img.addEventListener('error', () => img.closest('.coach-photo-cell, .coach-avatar-box')?.classList.add('broken'));
-    box.append(img);
-    return img;
+    const trigger = coachImageTrigger({
+      src,
+      alt,
+      openImage,
+      imageClassName: fit ? `coach-photo ${fit}` : 'coach-photo',
+      onError: (button, img) => {
+        // 图挂了仍保留移除按钮；先记下容器，再拆掉灯箱按钮和碎图。
+        const container = img.closest('.coach-photo-cell, .coach-avatar-box');
+        button.remove();
+        container?.classList.add('broken');
+      },
+    });
+    box.append(trigger);
+    return trigger;
   }
 
   function removeButton(kind, name) {
@@ -290,6 +351,10 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       years: el.years.value,
       tagline: el.tagline.value,
       honors: el.honors.value,
+      enrollment_notes: el.enrollmentNotes.value,
+      hourly_rate_cny: el.hourlyRate.value,
+      tuition_text: el.tuitionText.value,
+      schedule_text: el.scheduleText.value,
       language: el.language.value,
       timezone: el.timezone.value,
       avatar: profile?.avatar ?? '',
@@ -307,6 +372,10 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     el.years.value = one.years ?? '';
     el.tagline.value = one.tagline ?? '';
     el.honors.value = one.honors ?? '';
+    el.enrollmentNotes.value = one.enrollment_notes ?? '';
+    el.hourlyRate.value = one.hourly_rate_cny ?? '';
+    el.tuitionText.value = one.tuition_text ?? '';
+    el.scheduleText.value = one.schedule_text ?? '';
     el.language.value = one.language ?? '';
     el.timezone.value = one.timezone ?? '';
     for (const group of MULTI) setChosen(group, one[group]);
@@ -321,17 +390,21 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       = hasFilled ? '改我的教练资料' : '填我的教练资料';
   }
 
-  /** 服务端那份。没取到就把表单摆成空的，【保存】照旧能用（不拿一个没读到的值拦人）。 */
   async function load({ quiet = false } = {}) {
-    if (!player()) {
-      profile = null;
-      hasFilled = false;
-      paintTrigger();
+    const ticket = ++request;
+    const who = context();
+    if (!who.id) {
+      reset();
       return { ok: false };
     }
+    loading = true;
+    idleSave();
     const reply = await call('chess_coach_profile_get.php', { method: 'GET' });
+    if (ticket !== request || !sameContext(who)) return { ok: false, stale: true };
+    loading = false;
+    idleSave();
     if (!reply.ok) {
-      if (!quiet) showError(reply.message ?? '这份资料没取回来，请再试一次。', null);
+      if (!quiet && who.teach === true) showError(reply.message ?? '这份资料没取回来，请再试一次。', null);
       return { ok: false, text: reply.message };
     }
     profile = reply.profile ?? null;
@@ -346,12 +419,15 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
    * 其余调用都发当场读到的表单。
    */
   async function save(overrides) {
-    if (busy) return;
+    const who = context();
+    if (busy || !who.id || who.teach !== true) return;
     const checked = validateCoachProfile({ ...formState(), ...overrides });
     if (!checked.ok) {
       showError(checked.text, checked.field);
       return;
     }
+    const ticket = ++mutation;
+    request += 1;
     clearError();
     busy = true;
     el.saveBtn.disabled = true;
@@ -359,9 +435,8 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     el.saveBtn.textContent = '保存中…';
 
     const reply = await call('chess_coach_profile_save.php', { body: checked.payload });
+    if (ticket !== mutation || !sameContext(who)) return;
     if (reply.ok) {
-      // 用服务端回的那一份重摆：多选被后端按白名单顺序排过，照片名也是后端起的，
-      // 留下发出去的形状迟早和库里不一样。
       profile = reply.profile ?? null;
       hasFilled = reply.filled === true;
       fill();
@@ -371,10 +446,8 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     } else {
       showError(reply.message ?? '没能存上，请再试一次。', reply.field ?? null);
     }
-
-    busy = false;
-    el.saveBtn.disabled = false;
     el.saveBtn.textContent = idle;
+    finishMutation(ticket);
   }
 
   async function removeImage(kind, name) {
@@ -384,14 +457,19 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   }
 
   async function sendImage(kind, file) {
-    if (!file || busy) return;
+    const who = context();
+    if (!file || busy || !who.id || who.teach !== true) return;
+    const ticket = ++mutation;
+    request += 1;
     clearError();
     busy = true;
+    el.saveBtn.disabled = true;
     const label = kind === 'certificates' ? '证书图片' : kind === 'avatar' ? '头像' : '照片';
     showToast(`${label}处理中…`);
 
     try {
       const prepared = await prepareCoachImage(file);
+      if (ticket !== mutation || !sameContext(who)) return;
       if (!prepared.ok) {
         showError(prepared.text, kind);
         return;
@@ -406,6 +484,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       form.append('kind', kind);
       form.append('file', prepared.file);
       const reply = await upload('chess_coach_photo_save.php', form);
+      if (ticket !== mutation || !sameContext(who)) return;
 
       if (reply.ok) {
         profile = reply.profile ?? profile;
@@ -418,7 +497,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
         showError(reply.message ?? '这张图没传上去，请再试一次。', reply.field ?? kind);
       }
     } finally {
-      busy = false;
+      finishMutation(ticket);
     }
   }
 
@@ -428,14 +507,18 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       showToast('先登录再填这份资料 —— 它是挂在账号上的。');
       return;
     }
-    if (!canTeach()) {
+    if (canTeach() !== true) {
       showToast('名录上的位置是给批过的教练留的 —— 先在课堂那一栏提交申请。');
       return;
     }
+    const who = context();
+    gateContext = who;
+    dialogContext = who;
     clearError();
     el.saveBtn.disabled = true;
     el.dialog.showModal();
     const got = await load({ quiet: true });
+    if (got.stale || !sameContext(who) || !el.dialog.open) return;
     fill();
     el.saveBtn.disabled = false;
     if (!got.ok && profile === null) {
@@ -449,6 +532,15 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   el.trigger.addEventListener('click', open);
   el.saveBtn.addEventListener('click', () => save());
   el.closeBtn.addEventListener('click', () => el.dialog.close());
+  el.dialog.addEventListener('close', () => {
+    request += 1;
+    mutation += 1;
+    loading = false;
+    busy = false;
+    dialogContext = null;
+    idleSave();
+    clearError();
+  });
   el.avatarFile.addEventListener('change', () => {
     const file = el.avatarFile.files?.[0];
     el.avatarFile.value = '';
@@ -472,6 +564,15 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     paintCounters();
     if (!el.error.hidden) clearError();
   });
+  for (const input of [el.enrollmentNotes, el.tuitionText, el.scheduleText]) {
+    input.addEventListener('input', () => {
+      paintCounters();
+      if (!el.error.hidden) clearError();
+    });
+  }
+  el.hourlyRate.addEventListener('input', () => {
+    if (!el.error.hidden) clearError();
+  });
   for (const group of MULTI) {
     $(`cp-${group}-choices`).addEventListener('change', () => {
       if (!el.error.hidden) clearError();
@@ -490,18 +591,32 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
 
   return {
     open,
-    /** 身份变了就问一次：这张表是挂在账号上的，不能留着上一个人的照片。 */
-    refresh: () => load({ quiet: true }),
-    /**
-     * 教练那一态（申请通过 / 管理员）变了之后重画入口。没登录就把资料丢掉 ——
-     * 否则退出登录后名录上还会亮着"改我的教练资料"。
-     */
+    refresh: () => {
+      const who = context();
+      const accountChanged = dialogContext !== null
+        && (dialogContext.id !== who.id || dialogContext.teach !== who.teach);
+      reset();
+      paintTrigger();
+      if (accountChanged && el.dialog.open) el.dialog.close();
+      if (!who.id) return Promise.resolve({ ok: false });
+      return load({ quiet: true });
+    },
     syncGate: () => {
-      if (!player()) {
-        profile = null;
-        hasFilled = false;
+      const who = context();
+      if (gateContext?.id === who.id && gateContext?.teach === who.teach) {
+        paintTrigger();
+        return;
+      }
+      gateContext = who;
+      reset();
+      if (!who.id || who.teach !== true) {
+        if (el.dialog.open) el.dialog.close();
+        paintTrigger();
+        return;
       }
       paintTrigger();
+      if (!profile && !el.dialog.open) void load({ quiet: true });
     },
+    value: () => profile,
   };
 }

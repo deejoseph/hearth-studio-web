@@ -7,13 +7,12 @@
  * 和 chess_class_core_mutate.php 同一个道理：一份"全绿"既可能说明规则层对，
  * 也可能说明测试压根没在看。这里挑的每一处都是一条独立规则 ——
  * 介绍的下限/上限（含边界差一个）、非字符串、够不够格、大小写、状态机的两头的门、
- * 回给申请人/管理员的形状，以及资料那一层的范围/码点量法/坏字节/图片形状/
- * "0 和没填不是一回事"。抓到就说明那条规则真在被覆盖；漏了要补用例，
- * 不是改规则层。
+ * 回给申请人/管理员的形状、资料与预约的边界、撤销优先级，以及申诉的哈希和
+ * 公开/私有白名单。抓到就说明那条规则真在被覆盖；漏了要补用例，不是改规则层。
  *
- * 规则层和测试各拷一份到系统临时目录，保持 v1/ 与 tools/ 的相对位置 —— 测试里
- * `require __DIR__ . '/../v1/chess_coach_core.php'` 才会指向被改坏的那一份，
- * 仓库里的真文件一个字都不动。
+ * 规则层和测试各拷一份到系统临时目录，保持 v1/ 与 tools/ 的相对位置 ——
+ * 测试里的 require 才会指向被改坏的那一份，仓库里的真文件一个字都不动。
+ * 两元素变异默认改教练核心；三元素变异的第一项是 coach 或 complaint。
  *
  * 退出码：0 = 每一处都变红且控制组全绿；1 = 有一处没抓到或控制组不干净。
  * 这文件不部署：它在 tools/ 下，而只有 v1/ 会同步到服务器的 /api/v1/。
@@ -21,10 +20,11 @@
 
 $root = dirname(__DIR__);
 $core_src = $root . '/v1/chess_coach_core.php';
+$complaint_src = $root . '/v1/chess_coach_complaint_core.php';
 $test_src = $root . '/tools/chess_coach_core_test.php';
 $scratch = sys_get_temp_dir() . '/chess_coach_core_mutate';
 
-foreach ([$core_src, $test_src] as $path) {
+foreach ([$core_src, $complaint_src, $test_src] as $path) {
     if (!is_readable($path)) {
         fwrite(STDERR, "missing: {$path}\n");
         exit(2);
@@ -33,8 +33,12 @@ foreach ([$core_src, $test_src] as $path) {
 @mkdir($scratch . '/v1', 0777, true);
 @mkdir($scratch . '/tools', 0777, true);
 $core = $scratch . '/v1/chess_coach_core.php';
+$complaint = $scratch . '/v1/chess_coach_complaint_core.php';
 $test = $scratch . '/tools/chess_coach_core_test.php';
-$clean = file_get_contents($core_src);
+$clean = [
+    'coach' => file_get_contents($core_src),
+    'complaint' => file_get_contents($complaint_src),
+];
 // 测试每轮从仓库重读一份：留着的旧副本会掩盖"改了规则但跑的是老测试"这类事。
 file_put_contents($test, file_get_contents($test_src));
 
@@ -64,11 +68,11 @@ $mutations = [
         "    \$given = \$data['intro'] ?? '';",
     ],
     'M6 谁都能开课堂' => [
-        "    return coach_key(\$status) === 'approved';",
+        "    return coach_key(\$status) === 'approved' && !coach_standing_is_revoked(\$standing);",
         "    return coach_key(\$status) !== 'rejected';",
     ],
     'M7 资格判定时把大小写抹平' => [
-        "    return coach_key(\$status) === 'approved';",
+        "    return coach_key(\$status) === 'approved' && !coach_standing_is_revoked(\$standing);",
         "    return strtolower(trim((string) \$status)) === 'approved';",
     ],
     'M8 后台能把人打回待审' => [
@@ -188,6 +192,212 @@ $mutations = [
         "    foreach (['levels', 'goals', 'formats', 'slots', 'photos'] as \$key) {",
     ],
 
+    /* --- 学员预算、详细时间与教练公开资料 --- */
+    'M36 预算下限高于上限也收' => [
+        "    if (\$budgetMin !== null && \$budgetMax !== null && \$budgetMin > \$budgetMax) {",
+        "    if (false) {",
+    ],
+    'M37 金额上限放到一百万' => [
+        'const COACH_MONEY_MAX = 100000;',
+        'const COACH_MONEY_MAX = 1000000;',
+    ],
+    'M38 空预算默认成 0' => [
+        "function coach_money_opt(\$value, \$min, \$max, \$field, \$code) {\n    if (\$value === null || \$value === '') {\n        return [null, \$field, null];\n    }",
+        "function coach_money_opt(\$value, \$min, \$max, \$field, \$code) {\n    if (\$value === null || \$value === '') {\n        return [0, \$field, null];\n    }",
+    ],
+    'M39 详细时间上限放到 501' => [
+        'const COACH_SCHEDULE_NOTE_MAX = 500;',
+        'const COACH_SCHEDULE_NOTE_MAX = 501;',
+    ],
+    'M40 详细时间漏传变成 null' => [
+        "            'schedule_note' => \$scheduleNote,",
+        "            'schedule_note' => null,",
+    ],
+    'M41 招生说明不再限 2000 字' => [
+        "        \$data['enrollment_notes'] ?? '', COACH_ENROLLMENT_NOTES_MAX, 'enrollment_notes',",
+        "        \$data['enrollment_notes'] ?? '', 9999, 'enrollment_notes',",
+    ],
+    'M42 每小时价格放到一百万' => [
+        "        \$data['hourly_rate_cny'] ?? null, 0, COACH_MONEY_MAX, 'hourly_rate_cny', 'bad_rate'",
+        "        \$data['hourly_rate_cny'] ?? null, 0, 1000000, 'hourly_rate_cny', 'bad_rate'",
+    ],
+    'M43 新公开资料一律清空' => [
+        "        'enrollment_notes' => (string) (\$row['enrollment_notes'] ?? ''),\n        'tuition_text' => (string) (\$row['tuition_text'] ?? ''),\n        'schedule_text' => (string) (\$row['schedule_text'] ?? ''),\n        'hourly_rate_cny' => \$num(\$row['hourly_rate_cny'] ?? null),",
+        "        'enrollment_notes' => '',\n        'tuition_text' => '',\n        'schedule_text' => '',\n        'hourly_rate_cny' => null,",
+    ],
+    'M44 0 元价格回界面变成没填' => [
+        "        'hourly_rate_cny' => \$num(\$row['hourly_rate_cny'] ?? null),",
+        "        'hourly_rate_cny' => (\$row['hourly_rate_cny'] ?? null) ?: null,",
+    ],
+    'M45 新文字字段不算填过资料' => [
+        "    foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text',\n        'schedule_text', 'language', 'timezone', 'avatar'] as \$key) {",
+        "    foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'avatar'] as \$key) {",
+    ],
+    'M46 0 元价格不算填过资料' => [
+        "    return (\$profile['elo'] ?? null) !== null || (\$profile['years'] ?? null) !== null\n        || (\$profile['hourly_rate_cny'] ?? null) !== null;",
+        "    return (\$profile['elo'] ?? null) !== null || (\$profile['years'] ?? null) !== null;",
+    ],
+    'M47 公开资料把 email 带出去' => [
+        "        'certificates' => \$list(\$row['certificates'] ?? ''),\n        'updated_at' => \$row['updated_at'] ?? null,",
+        "        'certificates' => \$list(\$row['certificates'] ?? ''),\n        'email' => \$row['email'] ?? '',\n        'updated_at' => \$row['updated_at'] ?? null,",
+    ],
+
+    /* --- 预约请求 --- */
+    'M48 预约许可收整数 1' => [
+        "    if ((\$data['contact_ok'] ?? null) !== true) {",
+        "    if ((\$data['contact_ok'] ?? null) !== true && (\$data['contact_ok'] ?? null) !== 1\n        && (\$data['contact_ok'] ?? null) !== '1') {",
+    ],
+    'M49 教练 ID 收前导零' => [
+        "    if (is_string(\$value) && preg_match('/^[1-9]\\d{0,9}\$/D', trim(\$value))) {",
+        "    if (is_string(\$value) && preg_match('/^\\d{1,10}\$/D', trim(\$value))) {",
+    ],
+    'M50 预约说明下限放到 19' => [
+        '    if ($len < 20 || $len > 2000) {',
+        '    if ($len < 19 || $len > 2000) {',
+    ],
+    'M51 预约说明上限放到 2001' => [
+        '    if ($len < 20 || $len > 2000) {',
+        '    if ($len < 20 || $len > 2001) {',
+    ],
+    'M52 预约说明按字节量长度' => [
+        '    $len = coach_len($message);',
+        '    $len = strlen($message);',
+    ],
+    'M53 预约说明收数组' => [
+        "    \$given = \$data['message'] ?? '';\n    if (!is_string(\$given)) {\n        return \$fail('bad_message', 'message');\n    }",
+        "    \$given = \$data['message'] ?? '';",
+    ],
+    'M54 教练 ID 收 0' => [
+        '        return $value > 0 && $value <= 2147483647 ? $value : null;',
+        '        return $value >= 0 && $value <= 2147483647 ? $value : null;',
+    ],
+
+    /* --- 生效中的撤销 --- */
+    'M55 批准状态越过撤销' => [
+        "    return coach_key(\$status) === 'approved' && !coach_standing_is_revoked(\$standing);",
+        "    return coach_key(\$status) === 'approved';",
+    ],
+    'M56 空恢复时间算已恢复' => [
+        "        && (\$restoredAt === null || \$restoredAt === '');",
+        "        && \$restoredAt === null;",
+    ],
+    'M57 管理员越过生效中的撤销' => [
+        "    return !coach_standing_is_revoked(\$standing)\n        && (\$isAdmin === true || coach_can_teach(\$status));",
+        "    return \$isAdmin === true || coach_can_teach(\$status, \$standing);",
+    ],
+
+    /* --- 申诉核心：边界、哈希、决定与隐私白名单 --- */
+    'C1 申诉下限放到 19' => [
+        'complaint',
+        '    if ($len < COACH_COMPLAINT_TEXT_MIN || $len > COACH_COMPLAINT_TEXT_MAX) {',
+        '    if ($len < COACH_COMPLAINT_TEXT_MIN - 1 || $len > COACH_COMPLAINT_TEXT_MAX) {',
+    ],
+    'C2 申诉上限放到 3001' => [
+        'complaint',
+        '    if ($len < COACH_COMPLAINT_TEXT_MIN || $len > COACH_COMPLAINT_TEXT_MAX) {',
+        '    if ($len < COACH_COMPLAINT_TEXT_MIN || $len > COACH_COMPLAINT_TEXT_MAX + 1) {',
+    ],
+    'C3 申诉正文按字节量长度' => [
+        'complaint',
+        '    $len = coach_len($text);',
+        '    $len = strlen($text);',
+    ],
+    'C4 重复哈希不再按教练隔离' => [
+        'complaint',
+        "        'text_hash' => hash('sha256', \$coachId . ':' . \$text), 'code' => null, 'field' => null];",
+        "        'text_hash' => hash('sha256', \$text), 'code' => null, 'field' => null];",
+    ],
+    'C5 申诉状态多收 approved' => [
+        'complaint',
+        "const COACH_COMPLAINT_STATUSES = ['pending', 'upheld', 'rejected'];",
+        "const COACH_COMPLAINT_STATUSES = ['pending', 'upheld', 'rejected', 'approved'];",
+    ],
+    'C6 严重程度多收 high' => [
+        'complaint',
+        "const COACH_COMPLAINT_SEVERITIES = ['normal', 'severe'];",
+        "const COACH_COMPLAINT_SEVERITIES = ['normal', 'severe', 'high'];",
+    ],
+    'C7 处理动作收 approve' => [
+        'complaint',
+        "    if (\$action !== 'uphold' && \$action !== 'reject') {",
+        "    if (\$action !== 'uphold' && \$action !== 'reject' && \$action !== 'approve') {",
+    ],
+    'C8 revoke 收字符串 true' => [
+        'complaint',
+        "    if (array_key_exists('revoke', \$data) && !is_bool(\$data['revoke'])) {",
+        "    if (array_key_exists('revoke', \$data) && !is_bool(\$data['revoke'])\n        && \$data['revoke'] !== 'true') {",
+    ],
+    'C9 驳回也能撤销资格' => [
+        'complaint',
+        "    if (\$action === 'reject') {\n        if (\$revoke) {\n            return \$fail('bad_revoke', 'revoke');\n        }",
+        "    if (\$action === 'reject') {",
+    ],
+    'C10 普通申诉也能撤销资格' => [
+        'complaint',
+        "    if (\$revoke && \$severity !== 'severe') {",
+        '    if (false) {',
+    ],
+    'C11 维持申诉允许空公开说明' => [
+        'complaint',
+        "    if (\$publicText === '' || coach_len(\$publicText) > COACH_COMPLAINT_PUBLIC_MAX) {",
+        "    if (coach_len(\$publicText) > COACH_COMPLAINT_PUBLIC_MAX) {",
+    ],
+    'C12 公开说明上限放到 3001' => [
+        'complaint',
+        'const COACH_COMPLAINT_PUBLIC_MAX = 3000;',
+        'const COACH_COMPLAINT_PUBLIC_MAX = 3001;',
+    ],
+    'C13 恢复原因收数组' => [
+        'complaint',
+        "    if (!is_string(\$value)) {\n        return ['ok' => false, 'reason' => '', 'code' => 'bad_restore_reason'];\n    }\n    \$reason = coach_trim(\$value);",
+        "    \$reason = coach_trim(\$value);",
+    ],
+    'C14 恢复原因按字节量长度' => [
+        'complaint',
+        "    if (\$reason === '' || !coach_is_utf8(\$reason) || coach_len(\$reason) > COACH_RESTORE_REASON_MAX) {",
+        "    if (\$reason === '' || !coach_is_utf8(\$reason) || strlen(\$reason) > COACH_RESTORE_REASON_MAX) {",
+    ],
+    'C15 公开申诉夹带原始正文' => [
+        'complaint',
+        "        'public_text' => (string) (\$row['public_text'] ?? ''),",
+        "        'text' => (string) (\$row['text'] ?? ''),\n        'public_text' => (string) (\$row['public_text'] ?? ''),",
+    ],
+    'C16 私有申诉夹带举报人 ID' => [
+        'complaint',
+        "        'coach_id' => (int) (\$row['coach_id'] ?? 0),\n        'text' => (string) (\$row['text'] ?? ''),",
+        "        'coach_id' => (int) (\$row['coach_id'] ?? 0),\n        'reporter_id' => (int) (\$row['reporter_id'] ?? 0),\n        'text' => (string) (\$row['text'] ?? ''),",
+    ],
+    'C17 被驳回正文回到教练屏幕' => [
+        'complaint',
+        "        \$out['text'] = '';",
+        "        \$out['text'] = (string) (\$row['text'] ?? '');",
+    ],
+    'C18 被驳回公开说明回到教练' => [
+        'complaint',
+        "        \$out['public_text'] = '';",
+        "        \$out['public_text'] = (string) (\$row['public_text'] ?? '');",
+    ],
+    'C19 管理员申诉夹带邮箱' => [
+        'complaint',
+        "        'coach_nickname' => (string) (\$row['coach_nickname'] ?? \$row['coach_name'] ?? ''),",
+        "        'coach_nickname' => (string) (\$row['coach_nickname'] ?? \$row['coach_name'] ?? ''),\n        'email' => (string) (\$row['email'] ?? ''),",
+    ],
+    'C20 举报回执夹带原始正文' => [
+        'complaint',
+        "        'status' => (string) (\$row['status'] ?? 'pending'),\n        'created_at' => \$row['created_at'] ?? null,",
+        "        'status' => (string) (\$row['status'] ?? 'pending'),\n        'text' => (string) (\$row['text'] ?? ''),\n        'created_at' => \$row['created_at'] ?? null,",
+    ],
+    'C21 standing 夹带举报人 ID' => [
+        'complaint',
+        "        'coach_id' => (int) (\$row['player_id'] ?? \$row['coach_id'] ?? 0),",
+        "        'coach_id' => (int) (\$row['player_id'] ?? \$row['coach_id'] ?? 0),\n        'reporter_id' => (int) (\$row['reporter_id'] ?? 0),",
+    ],
+    'C22 恢复原因上限放到 1001' => [
+        'complaint',
+        'const COACH_RESTORE_REASON_MAX = 1000;',
+        'const COACH_RESTORE_REASON_MAX = 1001;',
+    ],
+
     '控制：一个字都不改' => [null, null],
 ];
 
@@ -210,15 +420,21 @@ function read_verdict(array $lines): array
 }
 
 $missed = [];
-foreach ($mutations as $label => [$needle, $replacement]) {
+foreach ($mutations as $label => $mutation) {
+    $target = count($mutation) === 2 ? 'coach' : $mutation[0];
+    [$needle, $replacement] = count($mutation) === 2 ? $mutation : array_slice($mutation, 1);
+    $path = $target === 'complaint' ? $complaint : $core;
+
+    file_put_contents($core, $clean['coach']);
+    file_put_contents($complaint, $clean['complaint']);
     if ($needle === null) {
-        file_put_contents($core, $clean);
-    } elseif (strpos($clean, $needle) === false) {
+        // 控制组两份都保持原样。
+    } elseif (strpos($clean[$target], $needle) === false) {
         echo "!! {$label}: 规则层里找不到要改的那一行，这条结论作废\n";
         $missed[] = $label . '（改不动）';
         continue;
     } else {
-        file_put_contents($core, str_replace($needle, $replacement, $clean));
+        file_put_contents($path, str_replace($needle, $replacement, $clean[$target]));
     }
 
     $out = [];
@@ -254,6 +470,7 @@ foreach ($mutations as $label => [$needle, $replacement]) {
 }
 
 @unlink($core);
+@unlink($complaint);
 @unlink($test);
 @rmdir($scratch . '/v1');
 @rmdir($scratch . '/tools');

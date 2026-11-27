@@ -28,7 +28,10 @@ if (!$check['ok']) {
 $conn = chess_db();
 
 try {
-    if (chess_app_is_teacher($conn, $playerId)) {
+    if (chess_player_is_revoked($conn, $playerId)) {
+        chess_err('coach_revoked');
+    }
+    if (chess_player_can_teach($conn, $playerId)) {
         chess_err('already_teacher');
     }
     if (!chess_app_submit($conn, $playerId, $check['intro'])) {
@@ -45,7 +48,9 @@ try {
         'app' => coach_app_public($row),
         // 刚交完一定是待审 —— 直接从库里那一行算，不写死 false，
         // 免得哪天状态机改了这里还在报旧值。
-        'can_teach' => coach_can_teach($row['status'] ?? null),
+        'can_teach' => chess_player_can_teach($conn, $playerId),
+        'was_teacher' => chess_coach_was_teacher($conn, $playerId),
+        'revoked' => chess_player_is_revoked($conn, $playerId),
     ]);
 } catch (Throwable $e) {
     chess_fail($e, 'coach app save');

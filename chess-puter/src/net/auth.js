@@ -74,8 +74,11 @@ const PROBLEM_TEXT = {
 
   // 教练偏好。后端回这些 code 时还会带一个 field（哪一组不对），面板按它亮红框。
   bad_pref: '有一项没选上，或者选得比上限还多。',
-  long_note: '补充说明太长了，缩一缩再存。',
-  bad_note: '补充说明里有打不出来的字符，重写一遍就好。',
+  long_note: '自我介绍太长了，缩一缩再存。',
+  bad_note: '自我介绍里有打不出来的字符，重写一遍就好。',
+  bad_budget: '预算请填 0 到 100000 的非负整数，下限不能高于上限。',
+  long_schedule: '详细时间说明太长了，缩到 240 个字以内再存。',
+  bad_schedule: '详细时间说明里有打不出来的字符，重写一遍就好。',
 
   // 教练申请。开课堂的资格由服务端判（chess_guard.php 里的 chess_require_teacher），
   // 所以 teacher_only 这一句要给出路，不只是"不行"。
@@ -97,6 +100,33 @@ const PROBLEM_TEXT = {
   too_many_photos: '照片最多三张，先删一张再传。',
   too_many_certificates: '证书图片最多六张，先删一张再传。',
   too_many_uploads: '刚刚传的图片太多了，等一小时再试。',
+  bad_rate: '每小时费率请填 0 到 100000 的非负整数（人民币元），不确定就留空。',
+  long_enrollment_notes: '招生须知太长了，缩到 2000 个字以内再存。',
+  bad_enrollment_notes: '招生须知里有打不出来的字符，重写一遍就好。',
+  long_tuition: '课时费标准太长了，缩到 1000 个字以内再存。',
+  bad_tuition: '课时费标准里有打不出来的字符，重写一遍就好。',
+  long_schedule_text: '上课时段说明太长了，缩到 1000 个字以内再存。',
+  bad_schedule_text: '上课时段说明里有打不出来的字符，重写一遍就好。',
+
+  // 教练市场：预约走平台转信，投诉由平台私下审核。
+  coach_revoked: '这位教练的资格已被撤销，恢复前不能使用教练功能。',
+  bad_coach_id: '这位教练现在没法联系，请刷新名录后再试。',
+  contact_required: '请同意平台把账号邮箱交给教练，用于回复这次预约。',
+  short_message: '预约留言至少写 20 个字，说清楚想约什么课。',
+  long_message: '预约留言太长了，缩到 2000 个字以内再发。',
+  bad_message: '预约留言里有打不出来的字符，重写一遍就好。',
+  bad_request_id: '这次预约的请求标识不对，请重新打开预约窗口。',
+  inquiry_pending: '上一封预约邮件还在发送，请稍等再重试。',
+  inquiry_conflict: '这次预约标识已经用于另一段留言，请重新打开预约窗口。',
+  too_many_inquiries: '今天发的预约有点多，稍后再试。',
+  bad_complaint: '投诉内容里有打不出来的字符，重写一遍就好。',
+  short_complaint: '请写清楚发生了什么 —— 至少 20 个字，平台才能核实。',
+  long_complaint: '投诉内容太长了，缩到 3000 个字以内再交。',
+  complaint_target_invalid: '只能投诉当前或曾经的教练。',
+  complaint_pending: '你对这位教练已有一条待处理投诉，不用重复提交。',
+  duplicate_complaint: '相同内容的投诉已经提交过了。',
+  too_many_complaints: '今天交的投诉有点多，稍后再试。',
+  coach_only: '教练账号不能提交学员投诉。',
 };
 
 /**

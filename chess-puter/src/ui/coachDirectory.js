@@ -1,27 +1,25 @@
 /**
- * 推荐教练那一块的名录与主页（见 game/coachMatch.js 的排法、game/coachProfile.js 的字段）。
+ * 推荐教练名录与公开主页（排序见 game/coachMatch.js，公开字段见 game/coachProfile.js）。
  *
- * 只做三件事：取一次名录、按这个人填的偏好排序、点开看某一位的主页。
+ * 名录是公开端点，未登录也能看；个性化顺序只用当前账号自己的偏好。卡片不再整块
+ * 做成按钮：头像、主页、约课与投诉都是平级控件，避免嵌套交互元素，也避免误触。
  *
- * 名录是公开端点（chess_coach_directory.php），不登录也取，所以未登录的人也能
- * 看见有谁在教；排序用的是他自己填的偏好，没填就按"资料全不全"排（见 rankCoaches）。
- *
- * 🔴 这里不出现邮箱、也不出现申请时写给管理员看的那段介绍：名录行里就没有这两样
- * （coach_directory_entry），而联系走的是站内课堂。界面上那句承诺要一直成立。
- *
- * 渲染全部走 textContent：教练名字、简介、荣誉都是人写的字符串，
- * 拼 innerHTML 等于把主页变成别人的脚本。图片地址是服务端起的名字，见 coachPhotoUrl。
+ * 所有用户文字都走 textContent。公开主页只接收后台批准发表的投诉字段，不渲染
+ * 投诉人身份；联系由平台转信，公开展示不出现教练的私人邮箱。
  */
 
 import { call } from '../net/auth.js';
 import {
   COACH_PROFILE_TITLES,
   coachBadges,
+  coachEnrollmentRows,
   coachPhotoUrl,
   coachProfileRows,
   coachProfileTags,
 } from '../game/coachProfile.js';
-import { matchReasons, rankCoaches } from '../game/coachMatch.js';
+import { matchReasons, recommendedCoaches } from '../game/coachMatch.js';
+import { complaintSeverityLabel, publicComplaints } from '../game/coachMarketplace.js';
+import { coachImageTrigger } from './coachLightbox.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -32,47 +30,88 @@ function text(tag, className, value) {
   return node;
 }
 
-/** 头像：有图放图，没图用昵称第一个字占位（一个灰圈比一个碎图标好读）。 */
-function avatarOf(coach, wrap = text('span', 'coach-avatar')) {
-  wrap.replaceChildren();
-  const name = coach?.nickname ?? '';
-  const pic = coach?.profile?.avatar ?? '';
-  if (pic) {
-    const img = document.createElement('img');
-    img.src = coachPhotoUrl(coach.player_id, pic);
-    img.alt = `${name} 的头像`;
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.addEventListener('error', () => {
-      img.remove();
-      wrap.textContent = [...name][0] ?? '棋';
-    });
-    wrap.append(img);
-    return wrap;
+function button(label, className, controls) {
+  const node = text('button', className, label);
+  node.type = 'button';
+  if (controls) {
+    node.setAttribute('aria-haspopup', 'dialog');
+    node.setAttribute('aria-controls', controls);
   }
-  wrap.textContent = [...name][0] ?? '棋';
-  return wrap;
+  return node;
 }
 
-/** 一行"为什么把你排在这儿"：只说真对上的事，不替教练写广告。 */
+/** 有图是灯箱按钮，没图/图坏了是昵称首字；两种形态都不会套进另一个按钮。 */
+function avatarOf(coach, openImage, host = null, big = false) {
+  const name = coach?.nickname ?? '';
+  const pic = coach?.profile?.avatar ?? '';
+  const className = `coach-avatar${big ? ' big' : ''}`;
+  const initial = [...name][0] ?? '棋';
+  const fallback = () => {
+    if (host) {
+      host.className = className;
+      host.textContent = initial;
+      return host;
+    }
+    return text('span', className, initial);
+  };
+  // 主页的头像容器只负责定位；有图时样式落在按钮本身，避免两层头像样式嵌套。
+  if (host) host.className = '';
+  if (!pic) return fallback();
+
+  const trigger = coachImageTrigger({
+    src: coachPhotoUrl(coach.player_id, pic),
+    alt: `${name} 的头像`,
+    openImage,
+    className,
+    imageClassName: 'coach-avatar-image',
+    onError: (node) => {
+      if (host) {
+        node.remove();
+        host.className = className;
+        host.textContent = initial;
+      } else {
+        node.replaceWith(fallback());
+      }
+    },
+  });
+  if (host) {
+    host.replaceChildren(trigger);
+    return trigger;
+  }
+  return trigger;
+}
+
+/** 一行“为什么把你排在这儿”：只说真对上的事，不替教练写广告。 */
 function whyOf(item) {
   const reasons = matchReasons(item.match).join(' · ');
-  // <p> 塞进 <button> 是不合法的嵌套，这里整张卡片就是一个按钮，一律用 span。
-  if (reasons) return text('span', 'coach-why', `和你的偏好：${reasons}`);
+  if (reasons) return text('p', 'coach-why', `和你的偏好：${reasons}`);
   const tags = coachProfileTags(item.coach).join(' · ');
-  // 没填偏好、或者一样都没对上，就退而说这位教练自己标的那两样
-  return tags ? text('span', 'coach-why quiet', tags) : null;
+  return tags ? text('p', 'coach-why quiet', tags) : null;
 }
 
 /**
  * @param {{
  *   player(): object|null,
- *   pref(): object|null,          // 这个人填的教练偏好（game/coachPref.js 的形状）
- *   openProfile(): void,          // 批准教练的"填我的资料"入口
+ *   pref(): object|null,
+ *   openProfile(): void,
+ *   openEnrollment(coach: object): void,
+ *   openComplaint(coach: object): void,
+ *   complaints: {isStudent(): boolean},
+ *   canTeach(): boolean,
+ *   openImage(src: string, alt: string): void,
  * }} deps
  * @returns {{refresh(): Promise<any>, openHome(playerId: number): Promise<void>}}
  */
-export function mountCoachDirectory({ player, pref, openProfile }) {
+export function mountCoachDirectory({
+  player,
+  pref,
+  openProfile,
+  openEnrollment,
+  openComplaint,
+  complaints,
+  canTeach,
+  openImage,
+}) {
   const el = {
     list: $('coach-list'),
     empty: $('coach-empty'),
@@ -83,19 +122,28 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
     homeName: $('coach-home-name'),
     homeBadges: $('coach-home-badges'),
     homeTagline: $('coach-home-tagline'),
+    homeEnrollment: $('coach-home-enrollment'),
     homeHonorsLabel: $('coach-home-honors-label'),
     homeHonors: $('coach-home-honors'),
     homeCertificatesLabel: $('coach-home-certificates-label'),
     homeCertificates: $('coach-home-certificates'),
     homeRows: $('coach-home-rows'),
     homePhotos: $('coach-home-photos'),
+    homePublicComplaints: $('coach-home-public-complaints'),
+    homeComplaintsLabel: $('coach-home-complaints-label'),
+    homeComplaintsNote: $('coach-home-complaints-note'),
+    homeComplaints: $('coach-home-complaints'),
     homeState: $('coach-home-state'),
     homeClose: $('coach-home-close-btn'),
     homeEdit: $('coach-home-edit-btn'),
+    homeEnroll: $('coach-home-enroll-btn'),
+    homeComplaint: $('coach-home-complaint-btn'),
   };
 
   let rows = [];
-  let busy = false;
+  let homeCoach = null;
+  let homeRequest = 0;
+  let listRequest = 0;
 
   function say(textline) {
     el.state.textContent = textline ?? '';
@@ -104,39 +152,48 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
 
   function cardOf(item) {
     const coach = item.coach;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'coach-item';
-    btn.setAttribute('aria-haspopup', 'dialog');
-    btn.setAttribute('aria-controls', 'coach-home-dialog');
+    const card = text('article', 'coach-item');
+    const nameId = `coach-card-name-${coach.player_id}`;
+    card.setAttribute('aria-labelledby', nameId);
 
-    const head = text('span', 'coach-main');
-    head.append(avatarOf(coach));
-    const body = text('span', 'coach-body');
-    const name = text('span', 'coach-name');
-    name.append(text('span', null, coach.nickname || '教练'));
-    if (player()?.id === coach.player_id) {
-      name.append(text('span', 'coach-self', '这是我'));
-    }
+    const head = text('div', 'coach-main');
+    head.append(avatarOf(coach, openImage));
+    const body = text('div', 'coach-body');
+    const name = text('h3', 'coach-name', coach.nickname || '教练');
+    name.id = nameId;
+    if (player()?.id === coach.player_id) name.append(text('span', 'coach-self', '这是我'));
     body.append(name);
-    // 徽章和简介分两行，不像以前那样用"·"接成一串：这一列只有 236 像素宽，
-    // 接成一串时夹在中间截断的正好是最要紧的等级分数字。
+
     const badges = coachBadges(coach);
-    if (badges.length) body.append(text('span', 'coach-line', badges.join(' · ')));
+    if (badges.length) body.append(text('p', 'coach-line', badges.join(' · ')));
     const tagline = String(coach?.profile?.tagline ?? '').trim();
-    if (tagline) body.append(text('span', 'coach-tagline', tagline));
+    if (tagline) body.append(text('p', 'coach-tagline', tagline));
     const why = whyOf(item);
     if (why) body.append(why);
-    // "看主页"独占最后一行，不跟正文抢横向空间（整张卡本来就能点，这句只是给个提示）。
-    body.append(text('span', 'coach-go', '看主页 ›'));
+    for (const warning of item.match?.warnings ?? []) {
+      body.append(text('p', 'coach-budget-warning', `预算提醒：${warning}`));
+    }
     head.append(body);
-    btn.append(head);
-    btn.addEventListener('click', () => openHome(coach.player_id));
-    return btn;
+    card.append(head);
+
+    const actions = text('div', 'coach-item-actions');
+    const home = button('看主页', 'btn btn-ghost btn-sm', 'coach-home-dialog');
+    home.addEventListener('click', () => openHome(coach.player_id));
+    const enroll = button('约课', 'btn btn-primary btn-sm', 'coach-enroll-dialog');
+    enroll.addEventListener('click', () => openEnrollment(coach));
+    actions.append(home, enroll);
+    // 只有已确认邮箱的学员看得到投诉入口；教练与访客不渲染这颗按钮。
+    if (complaints.isStudent()) {
+      const complaint = button('投诉', 'btn btn-ghost btn-sm', 'coach-complaint-dialog');
+      complaint.addEventListener('click', () => openComplaint(coach));
+      actions.append(complaint);
+    }
+    card.append(actions);
+    return card;
   }
 
   function render() {
-    const scored = rankCoaches(rows, pref());
+    const scored = recommendedCoaches(rows, pref());
     el.list.replaceChildren(...scored.map(cardOf));
     el.list.hidden = scored.length === 0;
     el.empty.hidden = scored.length !== 0;
@@ -144,12 +201,13 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
   }
 
   async function load() {
+    const ticket = ++listRequest;
     const reply = await call('chess_coach_directory.php?n=12', { method: 'GET' });
+    if (ticket !== listRequest) return { ok: false, stale: true };
     if (!reply.ok) {
       rows = [];
       el.list.replaceChildren();
       el.list.hidden = true;
-      // 取不到不等于"没人入驻"：那句话要分开说，否则人以为整站空了。
       el.empty.hidden = true;
       el.refresh.hidden = false;
       say(reply.message ?? '教练名录这会儿没取回来。');
@@ -161,33 +219,79 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
     return reply;
   }
 
-  /** 主页整页取一次：名录那一行只有卡片要的东西，荣誉和照片列表在完整行里才有。 */
-  async function openHome(playerId) {
-    if (busy) return;
-    busy = true;
-    say('');
+  /** 切换教练时先清空上一页，慢网络下也不能把 A 的资料当成 B 的资料。 */
+  function resetHome() {
+    homeCoach = null;
+    avatarOf(null, openImage, el.homeAvatar, true);
+    el.homeName.textContent = '教练主页';
+    for (const node of [
+      el.homeBadges, el.homeTagline, el.homeRows, el.homeEnrollment, el.homeHonors,
+      el.homeCertificates, el.homePhotos, el.homeComplaints,
+    ]) node.replaceChildren();
+    for (const node of [
+      el.homeBadges, el.homeTagline, el.homeRows, el.homeHonorsLabel, el.homeHonors,
+      el.homeCertificatesLabel, el.homeCertificates, el.homePhotos,
+      el.homePublicComplaints, el.homeComplaintsLabel, el.homeComplaintsNote,
+      el.homeComplaints, el.homeEdit, el.homeComplaint,
+    ]) node.hidden = true;
+    el.homeEnroll.disabled = true;
     el.homeState.textContent = '正在取……';
     el.homeState.hidden = false;
-    el.home.showModal();
+  }
+
+  /** 主页整页取一次：名录卡片只有摘要，荣誉、照片与公开投诉在完整行里。 */
+  async function openHome(playerId) {
+    const ticket = ++homeRequest;
+    resetHome();
+    say('');
+    if (!el.home.open) el.home.showModal();
 
     const reply = await call(`chess_coach_get.php?c=${encodeURIComponent(playerId)}`, { method: 'GET' });
+    if (ticket !== homeRequest) return;
     if (!reply.ok) {
       el.homeState.textContent = reply.message ?? '这一页没取回来。';
-      busy = false;
       return;
     }
     const coach = reply.coach ?? null;
     if (!coach) {
       el.homeState.textContent = '这位教练还没进名录。';
-      busy = false;
       return;
     }
     paintHome(coach);
-    busy = false;
+  }
+
+  function homePhoto(coach, name, at, certificate = false) {
+    const imageClass = certificate ? 'coach-home-photo coach-home-certificate' : 'coach-home-photo';
+    return coachImageTrigger({
+      src: coachPhotoUrl(coach.player_id, name),
+      alt: `${coach.nickname || '教练'} 的${certificate ? '证书图片' : '照片'} ${at + 1}`,
+      openImage,
+      className: 'coach-home-photo-trigger',
+      imageClassName: imageClass,
+    });
+  }
+
+  function paintPublicComplaints(coach) {
+    const list = publicComplaints(coach);
+    el.homeComplaints.replaceChildren(...list.map((one) => {
+      const item = text('article', 'coach-public-complaint');
+      const head = text('h3', 'coach-public-complaint-head');
+      head.append(document.createTextNode(`平台已核实 · ${complaintSeverityLabel(one.severity)}`));
+      const at = typeof one.published_at === 'string' ? one.published_at.slice(0, 10) : '';
+      if (at) head.append(document.createTextNode(` · ${at}`));
+      item.append(head, text('p', 'coach-public-complaint-text', one.public_text));
+      return item;
+    }));
+    const empty = list.length === 0;
+    el.homePublicComplaints.hidden = empty;
+    el.homeComplaints.hidden = empty;
+    el.homeComplaintsLabel.hidden = empty;
+    el.homeComplaintsNote.hidden = empty;
   }
 
   function paintHome(coach) {
-    avatarOf(coach, el.homeAvatar);
+    homeCoach = coach;
+    avatarOf(coach, openImage, el.homeAvatar, true);
     el.homeName.textContent = coach.nickname || '教练';
     const badges = coachBadges(coach);
     el.homeBadges.textContent = badges.join(' · ');
@@ -204,17 +308,7 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
     el.homeHonors.hidden = !honors;
 
     const certificates = coach.profile?.certificates ?? [];
-    el.homeCertificatesLabel.textContent = COACH_PROFILE_TITLES.certificates;
-    el.homeCertificates.replaceChildren(...certificates.map((name, at) => {
-      const img = document.createElement('img');
-      img.className = 'coach-home-photo coach-home-certificate';
-      img.src = coachPhotoUrl(coach.player_id, name);
-      img.alt = `${el.homeName.textContent} 的证书图片 ${at + 1}`;
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.addEventListener('error', () => img.remove());
-      return img;
-    }));
+    el.homeCertificates.replaceChildren(...certificates.map((name, at) => homePhoto(coach, name, at, true)));
     el.homeCertificatesLabel.hidden = certificates.length === 0;
     el.homeCertificates.hidden = certificates.length === 0;
 
@@ -226,35 +320,59 @@ export function mountCoachDirectory({ player, pref, openProfile }) {
     }));
     el.homeRows.hidden = rowsHome.length === 0;
 
-    const photos = coach.profile?.photos ?? [];
-    el.homePhotos.replaceChildren(...photos.map((name, at) => {
-      const img = document.createElement('img');
-      img.className = 'coach-home-photo';
-      img.src = coachPhotoUrl(coach.player_id, name);
-      img.alt = `${el.homeName.textContent} 的照片 ${at + 1}`;
-      img.loading = 'lazy';
-      img.decoding = 'async';
-      img.addEventListener('error', () => img.remove());
-      return img;
+    el.homeEnrollment.replaceChildren(...coachEnrollmentRows(coach).map((row) => {
+      const section = text('section', 'coach-enrollment-row');
+      section.append(
+        text('h3', 'coach-enrollment-title', row.label),
+        text('p', 'coach-enrollment-text', row.text || '暂未填写，可在预约邮件中询问。'),
+      );
+      return section;
     }));
+
+    const photos = coach.profile?.photos ?? [];
+    el.homePhotos.replaceChildren(...photos.map((name, at) => homePhoto(coach, name, at)));
     el.homePhotos.hidden = photos.length === 0;
+    paintPublicComplaints(coach);
 
     const note = coach.has_profile ? '' : '这位教练还没填公开资料。';
     el.homeState.textContent = note;
     el.homeState.hidden = !note;
-    // 只有本人会看到【改我的资料】：别人点进去只会换来一句 teacher_only。
-    el.homeEdit.hidden = player()?.id !== coach.player_id;
+    el.homeEnroll.disabled = false;
+    el.homeEdit.hidden = player()?.id !== coach.player_id || canTeach() !== true;
+    el.homeComplaint.hidden = !complaints.isStudent();
   }
 
   el.refresh.addEventListener('click', load);
   el.homeClose.addEventListener('click', () => el.home.close());
+  el.home.addEventListener('close', () => {
+    homeRequest += 1;
+    homeCoach = null;
+  });
   el.homeEdit.addEventListener('click', () => {
     el.home.close();
     openProfile();
   });
+  el.homeEnroll.addEventListener('click', () => {
+    const coach = homeCoach;
+    el.home.close();
+    if (coach) openEnrollment(coach);
+  });
+  el.homeComplaint.addEventListener('click', () => {
+    const coach = homeCoach;
+    el.home.close();
+    if (coach) openComplaint(coach);
+  });
 
-  /** 首屏就取一次：名录是公开数据，没登录也该看见有谁在教。 */
+  // 首屏就取一次：公开名录，没登录也该看见有谁在教。
   load();
 
-  return { refresh: load, openHome };
+  return {
+    refresh: load,
+    openHome,
+    /** 身份或教练资格变化时只重画门禁，不把公开名录再取一遍。 */
+    syncGate: () => {
+      render();
+      if (homeCoach && el.home.open) paintHome(homeCoach);
+    },
+  };
 }

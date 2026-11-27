@@ -8,8 +8,9 @@
  * 这份管下棋的人（cookie 要作用到 /chess，所以 path=/）。两者互不相认。
  */
 
-// 教练偏好的选项白名单在 chess_coach_core.php，下面那句"缩到多少个字"要引用同一个数
+// 教练偏好、资格与申诉的规则层
 require_once __DIR__ . '/chess_coach_core.php';
+require_once __DIR__ . '/chess_coach_complaint_core.php';
 
 const CHESS_FAIL_WINDOW = 900;      // 15 分钟
 const CHESS_FAIL_LIMIT = 5;         // 同一 IP 的登录失败次数
@@ -35,6 +36,14 @@ const CHESS_JOIN_LIMIT = 20;        // 同一 IP 15 分钟内"查无此房"的�
 // （共享主机的磁盘是这台机器上最贵、也最难回退的那一项）。
 const CHESS_PHOTO_WINDOW = 3600;
 const CHESS_PHOTO_LIMIT = 12;
+
+const CHESS_INQUIRY_WINDOW = 86400;
+const CHESS_INQUIRY_STUDENT_LIMIT = 5;
+const CHESS_INQUIRY_COACH_LIMIT = 20;
+const CHESS_INQUIRY_RETRY_AFTER = 300;
+const CHESS_COMPLAINT_WINDOW = 86400;
+const CHESS_COMPLAINT_STUDENT_LIMIT = 5;
+const CHESS_COMPLAINT_COACH_LIMIT = 20;
 
 /**
  * 每个错误一个稳定 code，中文提示留在这里当兜底。
@@ -95,11 +104,17 @@ const CHESS_ERRORS = [
     'bad_move' => ['这一步看着不像一步棋', 400],
     'bad_player_id' => ['请选择课堂里的一位学生', 400],
     'stale' => ['课堂已经往前走了，请等棋盘同步后再试', 409],
+    'stale_class_move' => ['课堂局面已经变了，这一步没记下，请等棋盘同步后再试', 409],
+    'bad_approve' => ['批准状态必须是 true 或 false', 400],
+    'teacher_unavailable' => ['老师当前不能继续授课', 409],
 
     // 教练偏好（P3）。界面按 code + field 出句子，中文只当兜底。
     'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
     'long_note' => ['说明太长了，请缩到 ' . COACH_NOTE_MAX . ' 个字以内', 400],
     'bad_note' => ['说明里有打不出来的字符，重写一遍就好', 400],
+    'bad_budget' => ['预算要在 0 到 100000 元之间，且下限不能高于上限', 400],
+    'long_schedule' => ['时间说明太长了，请缩到 ' . COACH_SCHEDULE_NOTE_MAX . ' 个字以内', 400],
+    'bad_schedule' => ['时间说明里有打不出来的字符，重写一遍就好', 400],
 
     // 想当教练的申请 + 开课堂的资格位。
     // teacher_only 是这一整块的门：棋盘上任何一个人提交什么都换不来它，
@@ -116,11 +131,45 @@ const CHESS_ERRORS = [
     // 教练资料（名录上那张门面）。每个字段都可以留空，所以这些 code 全在
     // "填了但填错"这一侧；界面按 code + field 把红字挂到对应那一组上。
     'bad_profile' => ['这几项里有一项不对，请再检查一遍', 400],
+    'bad_rate' => ['每小时费率要是 0 到 100000 之间的整数', 400],
     'long_tagline' => ['一句话简介太长了，请缩到 ' . COACH_TAGLINE_MAX . ' 个字以内', 400],
     'bad_tagline' => ['简介里有打不出来的字符，重写一遍就好', 400],
     'long_honors' => ['荣誉写得太长了，请缩到 ' . COACH_HONORS_MAX . ' 个字以内', 400],
     'bad_honors' => ['荣誉里有打不出来的字符，重写一遍就好', 400],
+    'long_enrollment_notes' => ['招生要求太长了，请缩到 ' . COACH_ENROLLMENT_NOTES_MAX . ' 个字以内', 400],
+    'bad_enrollment_notes' => ['招生要求里有打不出来的字符，重写一遍就好', 400],
+    'long_tuition' => ['收费说明太长了，请缩到 ' . COACH_TUITION_TEXT_MAX . ' 个字以内', 400],
+    'bad_tuition' => ['收费说明里有打不出来的字符，重写一遍就好', 400],
+    'long_schedule_text' => ['授课时间太长了，请缩到 ' . COACH_SCHEDULE_TEXT_MAX . ' 个字以内', 400],
+    'bad_schedule_text' => ['授课时间里有打不出来的字符，重写一遍就好', 400],
     'no_such_coach' => ['没有这位教练，或他还没进名录', 404],
+
+    // 预约、申诉与资格撤销。
+    'coach_only' => ['这个账号是教练账号，不能提交学员投诉', 403],
+    'coach_revoked' => ['教练资格已被撤销，恢复前不能进行这些操作', 403],
+    'bad_coach_id' => ['请选择一位有效的教练', 400],
+    'contact_required' => ['预约前请明确同意把邮箱交给教练', 403],
+    'short_message' => ['预约说明至少写 20 个字', 400],
+    'long_message' => ['预约说明最多 2000 个字', 400],
+    'bad_message' => ['预约说明里有打不出来的字符，重写一遍就好', 400],
+    'bad_request_id' => ['这次预约的请求标识不对，请重新打开预约窗口', 400],
+    'inquiry_pending' => ['上一封预约邮件还在发送，请稍等再重试', 409],
+    'inquiry_conflict' => ['这次预约标识已经用于另一段留言，请重新打开预约窗口', 409],
+    'too_many_inquiries' => ['今天的预约次数太多了，稍后再试', 429],
+    'bad_complaint' => ['申诉内容里有打不出来的字符，重写一遍就好', 400],
+    'short_complaint' => ['申诉内容至少写 20 个字', 400],
+    'long_complaint' => ['申诉内容最多 3000 个字', 400],
+    'complaint_target_invalid' => ['只能申诉当前或曾经的教练', 403],
+    'complaint_pending' => ['你对这位教练已有一条待处理申诉', 409],
+    'duplicate_complaint' => ['相同内容的申诉已经提交过了', 409],
+    'too_many_complaints' => ['今天的申诉次数太多了，稍后再试', 429],
+    'no_such_complaint' => ['没找到这条申诉', 404],
+    'bad_public_text' => ['维持申诉必须填写不超过 3000 字的公开说明', 400],
+    'bad_severity' => ['严重程度只能是 normal 或 severe', 400],
+    'bad_revoke' => ['只有维持的严重申诉才能撤销教练资格', 400],
+    'bad_restore_reason' => ['请填写不超过 1000 字的恢复原因', 400],
+    'no_such_standing' => ['没找到这位教练的资格记录', 404],
+    'not_revoked' => ['这位教练当前没有被撤销资格', 409],
 
     // 头像、照片与证书。中文兜底同 bad_*：界面按 code 出句子。
     'bad_image' => ['那不是一个图片文件，换一张试试', 400],
@@ -153,6 +202,25 @@ function chess_client_ip() {
     return substr($ip, 0, 45);
 }
 
+/** 死锁只重试整个事务，避免其中一半写入留下来。 */
+function chess_transaction_retry($conn, callable $operation, $attempts = 3) {
+    for ($try = 1; $try <= $attempts; $try++) {
+        $conn->begin_transaction();
+        try {
+            $result = $operation();
+            $conn->commit();
+            return $result;
+        } catch (Throwable $e) {
+            $errno = (int) $conn->errno;
+            $conn->rollback();
+            if (!in_array($errno, [1205, 1213], true) || $try === $attempts) {
+                throw $e;
+            }
+            usleep(20000 * $try);
+        }
+    }
+}
+
 /**
  * 表在首次用到时建，跟留言板那套一致：共享主机上不方便跑迁移脚本。
  */
@@ -183,6 +251,13 @@ function chess_schema($conn) {
         ip VARCHAR(45) NOT NULL,
         tried_at DATETIME NOT NULL,
         INDEX idx_caa (scope, ip, tried_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_rate_limits (
+        scope VARCHAR(16) NOT NULL,
+        ip VARCHAR(45) NOT NULL,
+        window_started_at DATETIME NOT NULL,
+        used_count SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+        PRIMARY KEY (scope, ip)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // 棋谱库：存每个棋手的对局历史，从 localStorage 搬到服务端
     $conn->query("CREATE TABLE IF NOT EXISTS chess_library (
@@ -347,6 +422,265 @@ function chess_clear_attempts($conn, $scope, $ip) {
     $stmt->close();
 }
 
+function chess_take_rate_limits_locked($conn, array $limits, $cutoff, array &$buckets = []) {
+    $buckets = [];
+    $updates = [];
+    $now = date('Y-m-d H:i:s');
+    foreach ($limits as $limit) {
+        $scope = (string) $limit['scope'];
+        $ip = (string) $limit['ip'];
+        $cap = max(1, (int) $limit['limit']);
+        $stmt = $conn->prepare("INSERT INTO chess_rate_limits
+            (scope, ip, window_started_at, used_count) VALUES (?, ?, NOW(), 0)
+            ON DUPLICATE KEY UPDATE scope = VALUES(scope)");
+        $stmt->bind_param("ss", $scope, $ip);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('rate limit insert failed');
+        }
+        $stmt->close();
+
+        $stmt = $conn->prepare("SELECT window_started_at, used_count FROM chess_rate_limits
+            WHERE scope = ? AND ip = ? LIMIT 1 FOR UPDATE");
+        $stmt->bind_param("ss", $scope, $ip);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('rate limit lock failed');
+        }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$row) {
+            throw new RuntimeException('rate limit row missing');
+        }
+        if ($row['window_started_at'] <= $cutoff) {
+            $window = $now;
+            $updates[] = [$scope, $ip, 1, true];
+        } else {
+            if ((int) $row['used_count'] >= $cap) {
+                return false;
+            }
+            $window = $row['window_started_at'];
+            $updates[] = [$scope, $ip, (int) $row['used_count'] + 1, false];
+        }
+        $buckets[] = ['scope' => $scope, 'ip' => $ip, 'window_started_at' => $window];
+    }
+
+    foreach ($updates as [$scope, $ip, $used, $reset]) {
+        $sql = $reset
+            ? "UPDATE chess_rate_limits SET window_started_at = ?, used_count = ? WHERE scope = ? AND ip = ?"
+            : "UPDATE chess_rate_limits SET used_count = ? WHERE scope = ? AND ip = ?";
+        $stmt = $conn->prepare($sql);
+        if ($reset) {
+            $window = date('Y-m-d H:i:s');
+            $stmt->bind_param("siss", $window, $used, $scope, $ip);
+            foreach ($buckets as &$bucket) {
+                if ($bucket['scope'] === $scope && $bucket['ip'] === $ip) {
+                    $bucket['window_started_at'] = $window;
+                }
+            }
+            unset($bucket);
+        } else {
+            $stmt->bind_param("iss", $used, $scope, $ip);
+        }
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('rate limit update failed');
+        }
+        $stmt->close();
+    }
+    return true;
+}
+
+function chess_coach_inquiries_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    chess_schema($conn);
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_inquiries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        coach_id INT NOT NULL,
+        request_hash CHAR(64) NOT NULL,
+        message_hash CHAR(64) NOT NULL,
+        rate_windows TEXT NOT NULL,
+        status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        UNIQUE KEY uq_coach_inquiry_request (student_id, request_hash),
+        INDEX idx_coach_inquiry_coach (coach_id, created_at),
+        INDEX idx_coach_inquiry_message (student_id, coach_id, message_hash, id),
+        FOREIGN KEY (student_id) REFERENCES chess_players(id) ON DELETE CASCADE,
+        FOREIGN KEY (coach_id) REFERENCES chess_players(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ready = true;
+}
+
+/** 预约先落幂等回执并原子占额度；邮件在事务外发送。 */
+function chess_inquiry_reserve($conn, $studentId, $coachId, $requestId, $message) {
+    chess_coach_inquiries_schema($conn);
+    $studentId = (int) $studentId;
+    $coachId = (int) $coachId;
+    $requestHash = hash('sha256', 'coach-inquiry:' . $requestId);
+    $messageHash = hash('sha256', $coachId . "\n" . $message);
+    $limits = [
+        ['scope' => 'iq_s_' . $studentId, 'ip' => 'student', 'limit' => CHESS_INQUIRY_STUDENT_LIMIT],
+        ['scope' => 'iq_c_' . $coachId, 'ip' => 'coach', 'limit' => CHESS_INQUIRY_COACH_LIMIT],
+    ];
+    usort($limits, static fn ($a, $b) => [$a['scope'], $a['ip']] <=> [$b['scope'], $b['ip']]);
+    $cutoff = date('Y-m-d H:i:s', time() - CHESS_INQUIRY_WINDOW);
+    $retryCutoff = date('Y-m-d H:i:s', time() - CHESS_INQUIRY_RETRY_AFTER);
+
+    return chess_transaction_retry($conn, static function () use (
+        $conn, $studentId, $coachId, $requestHash, $messageHash, $limits, $cutoff, $retryCutoff
+    ) {
+        $standing = chess_lock_player_standing($conn, $coachId);
+        if (coach_standing_is_revoked($standing)) {
+            return ['ok' => false, 'code' => 'no_such_coach'];
+        }
+        $reuse = static function (array $row) use ($conn, $studentId, $coachId, $messageHash, $retryCutoff) {
+            if ((int) $row['coach_id'] !== $coachId || $row['message_hash'] !== $messageHash) {
+                return ['ok' => false, 'code' => 'inquiry_conflict'];
+            }
+            if ($row['status'] === 'sent') {
+                return ['ok' => true, 'existing' => true, 'sent' => true, 'id' => (int) $row['id']];
+            }
+            if ($row['updated_at'] > $retryCutoff) {
+                return ['ok' => false, 'code' => 'inquiry_pending'];
+            }
+            $stmt = $conn->prepare("UPDATE chess_coach_inquiries SET updated_at = NOW()
+                WHERE id = ? AND student_id = ? AND status = 'pending'");
+            $stmt->bind_param("ii", $row['id'], $studentId);
+            if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+                $stmt->close();
+                throw new RuntimeException('inquiry retry claim failed');
+            }
+            $stmt->close();
+            $buckets = json_decode($row['rate_windows'], true);
+            if (!is_array($buckets)) {
+                throw new RuntimeException('inquiry retry windows invalid');
+            }
+            return ['ok' => true, 'existing' => true, 'sent' => false,
+                'id' => (int) $row['id'], 'buckets' => $buckets];
+        };
+
+        $stmt = $conn->prepare("SELECT id, coach_id, message_hash, rate_windows, status, created_at, updated_at
+            FROM chess_coach_inquiries WHERE student_id = ? AND request_hash = ? LIMIT 1 FOR UPDATE");
+        $stmt->bind_param("is", $studentId, $requestHash);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('inquiry idempotency read failed');
+        }
+        $existing = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($existing) {
+            return $reuse($existing);
+        }
+
+        $stmt = $conn->prepare("SELECT id, coach_id, message_hash, rate_windows, status, created_at, updated_at
+            FROM chess_coach_inquiries
+            WHERE student_id = ? AND coach_id = ? AND message_hash = ?
+            ORDER BY id DESC LIMIT 1 FOR UPDATE");
+        $stmt->bind_param("iis", $studentId, $coachId, $messageHash);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('inquiry duplicate read failed');
+        }
+        $recent = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($recent && ($recent['status'] === 'pending' || $recent['created_at'] > $retryCutoff)) {
+            return $reuse($recent);
+        }
+
+        $buckets = [];
+        if (!chess_take_rate_limits_locked($conn, $limits, $cutoff, $buckets)) {
+            return ['ok' => false, 'code' => 'too_many_inquiries'];
+        }
+        $now = date('Y-m-d H:i:s');
+        $stmt = $conn->prepare("INSERT INTO chess_coach_inquiries
+            (student_id, coach_id, request_hash, message_hash, rate_windows, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)");
+        $rateWindows = json_encode($buckets, JSON_UNESCAPED_SLASHES);
+        $stmt->bind_param("iisssss", $studentId, $coachId, $requestHash, $messageHash, $rateWindows, $now, $now);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('inquiry receipt insert failed');
+        }
+        $id = (int) $conn->insert_id;
+        $stmt->close();
+        return ['ok' => true, 'existing' => false, 'sent' => false, 'id' => $id, 'buckets' => $buckets];
+    });
+}
+
+function chess_inquiry_mark_sent($conn, $studentId, $inquiryId) {
+    return chess_transaction_retry($conn, static function () use ($conn, $studentId, $inquiryId) {
+        $stmt = $conn->prepare("UPDATE chess_coach_inquiries
+            SET status = 'sent', updated_at = NOW()
+            WHERE id = ? AND student_id = ? AND status = 'pending'");
+        $stmt->bind_param("ii", $inquiryId, $studentId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('inquiry receipt update failed');
+        }
+        $changed = $stmt->affected_rows;
+        $stmt->close();
+        if ($changed !== 1) {
+            throw new RuntimeException('inquiry receipt missing before sent');
+        }
+        return true;
+    });
+}
+
+function chess_inquiry_refund($conn, $studentId, $inquiryId, array $buckets) {
+    usort($buckets, static fn ($a, $b) => [$a['scope'], $a['ip']] <=> [$b['scope'], $b['ip']]);
+    return chess_transaction_retry($conn, static function () use ($conn, $studentId, $inquiryId, $buckets) {
+        $stmt = $conn->prepare("SELECT status FROM chess_coach_inquiries
+            WHERE id = ? AND student_id = ? LIMIT 1 FOR UPDATE");
+        $stmt->bind_param("ii", $inquiryId, $studentId);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new RuntimeException('inquiry refund read failed');
+        }
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$row || $row['status'] !== 'pending') {
+            return false;
+        }
+        $stmt = $conn->prepare("DELETE FROM chess_coach_inquiries WHERE id = ? AND student_id = ?");
+        $stmt->bind_param("ii", $inquiryId, $studentId);
+        if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+            $stmt->close();
+            throw new RuntimeException('inquiry refund delete failed');
+        }
+        $stmt->close();
+
+        foreach ($buckets as $bucket) {
+            $stmt = $conn->prepare("SELECT used_count FROM chess_rate_limits
+                WHERE scope = ? AND ip = ? AND window_started_at = ? LIMIT 1 FOR UPDATE");
+            $stmt->bind_param("sss", $bucket['scope'], $bucket['ip'], $bucket['window_started_at']);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('inquiry refund bucket read failed');
+            }
+            $rate = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$rate || (int) $rate['used_count'] < 1) {
+                continue;
+            }
+            $used = (int) $rate['used_count'] - 1;
+            $stmt = $conn->prepare("UPDATE chess_rate_limits SET used_count = ?
+                WHERE scope = ? AND ip = ? AND window_started_at = ?");
+            $stmt->bind_param("isss", $used, $bucket['scope'], $bucket['ip'], $bucket['window_started_at']);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('inquiry refund bucket update failed');
+            }
+            $stmt->close();
+        }
+        return true;
+    });
+}
+
 /**
  * 令牌只在库里存 SHA-256：数据库被读走也拿不到还能用的验证链接。
  * 返回 [明文令牌（只出现在这一次，用于拼链接）, 落库的哈希]。
@@ -454,6 +788,15 @@ function chess_require_verified() {
     }
     if ($row['verified_at'] === null) {
         chess_err('verify_required');
+    }
+    return $id;
+}
+
+/** 预约和申诉只给从未成为教练的账号。 */
+function chess_require_student() {
+    $id = chess_require_verified();
+    if (chess_coach_was_teacher(chess_db(), $id)) {
+        chess_err('coach_only');
     }
     return $id;
 }
@@ -781,6 +1124,32 @@ function chess_class_from_row($row) {
     ];
 }
 
+function chess_class_for_update($conn, $classId) {
+    $stmt = $conn->prepare("SELECT id, code, teacher_id, fen, status, seq
+        FROM chess_classes WHERE id = ? LIMIT 1 FOR UPDATE");
+    $stmt->bind_param("i", $classId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        throw new RuntimeException('class lock failed');
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_class_member_for_update($conn, $classId, $playerId) {
+    $stmt = $conn->prepare("SELECT role, hand_status FROM chess_class_members
+        WHERE class_id = ? AND player_id = ? LIMIT 1 FOR UPDATE");
+    $stmt->bind_param("ii", $classId, $playerId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        throw new RuntimeException('class member lock failed');
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
 function chess_insert_class($conn, array $class) {
     chess_class_schema($conn);
     for ($try = 0; $try < 5; $try++) {
@@ -861,8 +1230,9 @@ function chess_class_remove_member($conn, $classId, $playerId) {
     $stmt = $conn->prepare("DELETE FROM chess_class_members WHERE class_id = ? AND player_id = ?");
     $stmt->bind_param("ii", $classId, $playerId);
     $ok = $stmt->execute();
+    $affected = $stmt->affected_rows;
     $stmt->close();
-    return $ok;
+    return $ok && $affected === 1;
 }
 
 function chess_class_set_hand($conn, $classId, $playerId, $status) {
@@ -932,6 +1302,26 @@ function chess_class_close($conn, $classId, $expectSeq) {
  * chess_library 那张表用 JSON 建没建成我此刻也无从查起。逗号串在任何
  * 一个还活着的版本上都是一列 VARCHAR —— 少一个能静默失败的地方。
  */
+function chess_schema_column($conn, $table, $column, $definition, $after = null) {
+    $result = $conn->query("SHOW COLUMNS FROM {$table} LIKE '{$column}'");
+    if ($result instanceof mysqli_result && $result->num_rows > 0) {
+        return;
+    }
+    $tail = $after === null ? '' : " AFTER {$after}";
+    try {
+        $migrated = $conn->query("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}{$tail}");
+    } catch (Throwable $e) {
+        if ((int) $conn->errno === 1060) {
+            return;
+        }
+        error_log('chess schema: add ' . $table . '.' . $column . ' failed: ' . $conn->error);
+        return;
+    }
+    if (!$migrated && (int) $conn->errno !== 1060) {
+        error_log('chess schema: add ' . $table . '.' . $column . ' failed: ' . $conn->error);
+    }
+}
+
 function chess_coach_schema($conn) {
     static $ready = false;
     if ($ready) {
@@ -947,11 +1337,18 @@ function chess_coach_schema($conn) {
         language VARCHAR(8) NOT NULL,
         note VARCHAR(240) NOT NULL DEFAULT '',
         contact_ok TINYINT(1) NOT NULL DEFAULT 0,
+        budget_min_cny INT NULL,
+        budget_max_cny INT NULL,
+        schedule_note VARCHAR(" . COACH_SCHEDULE_NOTE_MAX . ") NOT NULL DEFAULT '',
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         INDEX idx_coach_level (level),
         FOREIGN KEY (player_id) REFERENCES chess_players(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    chess_schema_column($conn, 'chess_coach_prefs', 'budget_min_cny', 'INT NULL', 'contact_ok');
+    chess_schema_column($conn, 'chess_coach_prefs', 'budget_max_cny', 'INT NULL', 'budget_min_cny');
+    chess_schema_column($conn, 'chess_coach_prefs', 'schedule_note',
+        'VARCHAR(' . COACH_SCHEDULE_NOTE_MAX . ") NOT NULL DEFAULT ''", 'budget_max_cny');
     $ready = true;
 }
 
@@ -959,7 +1356,7 @@ function chess_coach_schema($conn) {
 function chess_coach_pref_read($conn, $playerId) {
     chess_coach_schema($conn);
     $stmt = $conn->prepare("SELECT level, goals, formats, slots, timezone, language,
-            note, contact_ok, updated_at
+            note, contact_ok, budget_min_cny, budget_max_cny, schedule_note, updated_at
         FROM chess_coach_prefs WHERE player_id = ? LIMIT 1");
     $stmt->bind_param("i", $playerId);
     $stmt->execute();
@@ -979,18 +1376,20 @@ function chess_coach_pref_write($conn, $playerId, array $pref) {
     chess_coach_schema($conn);
     $stmt = $conn->prepare("INSERT INTO chess_coach_prefs
         (player_id, level, goals, formats, slots, timezone, language, note, contact_ok,
-         created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+         budget_min_cny, budget_max_cny, schedule_note, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE level = VALUES(level), goals = VALUES(goals),
             formats = VALUES(formats), slots = VALUES(slots), timezone = VALUES(timezone),
             language = VALUES(language), note = VALUES(note),
-            contact_ok = VALUES(contact_ok), updated_at = NOW()");
+            contact_ok = VALUES(contact_ok), budget_min_cny = VALUES(budget_min_cny),
+            budget_max_cny = VALUES(budget_max_cny), schedule_note = VALUES(schedule_note),
+            updated_at = NOW()");
     if ($stmt === false) {
         error_log('chess coach pref: prepare failed: ' . $conn->error);
         return false;
     }
     $stmt->bind_param(
-        "isssssssi",
+        "isssssssiiis",
         $playerId,
         $pref['level'],
         $pref['goals'],
@@ -999,7 +1398,10 @@ function chess_coach_pref_write($conn, $playerId, array $pref) {
         $pref['timezone'],
         $pref['language'],
         $pref['note'],
-        $pref['contact_ok']
+        $pref['contact_ok'],
+        $pref['budget_min_cny'],
+        $pref['budget_max_cny'],
+        $pref['schedule_note']
     );
     $ok = $stmt->execute();
     if (!$ok) {
@@ -1044,6 +1446,575 @@ function chess_app_schema($conn) {
     $ready = true;
 }
 
+/** 资格撤销与"曾经是教练"的永久标记；申请状态变化不会清掉它。 */
+function chess_coach_standing_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    chess_app_schema($conn);
+    chess_class_schema($conn);
+    chess_profile_schema($conn);
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_standing (
+        player_id INT PRIMARY KEY,
+        status ENUM('active', 'revoked') NOT NULL DEFAULT 'active',
+        was_coach TINYINT(1) NOT NULL DEFAULT 0,
+        revoked_at DATETIME NULL,
+        revoked_by INT NULL,
+        revoke_complaint_id INT NULL,
+        reason VARCHAR(" . COACH_RESTORE_REASON_MAX . ") NOT NULL DEFAULT '',
+        restored_at DATETIME NULL,
+        restored_by INT NULL,
+        restore_reason VARCHAR(" . COACH_RESTORE_REASON_MAX . ") NOT NULL DEFAULT '',
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        INDEX idx_standing_status (status, was_coach),
+        FOREIGN KEY (player_id) REFERENCES chess_players(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $conn->query("INSERT IGNORE INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        SELECT player_id, 'active', 1, NOW(), NOW() FROM chess_coach_apps WHERE status = 'approved'");
+    $conn->query("INSERT IGNORE INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        SELECT DISTINCT player_id, 'active', 1, NOW(), NOW() FROM chess_class_members
+        WHERE role = 'teacher'");
+    $conn->query("INSERT IGNORE INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        SELECT DISTINCT teacher_id, 'active', 1, NOW(), NOW() FROM chess_classes");
+    $conn->query("INSERT IGNORE INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        SELECT player_id, 'active', 1, NOW(), NOW() FROM chess_coach_profiles");
+    $tables = $conn->query("SHOW TABLES LIKE 'admin_users'");
+    if ($tables instanceof mysqli_result && $tables->num_rows > 0) {
+        $conn->query("INSERT IGNORE INTO chess_coach_standing
+            (player_id, status, was_coach, created_at, updated_at)
+            SELECT p.id, 'active', 1, NOW(), NOW() FROM chess_players p
+            JOIN admin_users a ON a.email = p.email");
+    }
+    $ready = true;
+}
+
+function chess_player_standing($conn, $playerId) {
+    chess_coach_standing_schema($conn);
+    $stmt = $conn->prepare("SELECT player_id, status, was_coach, revoked_at, revoked_by,
+            revoke_complaint_id, reason, restored_at, restored_by, restore_reason, updated_at
+        FROM chess_coach_standing WHERE player_id = ? LIMIT 1");
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_lock_player_standing($conn, $playerId) {
+    $stmt = $conn->prepare("INSERT INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        VALUES (?, 'active', 1, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE player_id = VALUES(player_id)");
+    $stmt->bind_param("i", $playerId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        throw new RuntimeException('standing lock failed');
+    }
+    $stmt->close();
+    $stmt = $conn->prepare("SELECT player_id, status, was_coach, revoked_at, revoked_by,
+            revoke_complaint_id, reason, restored_at, restored_by, restore_reason, updated_at
+        FROM chess_coach_standing WHERE player_id = ? LIMIT 1 FOR UPDATE");
+    $stmt->bind_param("i", $playerId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        throw new RuntimeException('standing lock read failed');
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_coach_standing_mark($conn, $playerId) {
+    chess_coach_standing_schema($conn);
+    $stmt = $conn->prepare("INSERT INTO chess_coach_standing
+        (player_id, status, was_coach, created_at, updated_at)
+        VALUES (?, 'active', 1, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE was_coach = 1");
+    $stmt->bind_param("i", $playerId);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return $ok;
+}
+
+function chess_player_is_revoked($conn, $playerId) {
+    return coach_standing_is_revoked(chess_player_standing($conn, $playerId));
+}
+
+/** 当前管理员、批准过的申请或教过课堂的人都算教练，含已撤销资格的人。 */
+function chess_coach_was_teacher($conn, $playerId) {
+    $playerId = (int) $playerId;
+    if ($playerId < 1) {
+        return false;
+    }
+    $standing = chess_player_standing($conn, $playerId);
+    if ((int) ($standing['was_coach'] ?? 0) === 1) {
+        return true;
+    }
+    $app = chess_app_read($conn, $playerId);
+    if (coach_key($app['status'] ?? null) === 'approved') {
+        chess_coach_standing_mark($conn, $playerId);
+        return true;
+    }
+    if (chess_player_is_admin($conn, $playerId)) {
+        return true;
+    }
+    $stmt = $conn->prepare("SELECT 1 FROM chess_class_members
+        WHERE player_id = ? AND role = 'teacher' LIMIT 1");
+    $stmt->bind_param("i", $playerId);
+    $stmt->execute();
+    $found = $stmt->get_result()->fetch_assoc() !== null;
+    $stmt->close();
+    if ($found) {
+        chess_coach_standing_mark($conn, $playerId);
+    }
+    return $found;
+}
+
+function chess_coach_complaints_schema($conn) {
+    static $ready = false;
+    if ($ready) {
+        return;
+    }
+    chess_coach_standing_schema($conn);
+    $conn->query("CREATE TABLE IF NOT EXISTS chess_coach_complaints (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        coach_id INT NOT NULL,
+        reporter_id INT NOT NULL,
+        text TEXT NOT NULL,
+        text_hash CHAR(64) NOT NULL,
+        status ENUM('pending', 'upheld', 'rejected') NOT NULL DEFAULT 'pending',
+        severity ENUM('normal', 'severe') NOT NULL DEFAULT 'normal',
+        public_text TEXT NOT NULL,
+        decided_by INT NULL,
+        decided_at DATETIME NULL,
+        published_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        UNIQUE KEY uq_coach_complaint_reporter_hash (coach_id, reporter_id, text_hash),
+        INDEX idx_complaint_pending (coach_id, reporter_id, status),
+        INDEX idx_complaint_public (coach_id, status, published_at, id),
+        FOREIGN KEY (coach_id) REFERENCES chess_players(id) ON DELETE CASCADE,
+        FOREIGN KEY (reporter_id) REFERENCES chess_players(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $inspect = static function () use ($conn) {
+        $indexes = [];
+        $result = $conn->query("SHOW INDEX FROM chess_coach_complaints");
+        if (!$result) {
+            throw new RuntimeException('complaint index inspection failed');
+        }
+        while ($row = $result->fetch_assoc()) {
+            $indexes[(string) $row['Key_name']][(int) $row['Seq_in_index']][] = $row;
+        }
+        $result->free();
+        $hasReporterHash = false;
+        $hasLegacyHash = false;
+        foreach ($indexes as $keyRows) {
+            ksort($keyRows);
+            $columns = array_merge(...array_values($keyRows));
+            $names = array_column($columns, 'Column_name');
+            $keyName = (string) ($columns[0]['Key_name'] ?? '');
+            $unique = (int) ($columns[0]['Non_unique'] ?? 1) === 0;
+            if ($names === ['coach_id', 'reporter_id', 'text_hash'] && $unique) {
+                $hasReporterHash = true;
+            }
+            if ($keyName === 'uq_coach_complaint_hash'
+                && $names === ['coach_id', 'text_hash'] && $unique) {
+                $hasLegacyHash = true;
+            }
+        }
+        return [$hasReporterHash, $hasLegacyHash];
+    };
+    [$hasReporterHash, $hasLegacyHash] = $inspect();
+    if ($hasLegacyHash) {
+        if (!$conn->query("ALTER TABLE chess_coach_complaints DROP INDEX uq_coach_complaint_hash")
+            && (int) $conn->errno !== 1091) {
+            throw new RuntimeException('complaint legacy index migration failed');
+        }
+    }
+    if (!$hasReporterHash) {
+        if (!$conn->query("ALTER TABLE chess_coach_complaints
+            ADD UNIQUE KEY uq_coach_complaint_reporter_hash (coach_id, reporter_id, text_hash)")) {
+            if ((int) $conn->errno !== 1061) {
+                throw new RuntimeException('complaint reporter index migration failed');
+            }
+            [$hasReporterHash] = $inspect();
+            if (!$hasReporterHash) {
+                throw new RuntimeException('complaint reporter index migration conflicted');
+            }
+        }
+    }
+    $ready = true;
+}
+
+/** 同一教练的待处理申诉串行写入，避免两人同时绕过"一人一条待处理"。 */
+function chess_coach_complaint_save($conn, $reporterId, $coachId, $text, $textHash) {
+    chess_coach_complaints_schema($conn);
+    chess_schema($conn);
+    $reporterId = (int) $reporterId;
+    $coachId = (int) $coachId;
+    $limits = [
+        ['scope' => 'cp_s_' . $reporterId, 'ip' => 'student', 'limit' => CHESS_COMPLAINT_STUDENT_LIMIT],
+        ['scope' => 'cp_c_' . $coachId, 'ip' => 'coach', 'limit' => CHESS_COMPLAINT_COACH_LIMIT],
+    ];
+    usort($limits, static fn ($a, $b) => [$a['scope'], $a['ip']] <=> [$b['scope'], $b['ip']]);
+    $cutoff = date('Y-m-d H:i:s', time() - CHESS_COMPLAINT_WINDOW);
+    try {
+        return chess_transaction_retry($conn, static function () use ($conn, $reporterId, $coachId, $text, $textHash, $limits, $cutoff) {
+            chess_lock_player_standing($conn, $coachId);
+
+            $stmt = $conn->prepare("SELECT id FROM chess_coach_complaints
+                WHERE coach_id = ? AND reporter_id = ? AND status = 'pending' LIMIT 1 FOR UPDATE");
+            $stmt->bind_param("ii", $coachId, $reporterId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('complaint pending read failed');
+            }
+            $pending = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($pending) {
+                return ['ok' => false, 'code' => 'complaint_pending'];
+            }
+
+            $stmt = $conn->prepare("SELECT id FROM chess_coach_complaints
+                WHERE coach_id = ? AND reporter_id = ? AND text_hash = ? LIMIT 1");
+            $stmt->bind_param("iis", $coachId, $reporterId, $textHash);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('complaint duplicate read failed');
+            }
+            $duplicate = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if ($duplicate) {
+                return ['ok' => false, 'code' => 'duplicate_complaint'];
+            }
+            if (!chess_take_rate_limits_locked($conn, $limits, $cutoff)) {
+                return ['ok' => false, 'code' => 'too_many_complaints'];
+            }
+
+            $stmt = $conn->prepare("INSERT INTO chess_coach_complaints
+                (coach_id, reporter_id, text, text_hash, status, severity, public_text,
+                 created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'pending', 'normal', '', NOW(), NOW())");
+            $stmt->bind_param("iiss", $coachId, $reporterId, $text, $textHash);
+            if (!$stmt->execute()) {
+                $errno = (int) $conn->errno;
+                $stmt->close();
+                if ($errno === 1062) {
+                    return ['ok' => false, 'code' => 'duplicate_complaint'];
+                }
+                throw new RuntimeException('complaint insert failed');
+            }
+            $id = (int) $conn->insert_id;
+            $stmt->close();
+
+            $stmt = $conn->prepare("SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+                    c.created_at, c.decided_at, c.published_at, p.nickname AS coach_nickname
+                FROM chess_coach_complaints c
+                JOIN chess_players p ON p.id = c.coach_id
+                WHERE c.id = ? LIMIT 1");
+            $stmt->bind_param("i", $id);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('complaint receipt read failed');
+            }
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$row) {
+                throw new RuntimeException('complaint receipt missing');
+            }
+            return ['ok' => true, 'id' => $id, 'code' => null,
+                'complaint' => coach_complaint_private($row) + ['coach_nickname' => (string) $row['coach_nickname']]];
+        });
+    } catch (Throwable $e) {
+        error_log('chess complaint save: ' . $e->getMessage());
+        return ['ok' => false, 'code' => 'server'];
+    }
+}
+
+function chess_coach_complaint_receipt_row($conn, $complaintId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT id, coach_id, status, created_at
+        FROM chess_coach_complaints WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $complaintId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_coach_complaint_current($conn, $complaintId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT id, coach_id, status, severity
+        FROM chess_coach_complaints WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $complaintId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row;
+}
+
+function chess_coach_complaint_admin_row($conn, $complaintId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+            c.created_at, c.decided_at, c.published_at, p.nickname AS coach_name,
+            p.nickname AS coach_nickname, s.status AS standing_status, s.restored_at
+        FROM chess_coach_complaints c
+        JOIN chess_players p ON p.id = c.coach_id
+        LEFT JOIN chess_coach_standing s ON s.player_id = c.coach_id
+        WHERE c.id = ? LIMIT 1");
+    $stmt->bind_param("i", $complaintId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ? coach_complaint_admin($row) : null;
+}
+
+function chess_coach_complaints_for_coach($conn, $coachId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT id, coach_id, text, public_text, status, severity,
+            created_at, decided_at, published_at
+        FROM chess_coach_complaints WHERE coach_id = ?
+        ORDER BY created_at DESC, id DESC LIMIT 100");
+    $stmt->bind_param("i", $coachId);
+    $stmt->execute();
+    $rows = [];
+    while ($row = $stmt->get_result()->fetch_assoc()) {
+        $rows[] = coach_complaint_for_coach($row);
+    }
+    $stmt->close();
+    return $rows;
+}
+
+function chess_student_complaints($conn, $studentId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+            c.created_at, c.decided_at, c.published_at, p.nickname AS coach_nickname
+        FROM chess_coach_complaints c
+        JOIN chess_players p ON p.id = c.coach_id
+        WHERE c.reporter_id = ? ORDER BY c.created_at DESC, c.id DESC LIMIT 100");
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $rows = [];
+    while ($row = $stmt->get_result()->fetch_assoc()) {
+        $rows[] = coach_complaint_private($row) + ['coach_nickname' => (string) $row['coach_nickname']];
+    }
+    $stmt->close();
+    return $rows;
+}
+
+/** 后来成为教练的账号，也保留自己以前提交的申诉历史。 */
+function chess_player_complaints($conn, $playerId) {
+    chess_coach_complaints_schema($conn);
+    $stmt = $conn->prepare("SELECT * FROM (
+            SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+                c.created_at, c.decided_at, c.published_at, p.nickname AS coach_nickname,
+                'received' AS relation
+            FROM chess_coach_complaints c
+            JOIN chess_players p ON p.id = c.coach_id
+            WHERE c.coach_id = ?
+            UNION ALL
+            SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+                c.created_at, c.decided_at, c.published_at, p.nickname AS coach_nickname,
+                'submitted' AS relation
+            FROM chess_coach_complaints c
+            JOIN chess_players p ON p.id = c.coach_id
+            WHERE c.reporter_id = ? AND c.coach_id <> ?
+        ) AS records ORDER BY created_at DESC, id DESC LIMIT 100");
+    $stmt->bind_param("iii", $playerId, $playerId, $playerId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        throw new RuntimeException('player complaints query failed');
+    }
+    $rows = [];
+    while ($row = $stmt->get_result()->fetch_assoc()) {
+        $rows[] = ($row['relation'] === 'submitted'
+            ? coach_complaint_private($row)
+            : coach_complaint_for_coach($row))
+            + ['coach_nickname' => (string) $row['coach_nickname'], 'relation' => $row['relation']];
+    }
+    $stmt->close();
+    return $rows;
+}
+
+function chess_coach_complaints_admin($conn, $status = null, $cap = 100) {
+    chess_coach_complaints_schema($conn);
+    $limit = max(1, min(200, (int) $cap));
+    $where = '';
+    if ($status !== null) {
+        $safe = in_array($status, COACH_COMPLAINT_STATUSES, true) ? $status : 'pending';
+        $where = " WHERE c.status = '{$safe}'";
+    }
+    $result = $conn->query("SELECT c.id, c.coach_id, c.text, c.public_text, c.status, c.severity,
+            c.created_at, c.decided_at, c.published_at, p.nickname AS coach_name,
+            p.nickname AS coach_nickname, s.status AS standing_status, s.restored_at
+        FROM chess_coach_complaints c
+        JOIN chess_players p ON p.id = c.coach_id
+        LEFT JOIN chess_coach_standing s ON s.player_id = c.coach_id{$where}
+        ORDER BY c.created_at DESC, c.id DESC LIMIT {$limit}");
+    $rows = [];
+    if (!$result) {
+        throw new RuntimeException('complaint admin query failed: ' . $conn->error);
+    }
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = coach_complaint_admin($row);
+    }
+    $result->free();
+    return $rows;
+}
+
+function chess_coach_complaints_public($conn, $coachId, $cap = 20) {
+    chess_coach_complaints_schema($conn);
+    $limit = max(1, min(20, (int) $cap));
+    $stmt = $conn->prepare("SELECT id, public_text, severity, published_at
+        FROM chess_coach_complaints
+        WHERE coach_id = ? AND status = 'upheld' AND public_text <> '' AND published_at IS NOT NULL
+        ORDER BY published_at DESC, id DESC LIMIT {$limit}");
+    $stmt->bind_param("i", $coachId);
+    $stmt->execute();
+    $rows = [];
+    while ($row = $stmt->get_result()->fetch_assoc()) {
+        $rows[] = coach_complaint_public($row);
+    }
+    $stmt->close();
+    return $rows;
+}
+
+function chess_coach_complaint_decide($conn, $complaintId, array $decision, $adminId) {
+    chess_coach_complaints_schema($conn);
+    $complaintId = (int) $complaintId;
+    $adminId = (int) $adminId;
+    try {
+        return chess_transaction_retry($conn, static function () use ($conn, $complaintId, $decision, $adminId) {
+            $stmt = $conn->prepare("SELECT coach_id FROM chess_coach_complaints
+                WHERE id = ? LIMIT 1");
+            $stmt->bind_param("i", $complaintId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('complaint target read failed');
+            }
+            $target = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$target) {
+                return ['ok' => false, 'code' => 'no_such_complaint'];
+            }
+            $coachId = (int) $target['coach_id'];
+            chess_lock_player_standing($conn, $coachId);
+
+            $stmt = $conn->prepare("SELECT id, coach_id, status, severity
+                FROM chess_coach_complaints WHERE id = ? LIMIT 1 FOR UPDATE");
+            $stmt->bind_param("i", $complaintId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('complaint decision lock failed');
+            }
+            $current = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$current) {
+                return ['ok' => false, 'code' => 'no_such_complaint'];
+            }
+            if ($current['status'] !== 'pending') {
+                return ['ok' => false, 'code' => 'bad_decision'];
+            }
+            $normalized = coach_complaint_decision_normalize($decision, $current);
+            if (!$normalized['ok']) {
+                return ['ok' => false, 'code' => $normalized['code']];
+            }
+            $decision = $normalized;
+
+            $status = $decision['action'] === 'uphold' ? 'upheld' : 'rejected';
+            $publicText = $status === 'upheld' ? $decision['public_text'] : '';
+            $published = $status === 'upheld' ? 'NOW()' : 'NULL';
+            $stmt = $conn->prepare("UPDATE chess_coach_complaints
+                SET status = ?, public_text = ?, severity = ?, decided_at = NOW(), decided_by = ?,
+                    published_at = {$published}, updated_at = NOW()
+                WHERE id = ? AND status = 'pending'");
+            $stmt->bind_param("sssii", $status, $publicText, $decision['severity'], $adminId, $complaintId);
+            if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+                $stmt->close();
+                throw new RuntimeException('complaint decision update failed');
+            }
+            $stmt->close();
+
+            if ($decision['revoke']) {
+                $reason = 'Complaint #' . $complaintId;
+                $stmt = $conn->prepare("INSERT INTO chess_coach_standing
+                    (player_id, status, was_coach, revoked_at, revoked_by, revoke_complaint_id,
+                     reason, restored_at, restored_by, restore_reason, created_at, updated_at)
+                    VALUES (?, 'revoked', 1, NOW(), ?, ?, ?, NULL, NULL, '', NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE status = 'revoked', was_coach = 1,
+                        revoked_at = NOW(), revoked_by = VALUES(revoked_by),
+                        revoke_complaint_id = VALUES(revoke_complaint_id), reason = VALUES(reason),
+                        restored_at = NULL, restored_by = NULL, restore_reason = '', updated_at = NOW()");
+                $stmt->bind_param("iiis", $coachId, $adminId, $complaintId, $reason);
+                if (!$stmt->execute()) {
+                    $stmt->close();
+                    throw new RuntimeException('coach revocation failed');
+                }
+                $stmt->close();
+            }
+            $row = chess_coach_complaint_admin_row($conn, $complaintId);
+            if ($row === null) {
+                throw new RuntimeException('complaint decision receipt missing');
+            }
+            return ['ok' => true, 'complaint' => $row, 'code' => null];
+        });
+    } catch (Throwable $e) {
+        error_log('chess complaint decide: ' . $e->getMessage());
+        return ['ok' => false, 'code' => 'server'];
+    }
+}
+
+function chess_coach_standing_restore($conn, $coachId, $reason, $adminId) {
+    chess_coach_standing_schema($conn);
+    $coachId = (int) $coachId;
+    $adminId = (int) $adminId;
+    try {
+        return chess_transaction_retry($conn, static function () use ($conn, $coachId, $reason, $adminId) {
+            $stmt = $conn->prepare("SELECT player_id, status, restored_at
+                FROM chess_coach_standing WHERE player_id = ? LIMIT 1 FOR UPDATE");
+            $stmt->bind_param("i", $coachId);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('coach restore lock failed');
+            }
+            $current = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$current) {
+                return ['ok' => false, 'code' => 'no_such_standing'];
+            }
+            if ($current['status'] !== 'revoked'
+                || ($current['restored_at'] !== null && $current['restored_at'] !== '')) {
+                return ['ok' => false, 'code' => 'not_revoked'];
+            }
+            $stmt = $conn->prepare("UPDATE chess_coach_standing
+                SET restored_at = NOW(), restored_by = ?, restore_reason = ?, updated_at = NOW()
+                WHERE player_id = ? AND status = 'revoked'
+                    AND (restored_at IS NULL OR restored_at = '')");
+            $stmt->bind_param("isi", $adminId, $reason, $coachId);
+            if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+                $stmt->close();
+                throw new RuntimeException('coach restore failed');
+            }
+            $stmt->close();
+            $standing = chess_player_standing($conn, $coachId);
+            if (!$standing) {
+                throw new RuntimeException('coach restore receipt missing');
+            }
+            return ['ok' => true, 'standing' => coach_standing_admin($standing), 'code' => null];
+        });
+    } catch (Throwable $e) {
+        error_log('chess coach restore: ' . $e->getMessage());
+        return ['ok' => false, 'code' => 'server'];
+    }
+}
+
 /** 这个人的申请；没交过返回 null（"没交过"是常态，不是错误）。 */
 function chess_app_read($conn, $playerId) {
     chess_app_schema($conn);
@@ -1083,9 +2054,12 @@ function chess_app_submit($conn, $playerId, $intro) {
     return $ok;
 }
 
-/** 有没有开课堂的资格 —— 判定在规则层那一个函数里，这里只负责去库里取状态。 */
+/** 申请本身的资格；正在生效的撤销优先于已批准状态。 */
 function chess_app_is_teacher($conn, $playerId) {
-    return coach_can_teach(chess_app_read($conn, $playerId)['status'] ?? null);
+    return coach_can_teach(
+        chess_app_read($conn, $playerId)['status'] ?? null,
+        chess_player_standing($conn, $playerId)
+    );
 }
 
 /**
@@ -1126,12 +2100,20 @@ function chess_player_is_admin($conn, $playerId) {
     $stmt->execute();
     $found = $stmt->get_result()->fetch_assoc() !== null;
     $stmt->close();
+    if ($found) {
+        chess_coach_standing_mark($conn, $playerId);
+    }
     return $seen[$playerId] = $found;
 }
 
-/** 能开课堂的人：管理员不用申请，其他人要申请已通过。整条链路只认这一处。 */
+/** 管理员或已批准申请都能教，但正在生效的撤销优先于两者。 */
 function chess_player_can_teach($conn, $playerId) {
-    return chess_player_is_admin($conn, $playerId) || chess_app_is_teacher($conn, $playerId);
+    $standing = chess_player_standing($conn, $playerId);
+    if (coach_standing_is_revoked($standing)) {
+        return false;
+    }
+    $admin = chess_player_is_admin($conn, $playerId);
+    return coach_eligible(chess_app_read($conn, $playerId)['status'] ?? null, $admin, $standing);
 }
 
 /**
@@ -1141,8 +2123,31 @@ function chess_player_can_teach($conn, $playerId) {
  * 管理员（邮箱在 admin_users）不用走申请，直接就是教练。
  */
 function chess_require_teacher($conn, $playerId) {
+    if (chess_player_is_revoked($conn, $playerId)) {
+        chess_err('coach_revoked');
+    }
     if (!chess_player_can_teach($conn, $playerId)) {
         chess_err('teacher_only');
+    }
+}
+
+/** 返回老师资格错误码；调用方若在事务里，会先锁住资格行再判断。 */
+function chess_class_teacher_problem($conn, array $class, $playerId) {
+    if ((int) ($class['teacher_id'] ?? 0) !== (int) $playerId) {
+        return 'not_teacher';
+    }
+    chess_lock_player_standing($conn, $playerId);
+    if (chess_player_is_revoked($conn, $playerId)) {
+        return 'coach_revoked';
+    }
+    return chess_player_can_teach($conn, $playerId) ? null : 'not_teacher';
+}
+
+/** 已开课堂里的老师动作也要重新过资格，不能靠成员表里的旧角色永久教书。 */
+function chess_require_class_teacher($conn, array $class, $playerId) {
+    $problem = chess_class_teacher_problem($conn, $class, $playerId);
+    if ($problem !== null) {
+        chess_err($problem);
     }
 }
 
@@ -1192,21 +2197,44 @@ function chess_app_list($conn, $status = null, $cap = 100) {
  * 所以"批准成 pending"这类根本不该存在的跳转在这一层也过不去。
  */
 function chess_app_decide($conn, $playerId, $decision, $adminId) {
-    $current = chess_app_read($conn, $playerId);
-    if ($current === null) {
-        return null;   // 界面据此回 no_such_app：这人没交过申请
+    $playerId = (int) $playerId;
+    $adminId = (int) $adminId;
+    chess_app_schema($conn);
+    chess_coach_standing_schema($conn);
+    try {
+        return chess_transaction_retry($conn, static function () use ($conn, $playerId, $decision, $adminId) {
+            chess_lock_player_standing($conn, $playerId);
+            $stmt = $conn->prepare("SELECT status FROM chess_coach_apps
+                WHERE player_id = ? LIMIT 1 FOR UPDATE");
+            $stmt->bind_param("i", $playerId);
+            $stmt->execute();
+            $current = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            if (!$current) {
+                return null;
+            }
+            $next = coach_app_decide($current['status'], $decision);
+            if ($next === null) {
+                return false;
+            }
+            $stmt = $conn->prepare("UPDATE chess_coach_apps
+                SET status = ?, decided_at = NOW(), decided_by = ?, updated_at = NOW()
+                WHERE player_id = ? AND status = ?");
+            $stmt->bind_param("siis", $next, $adminId, $playerId, $current['status']);
+            if (!$stmt->execute()) {
+                $stmt->close();
+                throw new RuntimeException('coach application update failed');
+            }
+            $stmt->close();
+            if ($next === 'approved' && !chess_coach_standing_mark($conn, $playerId)) {
+                throw new RuntimeException('coach standing mark failed');
+            }
+            return $next;
+        });
+    } catch (Throwable $e) {
+        error_log('chess coach app decide: ' . $e->getMessage());
+        return false;
     }
-    $next = coach_app_decide($current['status'], $decision);
-    if ($next === null) {
-        return false;  // 状态机不认这一步
-    }
-    $stmt = $conn->prepare("UPDATE chess_coach_apps
-        SET status = ?, decided_at = NOW(), decided_by = ?, updated_at = NOW()
-        WHERE player_id = ?");
-    $stmt->bind_param("sii", $next, $adminId, $playerId);
-    $ok = $stmt->execute();
-    $stmt->close();
-    return $ok ? $next : false;
 }
 
 /**
@@ -1261,6 +2289,10 @@ function chess_profile_schema($conn) {
         years TINYINT NULL,
         tagline VARCHAR(" . COACH_TAGLINE_MAX . ") NOT NULL DEFAULT '',
         honors VARCHAR(" . COACH_HONORS_MAX . ") NOT NULL DEFAULT '',
+        enrollment_notes VARCHAR(" . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT '',
+        tuition_text VARCHAR(" . COACH_TUITION_TEXT_MAX . ") NOT NULL DEFAULT '',
+        schedule_text VARCHAR(" . COACH_SCHEDULE_TEXT_MAX . ") NOT NULL DEFAULT '',
+        hourly_rate_cny INT NULL,
         language VARCHAR(8) NOT NULL DEFAULT '',
         timezone VARCHAR(40) NOT NULL DEFAULT '',
         levels VARCHAR(64) NOT NULL DEFAULT '',
@@ -1277,23 +2309,25 @@ function chess_profile_schema($conn) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // CREATE IF NOT EXISTS 不会给已经建好的表补列；两个请求同时迁移时，
     // 后一个可能只撞到 1060（列已存在），那不是故障。
-    $columns = $conn->query("SHOW COLUMNS FROM chess_coach_profiles LIKE 'certificates'");
-    if ($columns instanceof mysqli_result && $columns->num_rows === 0) {
-        $migrated = $conn->query("ALTER TABLE chess_coach_profiles
-            ADD COLUMN certificates VARCHAR(192) NOT NULL DEFAULT '' AFTER photos");
-        if (!$migrated && (int) $conn->errno !== 1060) {
-            error_log('chess coach profile: add certificates failed: ' . $conn->error);
-        }
-    }
+    chess_schema_column($conn, 'chess_coach_profiles', 'enrollment_notes',
+        'VARCHAR(' . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT ''", 'honors');
+    chess_schema_column($conn, 'chess_coach_profiles', 'tuition_text',
+        'VARCHAR(' . COACH_TUITION_TEXT_MAX . ") NOT NULL DEFAULT ''", 'enrollment_notes');
+    chess_schema_column($conn, 'chess_coach_profiles', 'schedule_text',
+        'VARCHAR(' . COACH_SCHEDULE_TEXT_MAX . ") NOT NULL DEFAULT ''", 'tuition_text');
+    chess_schema_column($conn, 'chess_coach_profiles', 'hourly_rate_cny', 'INT NULL', 'schedule_text');
+    chess_schema_column($conn, 'chess_coach_profiles', 'certificates',
+        "VARCHAR(192) NOT NULL DEFAULT ''", 'photos');
     $ready = true;
 }
 
 /** 这个人的资料行；没建过返回 null。 */
-function chess_profile_row($conn, $playerId) {
+function chess_profile_row($conn, $playerId, $lock = false) {
     chess_profile_schema($conn);
-    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors, language, timezone,
-            levels, goals, formats, slots, avatar, photos, certificates, updated_at
-        FROM chess_coach_profiles WHERE player_id = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors,
+            enrollment_notes, tuition_text, schedule_text, hourly_rate_cny,
+            language, timezone, levels, goals, formats, slots, avatar, photos, certificates, updated_at
+        FROM chess_coach_profiles WHERE player_id = ? LIMIT 1" . ($lock ? ' FOR UPDATE' : ''));
     if ($stmt === false) {
         error_log('chess coach profile: prepare(read) failed: ' . $conn->error);
         return null;
@@ -1333,11 +2367,14 @@ function chess_profile_ensure($conn, $playerId) {
 function chess_profile_write($conn, $playerId, array $profile) {
     chess_profile_schema($conn);
     $stmt = $conn->prepare("INSERT INTO chess_coach_profiles
-        (player_id, title, elo, years, tagline, honors, language, timezone,
-         levels, goals, formats, slots, avatar, photos, certificates, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (player_id, title, elo, years, tagline, honors, enrollment_notes, tuition_text,
+         schedule_text, hourly_rate_cny, language, timezone, levels, goals, formats, slots,
+         avatar, photos, certificates, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE title = VALUES(title), elo = VALUES(elo),
             years = VALUES(years), tagline = VALUES(tagline), honors = VALUES(honors),
+            enrollment_notes = VALUES(enrollment_notes), tuition_text = VALUES(tuition_text),
+            schedule_text = VALUES(schedule_text), hourly_rate_cny = VALUES(hourly_rate_cny),
             language = VALUES(language), timezone = VALUES(timezone),
             levels = VALUES(levels), goals = VALUES(goals), formats = VALUES(formats),
             slots = VALUES(slots), avatar = VALUES(avatar), photos = VALUES(photos),
@@ -1346,16 +2383,20 @@ function chess_profile_write($conn, $playerId, array $profile) {
         error_log('chess coach profile: prepare(write) failed: ' . $conn->error);
         return false;
     }
-    // elo/years 绑成 i 时 PHP 的 null 会作为 SQL NULL 下发（不是 0），
+    // elo/years/rate 绑成 i 时 PHP 的 null 会作为 SQL NULL 下发（不是 0），
     // 这正是规则层要区分"没登记"和"0"的那一处。
     $stmt->bind_param(
-        "isiisssssssssss",
+        "isiissssssissssssss",
         $playerId,
         $profile['title'],
         $profile['elo'],
         $profile['years'],
         $profile['tagline'],
         $profile['honors'],
+        $profile['enrollment_notes'],
+        $profile['tuition_text'],
+        $profile['schedule_text'],
+        $profile['hourly_rate_cny'],
         $profile['language'],
         $profile['timezone'],
         $profile['levels'],
@@ -1435,17 +2476,25 @@ function chess_admin_player_ids($conn) {
  */
 function chess_coach_ids($conn, $cap = 100) {
     chess_profile_schema($conn);
+    chess_coach_standing_schema($conn);
     $limit = max(1, min(200, (int) $cap));
     $ids = [];
-    $result = $conn->query("SELECT player_id FROM chess_coach_apps
-        WHERE status = 'approved' ORDER BY decided_at DESC LIMIT {$limit}");
+    $result = $conn->query("SELECT a.player_id
+        FROM chess_coach_apps a
+        LEFT JOIN chess_coach_standing s ON s.player_id = a.player_id
+        WHERE a.status = 'approved'
+          AND (s.player_id IS NULL OR s.status <> 'revoked'
+               OR (s.restored_at IS NOT NULL AND s.restored_at <> ''))
+        ORDER BY a.decided_at DESC LIMIT {$limit}");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $ids[(int) $row['player_id']] = true;
         }
     }
     foreach (chess_admin_player_ids($conn) as $id) {
-        $ids[$id] = true;
+        if (!chess_player_is_revoked($conn, $id)) {
+            $ids[$id] = true;
+        }
     }
     unset($ids[0]);
     return array_keys($ids);
@@ -1478,9 +2527,10 @@ function chess_coach_rows($conn, array $ids) {
     }
     $in = implode(',', array_keys($clean));
     $result = $conn->query("SELECT p.id AS player_id, p.nickname, p.rating,
-            f.title, f.elo, f.years, f.tagline, f.honors, f.language, f.timezone,
-            f.levels, f.goals, f.formats, f.slots, f.avatar, f.photos, f.certificates,
-            f.updated_at AS profile_at
+            f.title, f.elo, f.years, f.tagline, f.honors,
+            f.enrollment_notes, f.tuition_text, f.schedule_text, f.hourly_rate_cny,
+            f.language, f.timezone, f.levels, f.goals, f.formats, f.slots,
+            f.avatar, f.photos, f.certificates, f.updated_at AS profile_at
         FROM chess_players p
         LEFT JOIN chess_coach_profiles f ON f.player_id = p.id
         WHERE p.id IN ({$in})");
@@ -1506,7 +2556,7 @@ function chess_coach_directory($conn, $cap = 100) {
  */
 function chess_coach_one($conn, $playerId) {
     $playerId = (int) $playerId;
-    if ($playerId < 1 || !in_array($playerId, chess_coach_ids($conn), true)) {
+    if ($playerId < 1 || !chess_player_can_teach($conn, $playerId)) {
         return null;
     }
     $rows = chess_coach_rows($conn, [$playerId]);

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COACH_APP_STATES,
@@ -29,10 +30,13 @@ import {
 const UI_SOURCE = readFileSync(new URL('../src/ui/coachApp.js', import.meta.url), 'utf8');
 const MARKUP = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const NET = readFileSync(new URL('../src/net/auth.js', import.meta.url), 'utf8');
-const API = new URL('../../../../ichessgeek-api/v1/', import.meta.url);
-const CORE = readFileSync(new URL('chess_coach_core.php', API), 'utf8');
-const GUARD = readFileSync(new URL('chess_guard.php', API), 'utf8');
-const CREATE = readFileSync(new URL('chess_class_create.php', API), 'utf8');
+const API = [
+  resolve(process.cwd(), '../../ichessgeek-api/v1'),
+  resolve(process.cwd(), '../../../ichessgeek-api/v1'),
+].find((path) => existsSync(path));
+const CORE = readFileSync(resolve(API, 'chess_coach_core.php'), 'utf8');
+const GUARD = readFileSync(resolve(API, 'chess_guard.php'), 'utf8');
+const CREATE = readFileSync(resolve(API, 'chess_class_create.php'), 'utf8');
 
 const han = '带过六个学生，教了三年'; // 11 个字
 const pad = (n) => han.repeat(Math.ceil(n / han.length)).slice(0, n);
@@ -196,7 +200,7 @@ describe('和后端的契约', () => {
     expect(UI_SOURCE).toContain('chess_coach_app_get.php');
     expect(UI_SOURCE).toContain('chess_coach_app_save.php');
     for (const file of ['chess_coach_app_get.php', 'chess_coach_app_save.php']) {
-      expect(existsSync(new URL(file, API)), file).toBe(true);
+      expect(existsSync(resolve(API, file)), file).toBe(true);
     }
   });
 
@@ -206,9 +210,9 @@ describe('和后端的契约', () => {
   });
 
   it('提交端点先要登录、再要确认邮箱，最后才判资格', () => {
-    const save = readFileSync(new URL('chess_coach_app_save.php', API), 'utf8');
+    const save = readFileSync(resolve(API, 'chess_coach_app_save.php'), 'utf8');
     expect(save).toContain('chess_require_verified()');
-    expect(save).toContain('chess_app_is_teacher');
+    expect(save).toContain('chess_player_can_teach');
     expect(save).toContain("chess_err('already_teacher')");
   });
 

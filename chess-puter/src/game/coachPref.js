@@ -12,6 +12,10 @@
 
 /** 和后端 COACH_NOTE_MAX 同一个数（字，不是字节）。改这里要改那边。 */
 export const COACH_NOTE_MAX = 240;
+/** 详细时段说明单独一栏；和自我介绍一样按码点量，不按 UTF-8 字节量。 */
+export const COACH_SCHEDULE_NOTE_MAX = 240;
+/** 预算和教练费率与后端 COACH_MONEY_MAX 同口径。 */
+export const COACH_MONEY_MAX = 100000;
 
 /**
  * 每组的选项：[key, 界面上的说法]。顺序就是界面排下来的顺序，
@@ -81,7 +85,9 @@ export const COACH_GROUP_TITLES = {
   slots: '方便的时间段',
   timezone: '你在哪个时区',
   language: '授课语言',
-  note: '补充说明',
+  note: '自我介绍',
+  budget: '预算（人民币）',
+  schedule_note: '详细时间说明',
 };
 
 /** 一组允许哪些 key（生成控件、也用来判断"这是不是我发出去的选项"）。 */
@@ -95,6 +101,34 @@ export function coachLabel(group, key) {
 }
 
 /**
+ * CNY 金额只收非负整数：空值（含空串）归一成 null，和"0 元"分开。
+ * 预算和教练费率共用这一条，免得一边收小数、另一边拒绝同一份值。
+ */
+export function parseCny(value) {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  if (typeof value !== 'string' && typeof value !== 'number') return { ok: false };
+  const text = String(value).trim();
+  if (text === '') return { ok: true, value: null };
+  if (!/^\d+$/.test(text)) return { ok: false };
+  const amount = Number(text);
+  return Number.isSafeInteger(amount) && amount <= COACH_MONEY_MAX
+    ? { ok: true, value: amount }
+    : { ok: false };
+}
+
+/** 给卡片和匹配理由用的同一种写法；未知价格不印"¥null"。 */
+export function formatCny(value) {
+  const parsed = parseCny(value);
+  return parsed.ok && parsed.value !== null ? `¥${parsed.value}` : '';
+}
+
+export function normalizeCoachText(value) {
+  return (typeof value === 'string' ? value : '')
+    .replace(/[\u3000\s]+/g, ' ')
+    .trim();
+}
+
+/**
  * 一份表单状态 → 该发出去的 payload，或者一句"哪儿不对"。
  *
  * 为什么前端要再验一遍（后端也会验）：这里拦下的是"少选了一项"这种手快,
@@ -102,7 +136,9 @@ export function coachLabel(group, key) {
  * 还要一次往返。两边都只是把门，判定以那边为准。
  *
  * @param {{level?: string, goals?: string[], formats?: string[], slots?: string[],
- *          timezone?: string, language?: string, note?: string, contactOk?: boolean}} form
+ *          timezone?: string, language?: string, note?: string, contactOk?: boolean,
+ *          budgetMinCny?: string|number|null, budgetMaxCny?: string|number|null,
+ *          scheduleNote?: string}} form
  * @returns {{ok: true, payload: object} | {ok: false, field: string, text: string}}
  */
 export function validateCoachForm(form) {
@@ -134,17 +170,31 @@ export function validateCoachForm(form) {
     }
   }
 
-  // 说明按"字"量而不是按字节量：中文一条消息 3 个字节一个字，
-  // 拿 length 量的话人写到八十个字就被判超长。
-  const note = (typeof source.note === 'string' ? source.note : '')
-    .replace(/[\u3000\s]+/g, ' ')
-    .trim();
+  const note = normalizeCoachText(source.note);
   if ([...note].length > COACH_NOTE_MAX) {
     return {
       ok: false,
       field: 'note',
-      text: `补充说明请写在 ${COACH_NOTE_MAX} 个字以内（现在 ${[...note].length} 个字）。`,
+      text: `自我介绍请写在 ${COACH_NOTE_MAX} 个字以内（现在 ${[...note].length} 个字）。`,
     };
+  }
+
+  const scheduleNote = normalizeCoachText(source.scheduleNote ?? source.schedule_note);
+  if ([...scheduleNote].length > COACH_SCHEDULE_NOTE_MAX) {
+    return {
+      ok: false,
+      field: 'schedule_note',
+      text: `详细时间说明请写在 ${COACH_SCHEDULE_NOTE_MAX} 个字以内（现在 ${[...scheduleNote].length} 个字）。`,
+    };
+  }
+
+  const budgetMin = parseCny(source.budgetMinCny ?? source.budget_min_cny);
+  const budgetMax = parseCny(source.budgetMaxCny ?? source.budget_max_cny);
+  if (!budgetMin.ok || !budgetMax.ok) {
+    return { ok: false, field: 'budget', text: '预算请填 0 到 100000 的非负整数（人民币元），不确定的那一项可以留空。' };
+  }
+  if (budgetMin.value !== null && budgetMax.value !== null && budgetMin.value > budgetMax.value) {
+    return { ok: false, field: 'budget', text: '预算下限不能高于上限。' };
   }
 
   return {
@@ -158,6 +208,9 @@ export function validateCoachForm(form) {
       language: pick('language')[0],
       note,
       contact_ok: source.contactOk === true,
+      budget_min_cny: budgetMin.value,
+      budget_max_cny: budgetMax.value,
+      schedule_note: scheduleNote,
     },
   };
 }
@@ -177,6 +230,18 @@ export function coachPrefSummary(pref) {
     list('goals', pref.goals),
     list('formats', pref.formats),
   ].filter(Boolean);
+  const min = formatCny(pref.budget_min_cny);
+  const max = formatCny(pref.budget_max_cny);
+  if (min || max) parts.push(`预算 ${min && max ? `${min}–${max}` : min || max} / 60 分钟`);
+  const times = [
+    list('slots', pref.slots),
+    typeof pref.schedule_note === 'string' ? pref.schedule_note.trim() : '',
+  ].filter(Boolean);
+  if (times.length) {
+    // 小结只提醒"写过时间要求"，完整内容在偏好面板里，不把整段话挤到卡片上。
+    const detail = [...times.join('、')];
+    parts.push(`时间 ${detail.slice(0, 48).join('')}${detail.length > 48 ? '…' : ''}`);
+  }
   if (parts.length === 0) return '';
   const at = typeof pref.updated_at === 'string' ? pref.updated_at.slice(0, 10) : '';
   return `已记下：${parts.join(' · ')}${at ? `（${at} 填的）` : ''}`;

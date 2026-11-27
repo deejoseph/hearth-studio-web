@@ -13,6 +13,7 @@
  */
 
 require_once __DIR__ . '/../v1/chess_coach_core.php';
+require_once __DIR__ . '/../v1/chess_coach_complaint_core.php';
 
 $checks = 0;
 $failures = [];
@@ -59,6 +60,9 @@ $assert($p['timezone'] === 'Asia/Shanghai', 'timezone 存 IANA 名');
 $assert($p['language'] === 'zh', 'language 一条');
 $assert($p['note'] === '想周末上课', 'note 原样');
 $assert($p['contact_ok'] === 1, 'contact_ok true → 1');
+$assert($p['budget_min_cny'] === null && $p['budget_max_cny'] === null,
+    '漏传预算保持 null,不默认成 0');
+$assert($p['schedule_note'] === '', '漏传时间说明保持空串');
 
 /* --- 单选 --- */
 foreach (['level', 'timezone', 'language'] as $field) {
@@ -138,6 +142,40 @@ $noConsent = $good();
 unset($noConsent['contact_ok']);
 $assert($ok($noConsent)['contact_ok'] === 0, '漏传 contact_ok 算不同意 —— 不能默认把邮箱给出去');
 
+/* --- 预算与详细时间 --- */
+$assert(COACH_MONEY_MAX === 100000, '预算与每小时价格的契约上限是 100000 元');
+$assert(COACH_SCHEDULE_NOTE_MAX === 240, '学员详细时间说明最多 240 字');
+foreach ([[null, null], ['', null]] as [$given, $want]) {
+    $got = $ok($good(['budget_min_cny' => $given]));
+    $assert($got !== null && $got['budget_min_cny'] === $want,
+        '预算空值保持 null：' . var_export($given, true));
+}
+foreach ([[0, 0], ['0', 0], [COACH_MONEY_MAX, COACH_MONEY_MAX], ['100000', 100000]] as [$given, $want]) {
+    $got = $ok($good(['budget_min_cny' => $given, 'budget_max_cny' => $given]));
+    $assert($got !== null && $got['budget_min_cny'] === $want && $got['budget_max_cny'] === $want,
+        '预算边界与数字串照收：' . var_export($given, true));
+}
+$onlyMin = $ok($good(['budget_min_cny' => 200]));
+$onlyMax = $ok($good(['budget_max_cny' => 300]));
+$assert($onlyMin['budget_min_cny'] === 200 && $onlyMin['budget_max_cny'] === null, '只填预算下限');
+$assert($onlyMax['budget_min_cny'] === null && $onlyMax['budget_max_cny'] === 300, '只填预算上限');
+foreach ([-1, 100001, '100001', '12.5', '12a', '0000000', 12.5, true, [100]] as $given) {
+    $assert($bad($good(['budget_min_cny' => $given])) === ['bad_budget', 'budget_min_cny'],
+        '预算形状或范围不对：' . var_export($given, true));
+}
+$assert($bad($good(['budget_min_cny' => 301, 'budget_max_cny' => 300]))
+    === ['bad_budget', 'budget_max_cny'], '预算下限高于上限 → bad_budget');
+$assert($ok($good(['schedule_note' => "  周六　下午\n "]))['schedule_note'] === '周六 下午',
+    '详细时间按同一口径归一空白');
+$assert($ok($good(['schedule_note' => str_repeat('马', COACH_SCHEDULE_NOTE_MAX)])) !== null,
+    '详细时间恰好到上限收得住');
+$assert($bad($good(['schedule_note' => str_repeat('马', COACH_SCHEDULE_NOTE_MAX + 1)]))
+    === ['long_schedule', 'schedule_note'], '详细时间超一个码点 → long_schedule');
+$assert($bad($good(['schedule_note' => ['周六']])) === ['bad_schedule', 'schedule_note'],
+    '详细时间收数组会变成 Array,必须拒');
+$assert($bad($good(['schedule_note' => "周六\xa0下午"])) === ['bad_schedule', 'schedule_note'],
+    '详细时间坏字节 → bad_schedule');
+
 /* --- 整体形状 --- */
 $assert(coach_pref_normalize('nope')['ok'] === false, 'body 不是对象 → 不通过');
 $assert(coach_pref_normalize([]) === ['ok' => false, 'pref' => null, 'code' => 'bad_pref', 'field' => 'level'],
@@ -153,16 +191,24 @@ $public = coach_pref_public([
     'language' => 'zh_en',
     'note' => '想周末',
     'contact_ok' => '1',
+    'budget_min_cny' => '0',
+    'budget_max_cny' => '500',
+    'schedule_note' => '周六下午',
     'updated_at' => '2026-11-25 23:59:59',
 ]);
 $assert($public['goals'] === ['basics', 'tactics'], '回界面时多选变数组');
 $assert($public['slots'] === [], '空串变空数组,界面不用判 null');
 $assert($public['contact_ok'] === true, 'contact_ok 从小整数串变真值');
+$assert($public['budget_min_cny'] === 0 && $public['budget_max_cny'] === 500,
+    '预算数字串变整数,0 不被当成没填');
+$assert($public['schedule_note'] === '周六下午', '详细时间原样带回');
 $assert($public['updated_at'] === '2026-11-25 23:59:59', '最后修改的时刻带回去');
 $empty = coach_pref_public(['level' => 'zero', 'goals' => '', 'formats' => '', 'slots' => '',
     'timezone' => 'Asia/Shanghai', 'language' => 'zh', 'contact_ok' => '0']);
 $assert($empty['goals'] === [] && $empty['note'] === '' && $empty['contact_ok'] === false && $empty['updated_at'] === null,
     '行里缺 note/updated_at 也不会给界面 undefined');
+$assert($empty['budget_min_cny'] === null && $empty['budget_max_cny'] === null && $empty['schedule_note'] === '',
+    '旧行缺预算与时间说明时按空值兼容');
 
 /* --- 往返：normalize 出来的串能被 public 还原成同一份选择 --- */
 $round = $ok($good(['goals' => ['endgame', 'basics'], 'formats' => ['review', 'one']]));
@@ -224,6 +270,24 @@ foreach (['pending', 'rejected', '', 'Approved', 'APPROVED', null, false, 0, ['a
     $assert(coach_can_teach($status) === false,
         '别的一律不算：' . var_export($status, true));
 }
+
+/* --- standing：生效中的撤销优先于批准与管理員 --- */
+$active = ['status' => 'active', 'restored_at' => null];
+$revoked = ['status' => 'revoked', 'restored_at' => null];
+$revokedEmpty = ['status' => 'revoked', 'restored_at' => ''];
+$restored = ['status' => 'revoked', 'restored_at' => '2026-11-26 10:00:00'];
+$assert(coach_standing_is_revoked($revoked) === true, 'revoked 且未恢复 = 正在撤销');
+$assert(coach_standing_is_revoked($revokedEmpty) === true, '空恢复时间仍算未恢复');
+$assert(coach_standing_is_revoked($restored) === false, '有恢复时间 = 撤销已失效');
+$assert(coach_standing_is_revoked($active) === false && coach_standing_is_revoked(null) === false,
+    'active 或没有 standing 都不算撤销');
+$assert(coach_can_teach('approved', $revoked) === false, '撤销优先于已批准申请');
+$assert(coach_eligible('approved', true, $revoked) === false, '管理员也不能越过生效中的撤销');
+$assert(coach_eligible('pending', true, $revokedEmpty) === false, '空恢复时间不能给管理员放行');
+$assert(coach_can_teach('approved', $restored) === true, '恢复后批准申请重新获得资格');
+$assert(coach_eligible('pending', true, $restored) === true, '恢复后的管理员仍有资格');
+$assert(coach_eligible('approved', false, $active) === true, '普通批准教练在 active 时可教');
+$assert(coach_eligible('rejected', false, $active) === false, '普通驳回申请不能教');
 
 /* --- decision：管理员点的那一下 --- */
 $assert(coach_decision('approved') === 'approved', '批准');
@@ -326,6 +390,10 @@ $full = static function (array $over = []) use ($imgD) {
         'years' => 7,
         'tagline' => '带零基础到比赛',
         'honors' => '市青少年锦标赛 优秀教练',
+        'enrollment_notes' => '先发水平与目标，周末可约',
+        'tuition_text' => '每小时 300 元，可单次约课',
+        'schedule_text' => '周六日 14:00 后',
+        'hourly_rate_cny' => 300,
         'language' => 'zh_en',
         'timezone' => 'Asia/Shanghai',
         'levels' => ['zero', 'moves'],
@@ -344,6 +412,10 @@ $assert($p !== null, '一份完整资料该通过');
 $assert($p['title'] === 'im', 'title 原样');
 $assert($p['elo'] === 2210, 'elo 取成整数');
 $assert($p['years'] === 7, 'years 取成整数');
+$assert($p['enrollment_notes'] === '先发水平与目标，周末可约', '招生要求原样收下');
+$assert($p['tuition_text'] === '每小时 300 元，可单次约课', '收费说明原样收下');
+$assert($p['schedule_text'] === '周六日 14:00 后', '授课时间原样收下');
+$assert($p['hourly_rate_cny'] === 300, '每小时价格取成整数');
 $assert($p['levels'] === 'zero,moves', 'levels 按白名单顺序,不按点击顺序');
 $assert($p['goals'] === 'basics,tactics', 'goals 与学员那侧同一套 key');
 $assert($p['formats'] === 'one,group', 'formats 两条');
@@ -355,11 +427,12 @@ $assert($p['certificates'] === $imgD, 'certificates 一张');
 /* --- 每个字段都可以留空：资料不是门槛 --- */
 $assert($prof([]) !== null, '整张表单空着也要存得下 —— 判够不够格的是申请状态,不是这里');
 $blank = $prof([]);
-foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'levels', 'goals',
-    'formats', 'slots', 'avatar', 'photos', 'certificates'] as $key) {
+foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text', 'schedule_text',
+    'language', 'timezone', 'levels', 'goals', 'formats', 'slots', 'avatar', 'photos', 'certificates'] as $key) {
     $assert(($blank[$key] ?? '缺键') === '', "空着 {$key} 存空串");
 }
-$assert($blank['elo'] === null && $blank['years'] === null, 'elo/years 空着是 null,不是 0');
+$assert($blank['elo'] === null && $blank['years'] === null && $blank['hourly_rate_cny'] === null,
+    'elo/years/hourly_rate 空着是 null,不是 0');
 $assert($prof($full(['elo' => '', 'years' => '']))['elo'] === null, '显式发空串 = 清空登记');
 $assert($prof($full(['years' => 0]))['years'] === 0, '0 年教龄收得住,且和"没填"不是一回事');
 $assert($profBad($full(['years' => '三年'])) === ['bad_profile', 'years'], 'years 要数字,不收汉字');
@@ -406,6 +479,32 @@ $assert($prof($full(['honors' => str_repeat('奖', COACH_HONORS_MAX)])) !== null
 $assert($profBad($full(['honors' => str_repeat('奖', COACH_HONORS_MAX + 1)]))
     === ['long_honors', 'honors'], '荣誉超长 → long_honors');
 $assert($profBad($full(['honors' => "奖\xa0杯"])) === ['bad_honors', 'honors'], '荣誉坏字节 → bad_honors');
+
+/* --- 招生、收费、时间与每小时价格 --- */
+$assert(COACH_ENROLLMENT_NOTES_MAX === 2000 && COACH_TUITION_TEXT_MAX === 1000
+    && COACH_SCHEDULE_TEXT_MAX === 1000, '教练公开说明的三档字数上限保持契约值');
+foreach ([
+    ['enrollment_notes', COACH_ENROLLMENT_NOTES_MAX, 'long_enrollment_notes', 'bad_enrollment_notes'],
+    ['tuition_text', COACH_TUITION_TEXT_MAX, 'long_tuition', 'bad_tuition'],
+    ['schedule_text', COACH_SCHEDULE_TEXT_MAX, 'long_schedule_text', 'bad_schedule_text'],
+] as [$field, $max, $longCode, $badCode]) {
+    $assert($prof($full([$field => str_repeat('马', $max)])) !== null, "{$field} 恰好到上限");
+    $assert($profBad($full([$field => str_repeat('马', $max + 1)])) === [$longCode, $field],
+        "{$field} 超一个码点 → {$longCode}");
+    $assert($profBad($full([$field => [$field]])) === [$badCode, $field], "{$field} 不收数组");
+    $assert($profBad($full([$field => "说明\xa0"])) === [$badCode, $field], "{$field} 不收坏字节");
+}
+foreach ([[0, 0], ['0', 0], [COACH_MONEY_MAX, COACH_MONEY_MAX], [' 300 ', 300]] as [$given, $want]) {
+    $got = $prof($full(['hourly_rate_cny' => $given]));
+    $assert($got !== null && $got['hourly_rate_cny'] === $want,
+        '每小时价格收整数或数字串：' . var_export($given, true));
+}
+foreach ([-1, 100001, '100001', '300元', 300.5, true, [300]] as $given) {
+    $assert($profBad($full(['hourly_rate_cny' => $given])) === ['bad_rate', 'hourly_rate_cny'],
+        '每小时价格形状或范围不对：' . var_export($given, true));
+}
+$assert($prof($full(['hourly_rate_cny' => '']))['hourly_rate_cny'] === null,
+    '每小时价格发空串 = 清空,不是 0 元');
 
 /* --- 多选：可以整条不填，但填了就得全认 --- */
 $assert($prof($full(['levels' => []]))['levels'] === '', 'levels 不填允许');
@@ -490,12 +589,20 @@ $assert($row['levels'] === ['zero', 'moves'], '回界面时多选变数组');
 $assert($row['photos'] === [$imgB], '照片变数组,顺序还是那一列');
 $assert($row['certificates'] === [$imgD], '证书变数组,公开主页拿得到');
 $assert($row['elo'] === 2210 && $row['years'] === 7, '整数带回去');
+$assert($row['enrollment_notes'] === '先发水平与目标，周末可约'
+    && $row['tuition_text'] === '每小时 300 元，可单次约课'
+    && $row['schedule_text'] === '周六日 14:00 后' && $row['hourly_rate_cny'] === 300,
+    '招生、收费、时间与每小时价格都按公开形状带回');
 $empty = coach_profile_public([]);
 $assert($empty['title'] === '' && $empty['levels'] === [] && $empty['photos'] === []
     && $empty['certificates'] === [] && $empty['elo'] === null && $empty['updated_at'] === null,
     '空行不会给界面 undefined');
-$zero = coach_profile_public(['elo' => '0', 'years' => '0']);
-$assert($zero['elo'] === 0 && $zero['years'] === 0, '库里的 "0" 还是 0,不会被当成没登记');
+$assert($empty['enrollment_notes'] === '' && $empty['tuition_text'] === ''
+    && $empty['schedule_text'] === '' && $empty['hourly_rate_cny'] === null,
+    '旧资料行缺新字段时保持空值');
+$zero = coach_profile_public(['elo' => '0', 'years' => '0', 'hourly_rate_cny' => '0']);
+$assert($zero['elo'] === 0 && $zero['years'] === 0 && $zero['hourly_rate_cny'] === 0,
+    '库里的 "0" 还是 0,不会被当成没登记');
 
 /* --- 名录/主页上的一行 --- */
 $entry = coach_directory_entry([
@@ -513,6 +620,10 @@ $entry = coach_directory_entry([
     'title' => 'im',
     'elo' => '2210',
     'years' => '7',
+    'enrollment_notes' => '先发水平与目标，周末可约',
+    'tuition_text' => '每小时 300 元，可单次约课',
+    'schedule_text' => '周六日 14:00 后',
+    'hourly_rate_cny' => '300',
     'levels' => 'zero,moves',
     'photos' => "{$imgB},{$imgC}",
     'certificates' => $imgD,
@@ -526,6 +637,8 @@ $assert($entry['nickname'] === '青瓷' && $entry['rating'] === 1450, '名头和
 $assert($entry['profile']['levels'] === ['zero', 'moves'], '资料那一坨按 public 的形状');
 $assert($entry['profile']['photos'] === [$imgB, $imgC], '照片是数组,第一张当封面');
 $assert($entry['profile']['certificates'] === [$imgD], '证书按 public 的形状上主页');
+$assert($entry['profile']['hourly_rate_cny'] === 300 && $entry['profile']['tuition_text'] !== '',
+    '名录带得出每小时价格与收费说明');
 $assert($entry['profile']['updated_at'] === '2026-11-26 12:00:00', '资料改过的时刻取 profile_at');
 $assert($entry['has_profile'] === true, '填过了就说填过了');
 foreach (['email', 'verified_at', 'password_hash'] as $secret) {
@@ -544,10 +657,203 @@ $assert(coach_directory_entry(['player_id' => 4, 'rating' => ''])['rating'] === 
 $assert(coach_profile_filled(coach_profile_public(['elo' => 0])) === true,
     'elo 0 也是填过了：0 和没填不是一回事');
 $assert(coach_profile_filled(coach_profile_public(['years' => 0])) === true, '0 年教龄同上');
+$assert(coach_profile_filled(coach_profile_public(['hourly_rate_cny' => 0])) === true,
+    '0 元价格也算填过,不和没填混淆');
+foreach (['enrollment_notes', 'tuition_text', 'schedule_text'] as $field) {
+    $assert(coach_profile_filled(coach_profile_public([$field => '已填写'])) === true,
+        "只填 {$field} 也算填过资料");
+}
 $assert(coach_profile_filled(coach_profile_public(['photos' => $imgA])) === true,
     '只传了一张照片也算填过（那一行是先建起来的）');
 $assert(coach_profile_filled(coach_profile_public(['certificates' => $imgA])) === true,
     '只传一张证书也算填过,不会显示成"还没填资料"');
+
+/* ========== 学员预约 ========== */
+$inquiryGood = static function (array $over = []): array {
+    return array_merge(['coach_id' => 9, 'message' => str_repeat('想', 20), 'contact_ok' => true], $over);
+};
+$inq = static function ($data) {
+    $r = coach_inquiry_normalize($data);
+    return $r['ok'] ? $r : null;
+};
+$inqBad = static function ($data) {
+    $r = coach_inquiry_normalize($data);
+    return $r['ok'] ? null : [$r['code'], $r['field']];
+};
+$inquiry = $inq($inquiryGood());
+$assert($inquiry !== null && $inquiry['coach_id'] === 9 && $inquiry['contact_ok'] === true,
+    '预约请求收下明确同意联系的学员');
+$assert($inq($inquiryGood(['coach_id' => ' 9 ']))['coach_id'] === 9, '教练 ID 数字串去空格后照收');
+foreach ([0, -1, 1.5, true, [], '9a', '012', '2147483648', PHP_INT_MAX] as $given) {
+    $assert(coach_positive_id($given) === null, 'ID 不收这种形状：' . var_export($given, true));
+    $assert($inqBad($inquiryGood(['coach_id' => $given])) === ['bad_coach_id', 'coach_id'],
+        '预约教练 ID 不合法：' . var_export($given, true));
+}
+foreach ([1, '1', false, null, 'true'] as $given) {
+    $assert($inqBad($inquiryGood(['contact_ok' => $given])) === ['contact_required', 'contact_ok'],
+        '预约许可只认布尔 true：' . var_export($given, true));
+}
+$noContact = $inquiryGood();
+unset($noContact['contact_ok']);
+$assert($inqBad($noContact) === ['contact_required', 'contact_ok'], '预约漏传许可不能默认同意');
+$assert($inq($inquiryGood(['message' => str_repeat('马', 20)])) !== null, '预约说明恰好 20 字收得住');
+$assert($inq($inquiryGood(['message' => str_repeat('马', 2000)])) !== null, '预约说明恰好 2000 字收得住');
+$assert($inqBad($inquiryGood(['message' => str_repeat('马', 19)])) === ['short_message', 'message'],
+    '预约说明 19 字 → short_message');
+$assert($inqBad($inquiryGood(['message' => str_repeat('马', 2001)])) === ['long_message', 'message'],
+    '预约说明 2001 字 → long_message');
+$assert($inqBad($inquiryGood(['message' => ['想上课']])) === ['bad_message', 'message'], '预约说明不收数组');
+$assert($inqBad($inquiryGood(['message' => "想上课\xa0"])) === ['bad_message', 'message'], '预约说明不收坏字节');
+$assert($inqBad($inquiryGood(['message' => "  预约　上课\n "])) === ['short_message', 'message'],
+    '只有空白与短句不能凑够预约长度');
+$normalizedInquiry = $inq($inquiryGood(['message' => "  我想　上课\n请老师联系我，谢谢你的帮助。  "]));
+$assert($normalizedInquiry !== null
+    && $normalizedInquiry['message'] === '我想 上课 请老师联系我，谢谢你的帮助。',
+    '预约说明归一空白后再落库');
+$assert($inq($inquiryGood(['request_id' => '550e8400-e29b-41d4-a716-446655440000']))['request_id']
+    === '550e8400-e29b-41d4-a716-446655440000', '预约接收客户端幂等请求标识');
+foreach (['', 'short', 'bad id', str_repeat('a', 129), 123, true, []] as $given) {
+    $assert($inqBad($inquiryGood(['request_id' => $given])) === ['bad_request_id', 'request_id'],
+        '预约拒绝形状不对的幂等标识：' . var_export($given, true));
+}
+foreach (['email', 'student_email', 'coach_email', 'reporter_id'] as $private) {
+    $assert(!array_key_exists($private, $inquiry), "预约规范结果不携带 {$private}");
+}
+
+/* ========== 申诉规则与公开/私有白名单 ========== */
+$assert(COACH_COMPLAINT_TEXT_MIN === 20 && COACH_COMPLAINT_TEXT_MAX === 3000
+    && COACH_COMPLAINT_PUBLIC_MAX === 3000 && COACH_RESTORE_REASON_MAX === 1000,
+    '申诉正文、公开说明与恢复原因保持契约边界');
+$complaintText = str_repeat('投诉', 10);
+$complaint = static function (array $over = []) use ($complaintText) {
+    return coach_complaint_text_normalize(array_merge(['coach_id' => 9, 'text' => $complaintText], $over));
+};
+$saved = $complaint();
+$assert($saved['ok'] === true && $saved['coach_id'] === 9 && $saved['text'] === $complaintText,
+    '一条合格申诉收下');
+$assert($saved['text_hash'] === hash('sha256', '9:' . $complaintText), '举报哈希按教练 ID 与正文计算');
+$assert($complaint(['coach_id' => 10])['text_hash'] !== $saved['text_hash'], '相同正文换教练不能撞同一条哈希');
+$assert($complaint(['text' => str_repeat('字', COACH_COMPLAINT_TEXT_MIN)])['ok'] === true,
+    '申诉恰好 20 字收得住');
+$assert($complaint(['text' => str_repeat('字', COACH_COMPLAINT_TEXT_MAX)])['ok'] === true,
+    '申诉恰好 3000 字收得住');
+$assert($complaint(['text' => str_repeat('字', COACH_COMPLAINT_TEXT_MIN - 1)])['code'] === 'short_complaint',
+    '申诉 19 字 → short_complaint');
+$assert($complaint(['text' => str_repeat('字', COACH_COMPLAINT_TEXT_MAX + 1)])['code'] === 'long_complaint',
+    '申诉 3001 字 → long_complaint');
+$assert($complaint(['text' => ['投诉']])['code'] === 'bad_complaint', '申诉正文不收数组');
+$assert($complaint(['text' => "投诉内容\xa0"])['code'] === 'bad_complaint', '申诉正文不收坏字节');
+foreach ([0, '9a', [], 1.2] as $given) {
+    $assert($complaint(['coach_id' => $given])['code'] === 'bad_coach_id', '申诉目标 ID 不合法');
+}
+foreach (['email', 'reporter_id', 'coach_email'] as $private) {
+    $assert(!array_key_exists($private, $saved), "申诉规范结果不携带 {$private}");
+}
+$assert(coach_complaint_status(' pending ') === 'pending' && coach_complaint_status('upheld') === 'upheld'
+    && coach_complaint_status('rejected') === 'rejected', '申诉状态三个白名单值都认');
+$assert(coach_complaint_status('', true) === null && coach_complaint_status(null, true) === null,
+    '筛选状态允许空值');
+foreach (['approved', 'PENDING', 1, []] as $given) {
+    $assert(coach_complaint_status($given) === '', '申诉状态白名单外不收：' . var_export($given, true));
+}
+$assert(coach_complaint_severity('normal') === 'normal' && coach_complaint_severity(' severe ') === 'severe',
+    '严重程度只认 normal / severe');
+foreach (['high', 'NORMAL', 1, []] as $given) {
+    $assert(coach_complaint_severity($given) === null, '严重程度白名单外不收');
+}
+
+$decide = static function (array $data, array $current = []) {
+    return coach_complaint_decision_normalize($data, $current);
+};
+$uphold = $decide(['action' => ' uphold ', 'public_text' => '已核实并公开说明', 'severity' => 'severe', 'revoke' => true]);
+$assert($uphold['ok'] === true && $uphold['action'] === 'uphold' && $uphold['revoke'] === true,
+    '维持严重申诉并撤销资格是一条合法决定');
+$reject = $decide(['action' => 'reject', 'public_text' => '这段不应公开', 'severity' => 'severe']);
+$assert($reject['ok'] === true && $reject['public_text'] === '' && $reject['revoke'] === false,
+    '驳回会清空公开说明,且不能夹带撤销');
+foreach (['pending', 'approve', 'REJECT', '', null, 1, []] as $given) {
+    $assert($decide(['action' => $given])['code'] === 'bad_action', '处理动作只认 uphold / reject');
+}
+$assert($decide(['action' => 'uphold', 'public_text' => '公开说明'])['severity'] === 'normal',
+    '漏传严重程度默认 normal');
+$assert($decide(['action' => 'uphold', 'public_text' => '公开说明', 'revoke' => true],
+    ['severity' => 'severe'])['ok'] === true, '漏传严重程度时沿用当前行的 severe');
+$assert($decide(['action' => 'reject', 'severity' => 'high'])['code'] === 'bad_severity',
+    '处理时严重程度不能是白名单外的值');
+foreach ([1, 'true', null, []] as $given) {
+    $assert($decide(['action' => 'reject', 'revoke' => $given])['code'] === 'bad_revoke',
+        'revoke 只收布尔值');
+}
+$assert($decide(['action' => 'reject', 'revoke' => true])['code'] === 'bad_revoke', '驳回不能撤销资格');
+$assert($decide(['action' => 'uphold', 'public_text' => '公开说明', 'revoke' => true])['code'] === 'bad_revoke',
+    '普通维持申诉不能撤销资格');
+foreach ([null, '', '   ', [], "公开\xa0说明"] as $given) {
+    $assert($decide(['action' => 'uphold', 'public_text' => $given])['code'] === 'bad_public_text',
+        '维持申诉必须有合法公开说明：' . var_export($given, true));
+}
+$assert($decide(['action' => 'uphold', 'public_text' => str_repeat('字', COACH_COMPLAINT_PUBLIC_MAX)])['ok'] === true,
+    '公开说明恰好 3000 字收得住');
+$assert($decide(['action' => 'uphold', 'public_text' => str_repeat('字', COACH_COMPLAINT_PUBLIC_MAX + 1)])['code']
+    === 'bad_public_text', '公开说明 3001 字拒收');
+
+$assert(coach_restore_reason_normalize(' 申诉已复核 ')['reason'] === '申诉已复核', '恢复原因归一首尾空白');
+foreach ([null, '', '   ', [], "恢复\xa0", str_repeat('字', COACH_RESTORE_REASON_MAX + 1)] as $given) {
+    $assert(coach_restore_reason_normalize($given)['ok'] === false, '恢复原因必须非空、合法且不超限');
+}
+$assert(coach_restore_reason_normalize(str_repeat('字', COACH_RESTORE_REASON_MAX))['ok'] === true,
+    '恢复原因恰好 1000 字收得住');
+
+$complaintRow = [
+    'id' => '11', 'coach_id' => '9', 'reporter_id' => '22', 'text' => '原始指控正文',
+    'text_hash' => str_repeat('a', 64), 'public_text' => '管理员批准的公开说明',
+    'status' => 'upheld', 'severity' => 'severe', 'created_at' => '2026-11-26 10:00:00',
+    'decided_at' => '2026-11-26 11:00:00', 'published_at' => '2026-11-26 11:00:00',
+    'coach_name' => '青瓷', 'coach_nickname' => '青瓷', 'standing_status' => 'revoked',
+    'restored_at' => null, 'email' => 'private@example.com', 'intro' => '私人申请介绍',
+];
+$publicComplaint = coach_complaint_public($complaintRow);
+$assert(array_keys($publicComplaint) === ['id', 'public_text', 'severity', 'published_at'],
+    '公开申诉严格只有四个字段');
+$assert($publicComplaint['id'] === 11 && $publicComplaint['severity'] === 'severe', '公开申诉 ID 与严重程度正确');
+$privateComplaint = coach_complaint_private($complaintRow);
+$assert($privateComplaint['text'] === '原始指控正文', '举报人自己与管理员仍可看原始正文');
+foreach (['reporter_id', 'text_hash', 'email', 'intro', 'coach_name'] as $private) {
+    $assert(!array_key_exists($private, $privateComplaint), "私有申诉白名单不带 {$private}");
+}
+$coachComplaint = coach_complaint_for_coach($complaintRow);
+$assert($coachComplaint['text'] === '原始指控正文', '维持申诉的正文可回到教练屏幕');
+$rejectedRow = $complaintRow;
+$rejectedRow['status'] = 'rejected';
+$rejectedForCoach = coach_complaint_for_coach($rejectedRow);
+$assert($rejectedForCoach['text'] === '' && $rejectedForCoach['public_text'] === ''
+    && $rejectedForCoach['published_at'] === null,
+    '被驳回的原始指控与发表痕迹不回到教练屏幕');
+$assert(coach_complaint_private($rejectedRow)['text'] === '原始指控正文',
+    '举报人自己仍能审计被驳回的正文');
+$adminComplaint = coach_complaint_admin($complaintRow);
+$assert($adminComplaint['coach_name'] === '青瓷' && $adminComplaint['revoked'] === true,
+    '管理员队列带教练名与当前撤销状态');
+foreach (['reporter_id', 'text_hash', 'email', 'intro'] as $private) {
+    $assert(!array_key_exists($private, $adminComplaint), "管理员申诉白名单不带 {$private}");
+}
+$restoredComplaintRow = $complaintRow;
+$restoredComplaintRow['restored_at'] = '2026-11-26 12:00:00';
+$assert(coach_complaint_admin($restoredComplaintRow)['revoked'] === false, '已恢复的撤销不显示为生效中');
+$restoredComplaintRow['restored_at'] = '';
+$assert(coach_complaint_admin($restoredComplaintRow)['revoked'] === true, '空恢复时间仍显示为生效中');
+$receipt = coach_complaint_receipt($complaintRow);
+$assert(array_keys($receipt) === ['id', 'coach_id', 'status', 'created_at'], '举报回执严格只有四个字段');
+$standing = coach_standing_admin([
+    'player_id' => '9', 'status' => 'revoked', 'was_coach' => '1', 'revoked_at' => '2026-11-26 11:00:00',
+    'revoked_by' => '3', 'revoke_complaint_id' => '11', 'reason' => '严重申诉', 'restored_at' => null,
+    'restored_by' => null, 'restore_reason' => '', 'updated_at' => '2026-11-26 11:00:00',
+    'reporter_id' => '22', 'email' => 'private@example.com',
+]);
+$assert($standing['coach_id'] === 9 && $standing['was_coach'] === true && $standing['revoked_by'] === 3,
+    '管理员恢复接口的 standing 形状正确');
+foreach (['reporter_id', 'email', 'text_hash'] as $private) {
+    $assert(!array_key_exists($private, $standing), "standing 白名单不带 {$private}");
+}
 
 /* --- 上传那张图该不该收 --- */
 [$name, $code] = coach_image_store_name(['mime' => 'image/jpeg', 0 => 800, 1 => 600], 1024, 'a1b2c3d4e5f60718293a4b5c');

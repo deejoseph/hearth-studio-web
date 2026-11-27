@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COACH_CERTIFICATES_MAX,
@@ -38,14 +39,12 @@ const PROFILE_UI = readFileSync(new URL('../src/ui/coachProfile.js', import.meta
 const DIRECTORY_UI = readFileSync(new URL('../src/ui/coachDirectory.js', import.meta.url), 'utf8');
 const MARKUP = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const STYLE = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
-const CORE = readFileSync(
-  new URL('../../../../ichessgeek-api/v1/chess_coach_core.php', import.meta.url),
-  'utf8',
-);
-const GUARD = readFileSync(
-  new URL('../../../../ichessgeek-api/v1/chess_guard.php', import.meta.url),
-  'utf8',
-);
+const API = [
+  resolve(process.cwd(), '../../ichessgeek-api/v1'),
+  resolve(process.cwd(), '../../../ichessgeek-api/v1'),
+].find((path) => existsSync(path));
+const CORE = readFileSync(resolve(API, 'chess_coach_core.php'), 'utf8');
+const GUARD = readFileSync(resolve(API, 'chess_guard.php'), 'utf8');
 
 /** 服务端起的那种图片名：24 位十六进制 + 真类型给的扩展名（jpeg 存成 jpg，没有 .jpeg）。 */
 const PIC = 'deadbeefdeadbeefdeadbeef.jpg';
@@ -72,23 +71,27 @@ const good = (over = {}) => ({
 });
 
 describe('一份教练资料能不能发出去', () => {
-  it('十四项全发：整份覆盖，后端才分得出"清空"和"没带这个键"', () => {
+  it('十九项全发：整份覆盖，后端才分得出"清空"和"没带这个键"', () => {
     const result = validateCoachProfile(good());
     expect(result.ok).toBe(true);
     expect(Object.keys(result.payload).sort()).toEqual([
       'avatar',
       'certificates',
       'elo',
+      'enrollment_notes',
       'formats',
       'goals',
       'honors',
+      'hourly_rate_cny',
       'language',
       'levels',
       'photos',
+      'schedule_text',
       'slots',
       'tagline',
       'timezone',
       'title',
+      'tuition_text',
       'years',
     ]);
   });
@@ -373,6 +376,7 @@ describe('界面与后端的契约', () => {
 
   it('每一栏都有中文标题，报错时点名点得出', () => {
     for (const key of [...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors',
+      'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
       'language', 'timezone', 'avatar', 'photos', 'certificates']) {
       expect(COACH_PROFILE_TITLES[key], key).toBeTruthy();
     }
@@ -391,7 +395,7 @@ describe('界面与后端的契约', () => {
       wanted.add(`cp-${group}-legend`);
     }
     for (const key of Object.keys(COACH_PROFILE_TITLES)) {
-      wanted.add(`cp-${key}-group`);
+      wanted.add(`cp-${key.replaceAll('_', '-')}-group`);
     }
     for (const id of wanted) {
       expect(htmlIds.has(id) || generated.has(id), id).toBe(true);

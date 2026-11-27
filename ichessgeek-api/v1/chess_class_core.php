@@ -198,7 +198,7 @@ function chess_class_approve(array $class, $targetPlayerId, $approve, $isTeacher
  * $members 是 [{player_id, nickname, role, hand_status}] 数组。
  * $you 是当前请求者的角色信息。
  */
-function chess_class_public(array $class, array $members, $youId) {
+function chess_class_public(array $class, array $members, $youId, $teacherCanTeach = true) {
     $yourRole = null;
     $yourHand = CHESS_HAND_NONE;
     $canMove = false;
@@ -206,7 +206,8 @@ function chess_class_public(array $class, array $members, $youId) {
         if ($m['player_id'] === $youId) {
             $yourRole = $m['role'];
             $yourHand = $m['hand_status'];
-            $canMove = ($m['role'] === CHESS_CLASS_TEACHER) || ($m['hand_status'] === CHESS_HAND_APPROVED);
+            $canMove = ($m['role'] === CHESS_CLASS_TEACHER && $teacherCanTeach)
+                || ($m['hand_status'] === CHESS_HAND_APPROVED);
             break;
         }
     }

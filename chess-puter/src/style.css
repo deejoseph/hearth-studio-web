@@ -2147,6 +2147,10 @@ select:focus-visible {
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
+.btn[hidden] {
+  display: none;
+}
+
 .btn svg.lucide {
   width: 16px;
   height: 16px;
@@ -2231,6 +2235,37 @@ select:focus-visible {
   background: rgba(12, 14, 22, 0.45);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
+}
+
+/* 灯箱按弹窗可用宽度缩小图片，窄屏不能出现内部横向滚动。 */
+.coach-lightbox-dialog {
+  width: min(92vw, 760px);
+  padding: 20px;
+}
+
+.coach-lightbox-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.coach-lightbox-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 150px);
+  margin: 26px auto 0;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
+.coach-lightbox-caption {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 @keyframes dialog-in {

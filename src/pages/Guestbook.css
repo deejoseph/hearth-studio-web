@@ -191,7 +191,8 @@
 }
 
 .gb-field input,
-.gb-field textarea {
+.gb-field textarea,
+.gb-field select {
   padding: 12px 16px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -208,9 +209,22 @@
 }
 
 .gb-field input:focus,
-.gb-field textarea:focus {
+.gb-field textarea:focus,
+.gb-field select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.gb-field input:disabled,
+.gb-field textarea:disabled,
+.gb-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gb-field select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .gb-field textarea {
@@ -671,7 +685,8 @@
   color: var(--accent-warm);
 }
 
-.coa-badge-approved {
+.coa-badge-approved,
+.coa-badge-upheld {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -755,6 +770,248 @@
 .coa-btn:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ── 匿名投诉队列 ── */
+.coa-complaints {
+  scroll-margin-top: 90px;
+}
+
+.coa-complaint {
+  min-width: 0;
+  padding: 20px;
+}
+
+.coa-complaint-revoked {
+  border-color: rgba(255, 128, 128, 0.4);
+  border-left-width: 3px;
+}
+
+.coa-complaint-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.coa-complaint-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.coa-complaint-title .coa-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.coa-complaint-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.coa-severity {
+  padding: 1px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.coa-severity-severe {
+  border-color: var(--accent-warm);
+  color: var(--accent-warm);
+}
+
+.coa-revoked {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 128, 128, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 128, 128, 0.08);
+  color: #ff9a9a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.coa-restored {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(79, 209, 197, 0.3);
+  border-radius: 8px;
+  background: rgba(79, 209, 197, 0.08);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.coa-anonymous-label {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.coa-complaint-text {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 2px solid var(--accent-warm);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.coa-decision {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.coa-decision-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.coa-revoke-check {
+  padding: 12px 14px;
+  border: 1px solid rgba(246, 173, 85, 0.3);
+  border-radius: 8px;
+  background: rgba(246, 173, 85, 0.06);
+}
+
+.coa-revoke-check label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--accent-warm);
+  font-size: 13px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.coa-revoke-check input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent-warm);
+}
+
+.coa-revoke-check .gba-hint {
+  margin: 8px 0 0 28px;
+}
+
+.coa-decision .coa-actions {
+  margin-top: 18px;
+}
+
+.coa-decision .coa-actions .coa-btn {
+  flex: 1 1 150px;
+  min-height: 44px;
+}
+
+.coa-decision-result {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.coa-decision-result h4,
+.coa-restore h4 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.coa-decision-result p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.coa-decision-result span {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.coa-restore {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(79, 209, 197, 0.04);
+}
+
+.coa-restore .gba-hint {
+  margin: 0 0 14px;
+}
+
+.coa-restore .coa-btn {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+}
+
+.coa-retry {
+  margin-top: 18px;
+}
+
+.coa-btn:focus-visible,
+.coa-tab:focus-visible,
+.gba-logout:focus-visible,
+.coa-revoke-check input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (min-width: 720px) {
+  .coa-complaint {
+    padding: 24px;
+  }
+
+  .coa-complaint-head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .coa-complaint-meta {
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  .coa-decision-grid {
+    grid-template-columns: 180px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .coa-restore .coa-btn {
+    width: auto;
+  }
 }
 
 /* ── Responsive ── */

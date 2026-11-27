@@ -46,6 +46,13 @@ const COACH_LANGUAGES = ['zh', 'en', 'zh_en'];
 /** 补充说明的码点上限。库里那一列按字符建，两边取同一个数。 */
 const COACH_NOTE_MAX = 240;
 
+/** 招生补充、收费说明、详细时间与预算的共同口径。 */
+const COACH_ENROLLMENT_NOTES_MAX = 2000;
+const COACH_TUITION_TEXT_MAX = 1000;
+const COACH_SCHEDULE_TEXT_MAX = 1000;
+const COACH_SCHEDULE_NOTE_MAX = 240;
+const COACH_MONEY_MAX = 100000;
+
 /* --------------------------------------------------------------------------
  * 想当教练的那一份申请。和偏好的区别：偏好是"我想要什么"，随时能改；
  * 申请是"我要替别人上课"，交上来就要有人审，审过才算数。
@@ -230,6 +237,29 @@ function coach_pref_normalize($data) {
         return $fail('long_note', 'note');
     }
 
+    [$budgetMin, $field, $code] = coach_money_opt(
+        $data['budget_min_cny'] ?? null, 0, COACH_MONEY_MAX, 'budget_min_cny', 'bad_budget'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+    [$budgetMax, $field, $code] = coach_money_opt(
+        $data['budget_max_cny'] ?? null, 0, COACH_MONEY_MAX, 'budget_max_cny', 'bad_budget'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+    if ($budgetMin !== null && $budgetMax !== null && $budgetMin > $budgetMax) {
+        return $fail('bad_budget', 'budget_max_cny');
+    }
+
+    [$scheduleNote, $field, $code] = coach_text_opt(
+        $data['schedule_note'] ?? '', COACH_SCHEDULE_NOTE_MAX, 'schedule_note', 'long_schedule', 'bad_schedule'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
     // 联系许可只能显式给。缺字段算"不同意"，不能让一个漏传把人的邮箱交出去
     $contact = $data['contact_ok'] ?? false;
     $contactOk = (int) ($contact === true || $contact === 1 || $contact === '1');
@@ -245,6 +275,9 @@ function coach_pref_normalize($data) {
             'language' => $language,
             'note' => $note,
             'contact_ok' => $contactOk,
+            'budget_min_cny' => $budgetMin,
+            'budget_max_cny' => $budgetMax,
+            'schedule_note' => $scheduleNote,
         ],
         'code' => null,
         'field' => null,
@@ -266,16 +299,34 @@ function coach_pref_public($row) {
         'language' => $row['language'],
         'note' => $row['note'] ?? '',
         'contact_ok' => (bool) ($row['contact_ok'] ?? false),
+        'budget_min_cny' => isset($row['budget_min_cny']) && $row['budget_min_cny'] !== ''
+            ? (int) $row['budget_min_cny'] : null,
+        'budget_max_cny' => isset($row['budget_max_cny']) && $row['budget_max_cny'] !== ''
+            ? (int) $row['budget_max_cny'] : null,
+        'schedule_note' => (string) ($row['schedule_note'] ?? ''),
         'updated_at' => $row['updated_at'] ?? null,
     ];
 }
 
-/**
- * 有没有开课堂的资格。整条链路上只有这一行判它 —— 数据层（chess_app_is_teacher）、
- * 端点回给界面的 can_teach 都走这里，别再写一遍 === 'approved'。
- */
-function coach_can_teach($status) {
-    return coach_key($status) === 'approved';
+/** 只有正在生效且没有恢复的撤销记录才挡住资格。 */
+function coach_standing_is_revoked($standing) {
+    if (!is_array($standing)) {
+        return coach_key($standing) === 'revoked';
+    }
+    $restoredAt = $standing['restored_at'] ?? null;
+    return coach_key($standing['status'] ?? null) === 'revoked'
+        && ($restoredAt === null || $restoredAt === '');
+}
+
+/** 申请本身的资格；撤销记录优先于批准状态。 */
+function coach_can_teach($status, $standing = null) {
+    return coach_key($status) === 'approved' && !coach_standing_is_revoked($standing);
+}
+
+/** 管理员或已批准申请都能教，但都不能越过正在生效的撤销。 */
+function coach_eligible($status, $isAdmin, $standing = null) {
+    return !coach_standing_is_revoked($standing)
+        && ($isAdmin === true || coach_can_teach($status));
 }
 
 /**
@@ -489,6 +540,73 @@ function coach_int_opt($value, $min, $max, $field, $code = 'bad_profile') {
     return [$n, $field, null];
 }
 
+/** 金额允许到六位，空值保持 null；0 元和没填预算不是一回事。 */
+function coach_money_opt($value, $min, $max, $field, $code) {
+    if ($value === null || $value === '') {
+        return [null, $field, null];
+    }
+    if (is_int($value)) {
+        $n = $value;
+    } elseif (is_string($value) && preg_match('/^\d{1,6}$/', trim($value))) {
+        $n = (int) trim($value);
+    } else {
+        return [null, $field, $code];
+    }
+    if ($n < $min || $n > $max) {
+        return [null, $field, $code];
+    }
+    return [$n, $field, null];
+}
+
+/** ID 只收正整数或十进制数字串，不让 "1abc"、数组和浮点数混进查询。 */
+function coach_positive_id($value) {
+    if (is_int($value)) {
+        return $value > 0 && $value <= 2147483647 ? $value : null;
+    }
+    if (is_string($value) && preg_match('/^[1-9]\d{0,9}$/D', trim($value))) {
+        $id = (int) trim($value);
+        return $id <= 2147483647 ? $id : null;
+    }
+    return null;
+}
+
+/** 预约请求：许可必须显式为 true，正文按码点量长度。 */
+function coach_inquiry_normalize($data) {
+    $fail = static function ($code, $field = null) {
+        return ['ok' => false, 'coach_id' => null, 'message' => '', 'contact_ok' => false,
+            'code' => $code, 'field' => $field];
+    };
+    if (!is_array($data)) {
+        return $fail('bad_body');
+    }
+    $coachId = coach_positive_id($data['coach_id'] ?? null);
+    if ($coachId === null) {
+        return $fail('bad_coach_id', 'coach_id');
+    }
+    if (($data['contact_ok'] ?? null) !== true) {
+        return $fail('contact_required', 'contact_ok');
+    }
+    $given = $data['message'] ?? '';
+    if (!is_string($given)) {
+        return $fail('bad_message', 'message');
+    }
+    $message = coach_trim($given);
+    if ($message !== '' && !coach_is_utf8($message)) {
+        return $fail('bad_message', 'message');
+    }
+    $len = coach_len($message);
+    if ($len < 20 || $len > 2000) {
+        return $fail($len < 20 ? 'short_message' : 'long_message', 'message');
+    }
+    $requestId = $data['request_id'] ?? null;
+    if ($requestId !== null
+        && (!is_string($requestId) || !preg_match('/^[A-Za-z0-9_-]{16,128}$/D', $requestId))) {
+        return $fail('bad_request_id', 'request_id');
+    }
+    return ['ok' => true, 'coach_id' => $coachId, 'message' => $message, 'contact_ok' => true,
+        'request_id' => $requestId, 'code' => null, 'field' => null];
+}
+
 /**
  * 可选文本。判定和偏好那条 note 完全同口径（coach_trim → 坏字节 → 码点上限），
  * 因为同一句中文按字节量能差三倍，界面上印的上限必须是同一个量法。
@@ -618,6 +736,35 @@ function coach_profile_normalize($data) {
         return $fail($code, $field);
     }
 
+    [$out['enrollment_notes'], $field, $code] = coach_text_opt(
+        $data['enrollment_notes'] ?? '', COACH_ENROLLMENT_NOTES_MAX, 'enrollment_notes',
+        'long_enrollment_notes', 'bad_enrollment_notes'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['tuition_text'], $field, $code] = coach_text_opt(
+        $data['tuition_text'] ?? '', COACH_TUITION_TEXT_MAX, 'tuition_text', 'long_tuition', 'bad_tuition'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['schedule_text'], $field, $code] = coach_text_opt(
+        $data['schedule_text'] ?? '', COACH_SCHEDULE_TEXT_MAX, 'schedule_text', 'long_schedule_text', 'bad_schedule_text'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
+    [$out['hourly_rate_cny'], $field, $code] = coach_money_opt(
+        $data['hourly_rate_cny'] ?? null, 0, COACH_MONEY_MAX, 'hourly_rate_cny', 'bad_rate'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
     [$out['language'], $field, $code] = coach_pick_opt($data['language'] ?? '', COACH_LANGUAGES, 'language');
     if ($code !== null) {
         return $fail($code, $field);
@@ -693,6 +840,10 @@ function coach_profile_public($row) {
         'years' => $num($row['years'] ?? null),
         'tagline' => (string) ($row['tagline'] ?? ''),
         'honors' => (string) ($row['honors'] ?? ''),
+        'enrollment_notes' => (string) ($row['enrollment_notes'] ?? ''),
+        'tuition_text' => (string) ($row['tuition_text'] ?? ''),
+        'schedule_text' => (string) ($row['schedule_text'] ?? ''),
+        'hourly_rate_cny' => $num($row['hourly_rate_cny'] ?? null),
         'language' => (string) ($row['language'] ?? ''),
         'timezone' => (string) ($row['timezone'] ?? ''),
         'levels' => $list($row['levels'] ?? ''),
@@ -714,7 +865,8 @@ function coach_profile_public($row) {
  * 还全是默认值。所以这里判的是内容，不是有没有行。
  */
 function coach_profile_filled($profile) {
-    foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'avatar'] as $key) {
+    foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text',
+        'schedule_text', 'language', 'timezone', 'avatar'] as $key) {
         if ((string) ($profile[$key] ?? '') !== '') {
             return true;
         }
@@ -724,8 +876,9 @@ function coach_profile_filled($profile) {
             return true;
         }
     }
-    // elo/years 用 isset：0 分、0 年都是填过了，不是没填。
-    return ($profile['elo'] ?? null) !== null || ($profile['years'] ?? null) !== null;
+    // 0 元、0 分、0 年都是填过了，不是没填。
+    return ($profile['elo'] ?? null) !== null || ($profile['years'] ?? null) !== null
+        || ($profile['hourly_rate_cny'] ?? null) !== null;
 }
 
 /**

@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COACH_GROUPS,
   COACH_GROUP_TITLES,
   COACH_NOTE_MAX,
+  COACH_SCHEDULE_NOTE_MAX,
   COACH_RULES,
   coachKeys,
   coachLabel,
@@ -25,10 +27,11 @@ import {
 
 const UI_SOURCE = readFileSync(new URL('../src/ui/coachPref.js', import.meta.url), 'utf8');
 const MARKUP = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const CORE = readFileSync(
-  new URL('../../../../ichessgeek-api/v1/chess_coach_core.php', import.meta.url),
-  'utf8',
-);
+const API = [
+  resolve(process.cwd(), '../../ichessgeek-api/v1'),
+  resolve(process.cwd(), '../../../ichessgeek-api/v1'),
+].find((path) => existsSync(path));
+const CORE = readFileSync(resolve(API, 'chess_coach_core.php'), 'utf8');
 
 /** 一份哪一项都没动过的合格表单；每个用例只覆盖它在意的那一格。 */
 const good = (over = {}) => ({
@@ -56,17 +59,23 @@ describe('一份表单能不能发出去', () => {
       language: 'zh',
       note: '想每周一次',
       contact_ok: true,
+      budget_min_cny: null,
+      budget_max_cny: null,
+      schedule_note: '',
     });
   });
 
-  it('发出去的形状和后端落库的那八项一致', () => {
+  it('发出去的形状和后端落库的十一项一致', () => {
     expect(Object.keys(validateCoachForm(good()).payload).sort()).toEqual([
+      'budget_max_cny',
+      'budget_min_cny',
       'contact_ok',
       'formats',
       'goals',
       'language',
       'level',
       'note',
+      'schedule_note',
       'slots',
       'timezone',
     ]);
@@ -156,7 +165,7 @@ describe('补充说明的字数', () => {
   it('多一个字就报超长，并把当前字数回给人看', () => {
     const result = validateCoachForm(good({ note: pad(COACH_NOTE_MAX + 1) }));
     expect(result.field).toBe('note');
-    expect(result.text).toBe(`补充说明请写在 ${COACH_NOTE_MAX} 个字以内（现在 241 个字）。`);
+    expect(result.text).toBe(`自我介绍请写在 ${COACH_NOTE_MAX} 个字以内（现在 241 个字）。`);
   });
 
   it('换行、全角空格、nbsp 都归成一个空格再算', () => {
@@ -170,13 +179,57 @@ describe('补充说明的字数', () => {
   });
 });
 
+describe('预算与详细时间', () => {
+  const pad = (n) => '周六上午'.repeat(Math.ceil(n / 4)).slice(0, n);
+
+  it('预算收成整数，空项保留为 null', () => {
+    const payload = validateCoachForm(good({
+      budgetMinCny: '80', budgetMaxCny: '', scheduleNote: '周六上午，节假日另约',
+    })).payload;
+    expect(payload.budget_min_cny).toBe(80);
+    expect(payload.budget_max_cny).toBeNull();
+    expect(payload.schedule_note).toBe('周六上午，节假日另约');
+  });
+
+  it('小数、负数和超上限金额都不发给服务端', () => {
+    for (const value of ['80.5', '-1', '100001', 'abc']) {
+      const result = validateCoachForm(good({ budgetMinCny: value }));
+      expect(result).toEqual({
+        ok: false,
+        field: 'budget',
+        text: '预算请填 0 到 100000 的非负整数（人民币元），不确定的那一项可以留空。',
+      });
+    }
+  });
+
+  it('预算下限不能高于上限', () => {
+    expect(validateCoachForm(good({ budgetMinCny: 200, budgetMaxCny: 100 }))).toEqual({
+      ok: false, field: 'budget', text: '预算下限不能高于上限。',
+    });
+  });
+
+  it('详细时间说明按归一化码点计数，不按字节数', () => {
+    const text = pad(COACH_SCHEDULE_NOTE_MAX);
+    expect(validateCoachForm(good({ scheduleNote: text })).ok).toBe(true);
+    expect(Buffer.byteLength(text, 'utf8')).toBeGreaterThan(COACH_SCHEDULE_NOTE_MAX);
+    const over = validateCoachForm(good({ scheduleNote: pad(COACH_SCHEDULE_NOTE_MAX + 1) }));
+    expect(over.field).toBe('schedule_note');
+    expect(over.text).toBe(`详细时间说明请写在 ${COACH_SCHEDULE_NOTE_MAX} 个字以内（现在 241 个字）。`);
+  });
+
+  it('时间说明的换行和全角空格先归一', () => {
+    expect(validateCoachForm(good({ scheduleNote: ' 周六\u3000上午\n 九点 ' })).payload.schedule_note)
+      .toBe('周六 上午 九点');
+  });
+});
+
 describe('卡片上那行小结', () => {
   it('没填过就是空串，卡片整行藏起来', () => {
     expect(coachPrefSummary(null)).toBe('');
     expect(coachPrefSummary({})).toBe('');
   });
 
-  it('只串水平、想学什么、怎么上课三项，其余进面板再看', () => {
+  it('水平、目标、形式与时间提醒一起进小结', () => {
     expect(
       coachPrefSummary({
         level: 'zero',
@@ -187,7 +240,7 @@ describe('卡片上那行小结', () => {
         language: 'zh',
         updated_at: '2026-11-25 03:12:00',
       }),
-    ).toBe('已记下：完全零基础 · 打基础、补战术 · 一对一（2026-11-25 填的）');
+    ).toBe('已记下：完全零基础 · 打基础、补战术 · 一对一 · 时间 工作日晚间（2026-11-25 填的）');
   });
 
   it('日期取不到就不写括号，服务端没回那一列也不碍事', () => {
@@ -198,6 +251,20 @@ describe('卡片上那行小结', () => {
 
   it('只填了一部分时也照说，不硬凑分隔符', () => {
     expect(coachPrefSummary({ level: 'rated' })).toBe('已记下：有等级分，打过比赛');
+  });
+
+  it('预算与时间要求进小结，长说明截断但保留提醒', () => {
+    const summary = coachPrefSummary({
+      budget_min_cny: 80,
+      budget_max_cny: 160,
+      schedule_note: '工作日晚间和周六上午都可以，遇到考试周需要提前调整。',
+    });
+    expect(summary).toContain('预算 ¥80–¥160 / 60 分钟');
+    expect(summary).toContain('时间 工作日晚间和周六上午都可以，遇到考试周需要提前调整。');
+  });
+
+  it('只填预算一端时不硬凑区间', () => {
+    expect(coachPrefSummary({ budget_max_cny: 120 })).toBe('已记下：预算 ¥120 / 60 分钟');
   });
 
   it('库里出来一个界面不认的 key 时原样印出来，好排查', () => {
@@ -229,13 +296,15 @@ describe('界面与后端的契约', () => {
     }
   });
 
-  it('说明的字数上限两边取同一个数', () => {
+  it('两段说明的字数上限两边取同一个数', () => {
     const noteMax = CORE.match(/const COACH_NOTE_MAX = (\d+);/);
+    const scheduleMax = CORE.match(/const COACH_SCHEDULE_NOTE_MAX = (\d+);/);
     expect(noteMax && Number(noteMax[1])).toBe(COACH_NOTE_MAX);
+    expect(scheduleMax && Number(scheduleMax[1])).toBe(COACH_SCHEDULE_NOTE_MAX);
   });
 
   it('每组都有中文标题，报错时点名得了', () => {
-    for (const group of [...COACH_GROUPS, 'note']) {
+    for (const group of [...COACH_GROUPS, 'note', 'budget', 'schedule_note']) {
       expect(COACH_GROUP_TITLES[group], group).toBeTruthy();
     }
   });
@@ -255,8 +324,8 @@ describe('界面与后端的契约', () => {
       wanted.add(`pref-${group}-choices`);
       wanted.add(`pref-${group}-legend`);
     }
-    for (const section of [...COACH_GROUPS, 'note']) {
-      wanted.add(`pref-${section}-group`);
+    for (const section of [...COACH_GROUPS, 'note', 'budget', 'schedule_note']) {
+      wanted.add(`pref-${section.replaceAll('_', '-')}-group`);
     }
     for (const id of wanted) {
       expect(htmlIds.has(id) || builtHere.has(id), id).toBe(true);

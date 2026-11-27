@@ -13,7 +13,7 @@
  * game/coachPref.js 那一份表，而那张表和后端白名单由 tests/coachPref.test.js 逐条比对。
  */
 
-import { coachLabel } from './coachPref.js';
+import { coachLabel, formatCny, parseCny } from './coachPref.js';
 
 /** 各项值多少分。数字本身不重要，重要的是"能带你这一档"比"时区一样"重要。 */
 const WEIGHT = {
@@ -23,7 +23,12 @@ const WEIGHT = {
   slot: 2,
   timezone: 4,
   language: 4,
+  // 预算只做轻微加权：它不该把水平、目标这些硬匹配全盖过去。
+  budget: 2,
 };
+
+/** 推荐区最多三张；名录接口仍可多取，排序与截断在界面这一层完成。 */
+export const COACH_RECOMMENDATION_LIMIT = 3;
 
 const asList = (value) => (Array.isArray(value)
   ? value.map((one) => String(one ?? '').trim()).filter(Boolean)
@@ -45,6 +50,28 @@ function languageMatch(coachLang, studentLang) {
   return 0;
 }
 
+/** 价格未知（或学员没填上限）时不奖不罚；known over-budget 只轻扣一分并留下警示。 */
+function budgetMatch(pref, coach) {
+  const empty = { state: 'unknown', score: 0, reasons: [], warnings: [] };
+  const max = parseCny(pref?.budget_max_cny);
+  const rate = parseCny(coach?.profile?.hourly_rate_cny);
+  if (!max.ok || max.value === null || !rate.ok || rate.value === null) return empty;
+  if (rate.value > max.value) {
+    return {
+      state: 'over',
+      score: -1,
+      reasons: [],
+      warnings: [`课时费 ${formatCny(rate.value)} / 60 分钟，高于你的预算上限 ${formatCny(max.value)}`],
+    };
+  }
+  return {
+    state: 'within',
+    score: WEIGHT.budget,
+    reasons: [`课时费 ${formatCny(rate.value)} / 60 分钟，在你的预算上限内`],
+    warnings: [],
+  };
+}
+
 /**
  * 一位教练对一份偏好 → {score, reasons}。
  *
@@ -60,7 +87,8 @@ export function matchCoach(pref, coach) {
     return { score: null, reasons: [], matched: false };
   }
   const reasons = [];
-  let score = 0;
+  const budget = budgetMatch(pref, coach);
+  let score = budget.score;
 
   // 学员那一侧是单选（level：我现在什么水平），教练那一侧是多选（levels：我能带哪几档）。
   // 措辞和 coachProfileTags 同一句（那一行没填偏好时也会印）。
@@ -99,7 +127,8 @@ export function matchCoach(pref, coach) {
     reasons.push(profile.language === 'zh_en' ? '中文英文都行' : `用${coachLabel('language', profile.language)}上课`);
   }
 
-  return { score, reasons, matched: score > 0 };
+  reasons.push(...budget.reasons);
+  return { score, reasons, matched: score > 0, budget, warnings: budget.warnings };
 }
 
 /** 没填偏好时的顺序：填过资料的在前，然后按称号、等级分，最后按 id 稳住次序。 */
@@ -142,6 +171,11 @@ export function rankCoaches(coaches, pref) {
     return a.at - b.at;
   });
   return scored;
+}
+
+/** 推荐区真正渲染的那一份：排完只取前三，绝不把超预算的教练过滤掉。 */
+export function recommendedCoaches(coaches, pref) {
+  return rankCoaches(coaches, pref).slice(0, COACH_RECOMMENDATION_LIMIT);
 }
 
 /** 卡片上那句"为什么排在这儿"：最多三条，多了读不完，而前几条本来就是分最高的。 */

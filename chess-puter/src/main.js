@@ -82,6 +82,9 @@ import { mountLibrary } from './ui/library.js';
 import { mountCoachPref } from './ui/coachPref.js';
 import { mountCoachProfile } from './ui/coachProfile.js';
 import { mountCoachDirectory } from './ui/coachDirectory.js';
+import { mountCoachLightbox } from './ui/coachLightbox.js';
+import { mountCoachEnrollment } from './ui/coachEnrollment.js';
+import { mountCoachComplaint } from './ui/coachComplaint.js';
 import { mountCoachApp } from './ui/coachApp.js';
 import { analyzeGame, CLASSIFY_ANNOT, CLASSIFY_LABEL, markFor } from './game/review.js';
 import { mountReviewPanel, mountReviewProgress } from './ui/reviewPanel.js';
@@ -4574,6 +4577,19 @@ let coachPref = null;
 let coachApp = null;
 let coachProfile = null;
 let coachDirectory = null;
+let coachLightbox = null;
+let coachEnrollment = null;
+let coachComplaint = null;
+
+/** null = 资格还在查询；投诉入口必须等明确知道“不是教练”后才出现。 */
+function coachTeachState() {
+  const state = coachApp?.state();
+  return state == null ? null : state === 'approved';
+}
+
+function coachWasTeacher() {
+  return coachApp?.identity()?.wasTeacher ?? null;
+}
 
 const account = mountAccount({
   showToast,
@@ -4582,6 +4598,10 @@ const account = mountAccount({
   onIdentity: () => {
     // 登录/注册/退出的那一下就把"请先登录"那行收掉：它说的是刚才那个身份。
     if (classGateLine) setClassError('');
+    coachEnrollment?.syncGate();
+    coachComplaint?.syncGate();
+    coachProfile?.syncGate();
+    coachDirectory?.syncGate();
     coachPref?.refresh();
     coachApp?.refresh();
     // 退出之后【填我的教练资料】要立刻收掉，名录上"这是我"那一枚也一样；
@@ -4590,6 +4610,9 @@ const account = mountAccount({
     coachDirectory?.refresh();
   },
 });
+
+coachLightbox = mountCoachLightbox();
+const openCoachImage = (src, alt) => coachLightbox?.openImage(src, alt);
 
 /** Signed out with a room open: put the online tab back to where it starts. */
 function handleSignedOut() {
@@ -4615,6 +4638,20 @@ coachPref = mountCoachPref({
   onPrefChange: () => coachDirectory?.refresh(),
 });
 
+/** 预约与投诉都先在前端确认邮箱验证；服务端仍从会话重新判定身份。 */
+coachEnrollment = mountCoachEnrollment({
+  showToast,
+  player: () => account.player(),
+  openAccount: (which) => account.open(which),
+});
+coachComplaint = mountCoachComplaint({
+  showToast,
+  player: () => account.player(),
+  openAccount: (which) => account.open(which),
+  wasTeacher: coachWasTeacher,
+  onChanged: () => coachDirectory?.refresh(),
+});
+
 /**
  * 「填我的教练资料」：只给批过的教练（含管理员）看，判据来自 coachApp 那一态。
  * 资料本身在服务器上还有第二道门（chess_coach_profile_save.php 里的 can_teach），
@@ -4624,8 +4661,9 @@ coachProfile = mountCoachProfile({
   showToast,
   player: () => account.player(),
   openAccount: (which) => account.open(which),
-  canTeach: () => coachApp?.state() === 'approved',
+  canTeach: coachTeachState,
   onChanged: () => coachDirectory?.refresh(),
+  openImage: openCoachImage,
 });
 
 /** 名录 + 主页：公开数据，首屏就取一次，没登录也看得见有谁在教。 */
@@ -4633,6 +4671,11 @@ coachDirectory = mountCoachDirectory({
   player: () => account.player(),
   pref: () => coachPref?.value() ?? null,
   openProfile: () => coachProfile?.open(),
+  openEnrollment: (coach) => coachEnrollment?.open(coach),
+  openComplaint: (coach) => coachComplaint?.open(coach),
+  complaints: coachComplaint,
+  canTeach: coachTeachState,
+  openImage: openCoachImage,
 });
 
 /**
@@ -4648,6 +4691,9 @@ coachApp = mountCoachApp({
     tacticsPanel?.setCanManage(canManageTactics());
     // 刚批下来的教练当场就能看到【填我的教练资料】，不用刷新页面。
     coachProfile?.syncGate();
+    // 投诉按钮与教练投诉记录都随资格变化；查询中一律不显示投诉入口。
+    coachComplaint?.syncGate();
+    coachDirectory?.syncGate();
   },
 });
 

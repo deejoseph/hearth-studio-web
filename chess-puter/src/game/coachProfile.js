@@ -10,7 +10,7 @@
  * 逐条比对，改一边不改另一边就会红。
  */
 
-import { COACH_OPTIONS, coachKeys, coachLabel } from './coachPref.js';
+import { COACH_OPTIONS, coachKeys, coachLabel, formatCny, parseCny } from './coachPref.js';
 import { API_BASE } from '../net/auth.js';
 
 /** 和后端 COACH_TAGLINE_MAX / COACH_HONORS_MAX / COACH_PHOTOS_MAX / COACH_CERTIFICATES_MAX 同一个数。 */
@@ -21,6 +21,10 @@ export const COACH_CERTIFICATES_MAX = 6;
 export const COACH_ELO_MIN = 600;
 export const COACH_ELO_MAX = 2850;
 export const COACH_YEARS_MAX = 60;
+/** 三项招生说明分别与后端 COACH_*_MAX 同口径，按码点量。 */
+export const COACH_ENROLLMENT_NOTES_MAX = 2000;
+export const COACH_TUITION_TEXT_MAX = 1000;
+export const COACH_SCHEDULE_TEXT_MAX = 1000;
 /** 单张图的字节上限（后端 COACH_IMAGE_BYTES_MAX）。界面上先拦一道，省一次上传往返。 */
 export const COACH_IMAGE_BYTES_MAX = 2 * 1024 * 1024;
 
@@ -61,6 +65,10 @@ export const COACH_PROFILE_TITLES = {
   years: '教龄',
   tagline: '一句话简介',
   honors: '荣誉与成绩',
+  enrollment_notes: '招生须知',
+  hourly_rate_cny: '每小时费率（人民币）',
+  tuition_text: '课时费标准',
+  schedule_text: '上课时段',
   levels: '能带到什么水平',
   goals: '擅长教什么',
   formats: '上课形式',
@@ -159,6 +167,14 @@ export function validateCoachProfile(form) {
   if (tagline.error) return fail('tagline', tagline.error);
   const honors = text('honors', COACH_HONORS_MAX);
   if (honors.error) return fail('honors', honors.error);
+  const enrollmentNotes = text('enrollment_notes', COACH_ENROLLMENT_NOTES_MAX);
+  if (enrollmentNotes.error) return fail('enrollment_notes', enrollmentNotes.error);
+  const tuitionText = text('tuition_text', COACH_TUITION_TEXT_MAX);
+  if (tuitionText.error) return fail('tuition_text', tuitionText.error);
+  const scheduleText = text('schedule_text', COACH_SCHEDULE_TEXT_MAX);
+  if (scheduleText.error) return fail('schedule_text', scheduleText.error);
+  const hourlyRate = parseCny(source.hourly_rate_cny);
+  if (!hourlyRate.ok) return fail('hourly_rate_cny', '每小时费率请填 0 到 100000 的非负整数（人民币元），不确定就留空。');
 
   const avatarImage = images('avatar', 1);
   if (avatarImage.error) return fail('avatar', avatarImage.error);
@@ -173,6 +189,10 @@ export function validateCoachProfile(form) {
     years: years.value,
     tagline: tagline.value,
     honors: honors.value,
+    enrollment_notes: enrollmentNotes.value,
+    hourly_rate_cny: hourlyRate.value,
+    tuition_text: tuitionText.value,
+    schedule_text: scheduleText.value,
     language: one('language'),
     timezone: one('timezone'),
     avatar: avatarImage.value[0] ?? '',
@@ -241,6 +261,8 @@ export function coachBadges(coach) {
   if (profile.years !== null && profile.years !== undefined && profile.years !== '') {
     bits.push(`教龄 ${profile.years} 年`);
   }
+  const rate = formatCny(profile.hourly_rate_cny);
+  if (rate) bits.push(`${rate} / 60 分钟`);
   return bits;
 }
 
@@ -276,4 +298,21 @@ export function coachProfileRows(coach) {
     rows.push({ label: COACH_PROFILE_TITLES.timezone, text: coachLabel('timezone', profile.timezone) });
   }
   return rows;
+}
+
+/** 主页固定展示的四个招生栏目；没填时由界面写"暂未填写"，不把空栏藏掉。 */
+export function coachEnrollmentRows(coach) {
+  const profile = coach?.profile ?? {};
+  const clean = (value) => typeof value === 'string' ? value.trim() : '';
+  const rate = formatCny(profile.hourly_rate_cny);
+  return [
+    { key: 'enrollment_notes', label: COACH_PROFILE_TITLES.enrollment_notes, text: clean(profile.enrollment_notes) },
+    {
+      key: 'hourly_rate_cny',
+      label: COACH_PROFILE_TITLES.hourly_rate_cny,
+      text: rate ? `${rate} / 60 分钟` : '',
+    },
+    { key: 'tuition_text', label: COACH_PROFILE_TITLES.tuition_text, text: clean(profile.tuition_text) },
+    { key: 'schedule_text', label: COACH_PROFILE_TITLES.schedule_text, text: clean(profile.schedule_text) },
+  ];
 }

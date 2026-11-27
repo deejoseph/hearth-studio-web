@@ -30,18 +30,27 @@ if (!$check['ok']) {
 $conn = chess_db();
 
 try {
-    if (!chess_player_can_teach($conn, $playerId)) {
-        chess_err('teacher_only');
+    $result = chess_transaction_retry($conn, static function () use ($conn, $playerId, $check) {
+        chess_lock_player_standing($conn, $playerId);
+        if (chess_player_is_revoked($conn, $playerId)) {
+            return ['ok' => false, 'code' => 'coach_revoked'];
+        }
+        if (!chess_player_can_teach($conn, $playerId)) {
+            return ['ok' => false, 'code' => 'teacher_only'];
+        }
+        if (!chess_profile_write($conn, $playerId, $check['profile'])) {
+            throw new RuntimeException('coach profile write failed');
+        }
+        $row = chess_profile_row($conn, $playerId, true);
+        if ($row === null) {
+            throw new RuntimeException('coach profile written but missing');
+        }
+        return ['ok' => true, 'row' => $row];
+    });
+    if (!$result['ok']) {
+        chess_err($result['code']);
     }
-    if (!chess_profile_write($conn, $playerId, $check['profile'])) {
-        chess_err('server');
-    }
-    $row = chess_profile_row($conn, $playerId);
-    if ($row === null) {
-        // 写成功了又读不到：库在中间出了别的事，不能报"存好了"
-        error_log('chess coach profile: written but missing for player ' . $playerId);
-        chess_err('server');
-    }
+    $row = $result['row'];
     // 保存后这一行不再引用的文件就是被换下来的（删照片、换头像），顺手清掉：
     // 名录页上少几张照片不算事，磁盘上留一堆没人引用的图才是长期成本。
     $dropped = chess_coach_media_prune($playerId, chess_coach_media_names($row));
@@ -52,7 +61,7 @@ try {
         'ok' => true,
         'profile' => coach_profile_public($row),
         'filled' => coach_profile_filled(coach_profile_public($row)),
-        'listed' => true,   // 走到这里的一定在名录里（上面那道门刚判过）
+        'listed' => true,
     ]);
 } catch (Throwable $e) {
     chess_fail($e, 'coach profile save');
