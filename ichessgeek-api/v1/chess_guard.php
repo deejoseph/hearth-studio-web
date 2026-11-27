@@ -138,6 +138,10 @@ const CHESS_ERRORS = [
     'bad_honors' => ['荣誉里有打不出来的字符，重写一遍就好', 400],
     'long_teaching_focus' => ['补充说明太长了，请缩到 ' . COACH_TEACHING_FOCUS_MAX . ' 个字以内', 400],
     'bad_teaching_focus' => ['补充说明里有打不出来的字符，重写一遍就好', 400],
+    'long_goals_note' => ['授课方向说明太长了，请缩到 ' . COACH_GOALS_NOTE_MAX . ' 个字以内', 400],
+    'bad_goals_note' => ['授课方向说明里有打不出来的字符，重写一遍就好', 400],
+    'long_custom_slot' => ['自定义上课时段太长了，每条请缩到 ' . COACH_CUSTOM_SLOT_MAX . ' 个字以内', 400],
+    'bad_custom_slots' => ['自定义上课时段里有打不出来的字符，重写一遍就好', 400],
     'long_enrollment_notes' => ['招生要求太长了，请缩到 ' . COACH_ENROLLMENT_NOTES_MAX . ' 个字以内', 400],
     'bad_enrollment_notes' => ['招生要求里有打不出来的字符，重写一遍就好', 400],
     'long_tuition' => ['收费说明太长了，请缩到 ' . COACH_TUITION_TEXT_MAX . ' 个字以内', 400],
@@ -236,7 +240,7 @@ function chess_schema($conn) {
         email VARCHAR(190) NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         nickname VARCHAR(30) NOT NULL,
-        rating INT NOT NULL DEFAULT 400,
+        rating INT NULL DEFAULT NULL,
         verified_at DATETIME NULL,
         verify_token_hash CHAR(64) NULL,
         verify_expires DATETIME NULL,
@@ -247,6 +251,13 @@ function chess_schema($conn) {
         UNIQUE KEY uq_chess_email (email),
         UNIQUE KEY uq_chess_external (external_source, external_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $ratingColumn = $conn->query("SHOW COLUMNS FROM chess_players LIKE 'rating'");
+    if ($ratingColumn instanceof mysqli_result) {
+        $rating = $ratingColumn->fetch_assoc();
+        if (strtoupper((string) ($rating['Null'] ?? '')) !== 'YES' || $rating['Default'] !== null) {
+            $conn->query('ALTER TABLE chess_players MODIFY rating INT NULL DEFAULT NULL');
+        }
+    }
     $conn->query("CREATE TABLE IF NOT EXISTS chess_auth_attempts (
         id INT AUTO_INCREMENT PRIMARY KEY,
         scope VARCHAR(16) NOT NULL,
@@ -697,7 +708,7 @@ function chess_public_row($row) {
         'id' => (int) $row['id'],
         'email' => $row['email'],
         'nickname' => $row['nickname'],
-        'rating' => (int) $row['rating'],
+        'rating' => ($row['rating'] ?? null) === null || $row['rating'] === '' ? null : (int) $row['rating'],
         'verified' => $row['verified_at'] !== null,
         'verified_at' => $row['verified_at'],
         'created_at' => $row['created_at'],
@@ -2291,6 +2302,8 @@ function chess_profile_schema($conn) {
         tagline VARCHAR(" . COACH_TAGLINE_MAX . ") NOT NULL DEFAULT '',
         honors VARCHAR(" . COACH_HONORS_MAX . ") NOT NULL DEFAULT '',
         teaching_focus VARCHAR(" . COACH_TEACHING_FOCUS_MAX . ") NOT NULL DEFAULT '',
+        goals_note VARCHAR(" . COACH_GOALS_NOTE_MAX . ") NOT NULL DEFAULT '',
+        custom_slots TEXT NOT NULL,
         enrollment_notes VARCHAR(" . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT '',
         tuition_text VARCHAR(" . COACH_TUITION_TEXT_MAX . ") NOT NULL DEFAULT '',
         schedule_text VARCHAR(" . COACH_SCHEDULE_TEXT_MAX . ") NOT NULL DEFAULT '',
@@ -2313,6 +2326,9 @@ function chess_profile_schema($conn) {
     // 后一个可能只撞到 1060（列已存在），那不是故障。
     chess_schema_column($conn, 'chess_coach_profiles', 'teaching_focus',
         'VARCHAR(' . COACH_TEACHING_FOCUS_MAX . ") NOT NULL DEFAULT ''", 'honors');
+    chess_schema_column($conn, 'chess_coach_profiles', 'goals_note',
+        'VARCHAR(' . COACH_GOALS_NOTE_MAX . ") NOT NULL DEFAULT ''", 'teaching_focus');
+    chess_schema_column($conn, 'chess_coach_profiles', 'custom_slots', 'TEXT NOT NULL', 'goals_note');
     chess_schema_column($conn, 'chess_coach_profiles', 'enrollment_notes',
         'VARCHAR(' . COACH_ENROLLMENT_NOTES_MAX . ") NOT NULL DEFAULT ''", 'teaching_focus');
     chess_schema_column($conn, 'chess_coach_profiles', 'tuition_text',
@@ -2328,7 +2344,7 @@ function chess_profile_schema($conn) {
 /** 这个人的资料行；没建过返回 null。 */
 function chess_profile_row($conn, $playerId, $lock = false) {
     chess_profile_schema($conn);
-    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors, teaching_focus,
+    $stmt = $conn->prepare("SELECT title, elo, years, tagline, honors, teaching_focus, goals_note, custom_slots,
             enrollment_notes, tuition_text, schedule_text, hourly_rate_cny,
             language, timezone, levels, goals, formats, slots, avatar, photos, certificates, updated_at
         FROM chess_coach_profiles WHERE player_id = ? LIMIT 1" . ($lock ? ' FOR UPDATE' : ''));
@@ -2371,13 +2387,14 @@ function chess_profile_ensure($conn, $playerId) {
 function chess_profile_write($conn, $playerId, array $profile) {
     chess_profile_schema($conn);
     $stmt = $conn->prepare("INSERT INTO chess_coach_profiles
-        (player_id, title, elo, years, tagline, honors, teaching_focus, enrollment_notes, tuition_text,
-         schedule_text, hourly_rate_cny, language, timezone, levels, goals, formats, slots,
-         avatar, photos, certificates, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (player_id, title, elo, years, tagline, honors, teaching_focus, goals_note, custom_slots,
+         enrollment_notes, tuition_text, schedule_text, hourly_rate_cny, language, timezone, levels, goals,
+         formats, slots, avatar, photos, certificates, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE title = VALUES(title), elo = VALUES(elo),
             years = VALUES(years), tagline = VALUES(tagline), honors = VALUES(honors),
             teaching_focus = VALUES(teaching_focus),
+            goals_note = VALUES(goals_note), custom_slots = VALUES(custom_slots),
             enrollment_notes = VALUES(enrollment_notes), tuition_text = VALUES(tuition_text),
             schedule_text = VALUES(schedule_text), hourly_rate_cny = VALUES(hourly_rate_cny),
             language = VALUES(language), timezone = VALUES(timezone),
@@ -2390,8 +2407,9 @@ function chess_profile_write($conn, $playerId, array $profile) {
     }
     // elo/years/rate 绑成 i 时 PHP 的 null 会作为 SQL NULL 下发（不是 0），
     // 这正是规则层要区分"没登记"和"0"的那一处。
+    // 22 个绑定值：i s i i + 八个 s（到 custom_slots/说明文本）+ i（rate）+ 九个 s。
     $stmt->bind_param(
-        "isiissssssisssssssss",
+        "isiissssssssisssssssss",
         $playerId,
         $profile['title'],
         $profile['elo'],
@@ -2399,6 +2417,8 @@ function chess_profile_write($conn, $playerId, array $profile) {
         $profile['tagline'],
         $profile['honors'],
         $profile['teaching_focus'],
+        $profile['goals_note'],
+        $profile['custom_slots'],
         $profile['enrollment_notes'],
         $profile['tuition_text'],
         $profile['schedule_text'],
@@ -2532,7 +2552,7 @@ function chess_coach_rows($conn, array $ids) {
     }
     $in = implode(',', array_keys($clean));
     $result = $conn->query("SELECT p.id AS player_id, p.nickname, p.rating,
-            f.title, f.elo, f.years, f.tagline, f.honors,
+            f.title, f.elo, f.years, f.tagline, f.honors, f.teaching_focus, f.goals_note, f.custom_slots,
             f.enrollment_notes, f.tuition_text, f.schedule_text, f.hourly_rate_cny,
             f.language, f.timezone, f.levels, f.goals, f.formats, f.slots,
             f.avatar, f.photos, f.certificates, f.updated_at AS profile_at

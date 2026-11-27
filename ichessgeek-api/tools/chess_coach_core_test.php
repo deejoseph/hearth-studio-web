@@ -89,6 +89,7 @@ foreach (COACH_LANGUAGES as $lang) {
 }
 
 /* --- goals：多选 1–3 --- */
+$assert(COACH_GOALS_MAX === 3, '学生偏好仍最多三项，不跟随教练资料放宽');
 $assert($bad($good(['goals' => []])) === ['bad_pref', 'goals'], 'goals 一条不选 → bad_pref');
 $assert($bad($good(['goals' => 'nope'])) === ['bad_pref', 'goals'], 'goals 给一个白名单外的字符串');
 $assert($ok($good(['goals' => 'tactics']))['goals'] === 'tactics', 'goals 给单条字符串当一项');
@@ -98,6 +99,8 @@ $assert($ok($good(['goals' => ['contest', 'endgame', 'opening']]))['goals'] === 
     'goals 到上限三条,顺序照白名单');
 $assert($bad($good(['goals' => ['basics', 'tactics', 'opening', 'endgame']])) === ['bad_pref', 'goals'],
     'goals 四条超上限');
+$assert($bad($good(['goals' => COACH_GOALS])) === ['bad_pref', 'goals'],
+    '学生五项全选仍拒绝，教练资料的五项全选不改变偏好规则');
 $assert($bad($good(['goals' => ['tactics', '']])) === ['bad_pref', 'goals'], 'goals 混一条空串');
 $assert($bad($good(['goals' => ['tactics', 'rating']])) === ['bad_pref', 'goals'], 'goals 混一项不认识');
 
@@ -357,6 +360,11 @@ $anonRow = coach_app_admin(['player_id' => 8, 'verified_at' => null, 'has_pref' 
 $assert($anonRow['verified'] === false && $anonRow['has_pref'] === false, '"0" 和 null 都算没有');
 $assert($anonRow['status'] === 'pending' && $anonRow['intro'] === '' && $anonRow['email'] === '',
     '缺字段时给空值,界面不用判 undefined');
+$assert($anonRow['rating'] === null, '管理列表缺 rating 时保持未设置,不默认成 1200');
+foreach ([[null, null], ['', null], [0, 0], ['0', 0], ['1450', 1450]] as [$given, $want]) {
+    $got = coach_app_admin(['player_id' => 8, 'rating' => $given])['rating'];
+    $assert($got === $want, '管理列表 rating ' . var_export($given, true) . ' → ' . var_export($want, true));
+}
 // 管理员批的是"能不能教"，称号/等级分/教龄是他核对的那三样，所以要出现在列表行上。
 $proRow = coach_app_admin(['player_id' => 9, 'status' => 'pending', 'title' => 'im', 'elo' => '2210',
     'years' => '7', 'password_hash' => '$2y$10$leak']);
@@ -391,6 +399,8 @@ $full = static function (array $over = []) use ($imgD) {
         'tagline' => '带零基础到比赛',
         'honors' => '市青少年锦标赛 优秀教练',
         'teaching_focus' => '擅长把战术题拆成几步提问',
+        'goals_note' => "  基础　战术\n与赛前辅导  ",
+        'custom_slots' => [' 周一 19:00 ', '周三/六 20:00', '周一 19:00', '   '],
         'enrollment_notes' => '先发水平与目标，周末可约',
         'tuition_text' => '每小时 300 元，可单次约课',
         'schedule_text' => '周六日 14:00 后',
@@ -414,6 +424,9 @@ $assert($p['title'] === 'im', 'title 原样');
 $assert($p['elo'] === 2210, 'elo 取成整数');
 $assert($p['years'] === 7, 'years 取成整数');
 $assert($p['teaching_focus'] === '擅长把战术题拆成几步提问', '教学补充说明原样收下');
+$assert($p['goals_note'] === '基础 战术 与赛前辅导', '自填授课方向按统一口径归一空白');
+$assert($p['custom_slots'] === '["周一 19:00","周三/六 20:00"]',
+    '自定义时段去空白、去重、保序,以未转义中文和斜杠的 JSON 落库');
 $assert($p['enrollment_notes'] === '先发水平与目标，周末可约', '招生要求原样收下');
 $assert($p['tuition_text'] === '每小时 300 元，可单次约课', '收费说明原样收下');
 $assert($p['schedule_text'] === '周六日 14:00 后', '授课时间原样收下');
@@ -429,10 +442,12 @@ $assert($p['certificates'] === $imgD, 'certificates 一张');
 /* --- 每个字段都可以留空：资料不是门槛 --- */
 $assert($prof([]) !== null, '整张表单空着也要存得下 —— 判够不够格的是申请状态,不是这里');
 $blank = $prof([]);
-foreach (['title', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'tuition_text', 'schedule_text',
-    'language', 'timezone', 'levels', 'goals', 'formats', 'slots', 'avatar', 'photos', 'certificates'] as $key) {
+foreach (['title', 'tagline', 'honors', 'teaching_focus', 'goals_note', 'enrollment_notes', 'tuition_text',
+    'schedule_text', 'language', 'timezone', 'levels', 'goals', 'formats', 'slots', 'avatar', 'photos',
+    'certificates'] as $key) {
     $assert(($blank[$key] ?? '缺键') === '', "空着 {$key} 存空串");
 }
+$assert($blank['custom_slots'] === '[]', '空着 custom_slots 存空 JSON 列表');
 $assert($blank['elo'] === null && $blank['years'] === null && $blank['hourly_rate_cny'] === null,
     'elo/years/hourly_rate 空着是 null,不是 0');
 $assert($prof($full(['elo' => '', 'years' => '']))['elo'] === null, '显式发空串 = 清空登记');
@@ -531,10 +546,17 @@ $assert($profBad($full(['levels' => ['zero', 'nope']])) === ['bad_profile', 'lev
     'levels 混一项不认识 → bad_profile 并点名');
 $assert($profBad($full(['levels' => 123])) === ['bad_profile', 'levels'],
     'levels 收数字 → bad_profile');
+$assert(COACH_GOALS_MAX_COACH === 5 && count(COACH_GOALS) === 5,
+    '教练授课方向允许固定五项全选,不受学生偏好三项上限影响');
+$allGoals = $prof($full(['goals' => COACH_GOALS]));
+$assert($allGoals !== null && $allGoals['goals'] === implode(',', COACH_GOALS),
+    '教练五项目标全选通过,并按白名单顺序落库');
+$assert($prof($full(['goals' => []]))['goals'] === '',
+    '教练不选固定方向也允许,可用自填说明授课方向');
+$assert($prof($full(['goals' => '']))['goals'] === '',
+    '教练 goals 发空串也当"一个都没选"');
 $assert($prof($full(['goals' => ['basics', 'tactics', 'contest']]))['goals'] === 'basics,tactics,contest',
-    'goals 三条恰好到上限');
-$assert($profBad($full(['goals' => ['basics', 'tactics', 'opening', 'endgame']]))
-    === ['bad_profile', 'goals'], 'goals 四条超上限 ' . COACH_GOALS_MAX_COACH . '（五项全勾等于没标）');
+    'goals 三条仍照收');
 $assert($prof($full(['goals' => ['tactics', 'tactics']]))['goals'] === 'tactics', 'goals 重复项吃掉');
 $assert($profBad($full(['formats' => ['one', 'group', 'review', 'one']])) === ['bad_profile', 'formats'],
     'formats 条目数比白名单还多就不收：那 ' . COACH_FORMATS_MAX_COACH . ' 种能全列,四条不行');
@@ -544,6 +566,62 @@ $assert($profBad($full(['language' => 'fr'])) === ['bad_profile', 'language'],
     '语言只有中英和"都行",别的没有');
 $assert($profBad($full(['timezone' => 'Beijing'])) === ['bad_profile', 'timezone'],
     '时区存 IANA 名,城市名不收');
+
+/* --- goals_note：固定方向之外的自填说明 --- */
+$assert(COACH_GOALS_NOTE_MAX === 300, '自填授课方向说明最多 300 字');
+$assert($prof($full(['goals_note' => null]))['goals_note'] === '', 'goals_note 漏传或 null 等于没填');
+$assert($prof($full(['goals_note' => "  基础　战术\n与赛前辅导  "]))['goals_note']
+    === '基础 战术 与赛前辅导', 'goals_note 归一首尾、全角空格与换行');
+$assert($prof($full(['goals_note' => str_repeat('马', COACH_GOALS_NOTE_MAX)])) !== null,
+    'goals_note 恰好到上限收得住');
+$assert($profBad($full(['goals_note' => str_repeat('马', COACH_GOALS_NOTE_MAX + 1)]))
+    === ['long_goals_note', 'goals_note'], 'goals_note 超一个码点 → long_goals_note');
+$assert($profBad($full(['goals_note' => str_repeat('a', COACH_GOALS_NOTE_MAX + 1)]))
+    === ['long_goals_note', 'goals_note'], 'goals_note 按码点量,纯 ASCII 超限也一样');
+$assert($profBad($full(['goals_note' => ['基础']])) === ['bad_goals_note', 'goals_note'],
+    'goals_note 不收数组');
+$assert($profBad($full(['goals_note' => "基础\xa0"])) === ['bad_goals_note', 'goals_note'],
+    'goals_note 不收坏字节');
+
+/* --- custom_slots：自由添加上课时段 --- */
+$assert(COACH_CUSTOM_SLOTS_MAX === 20 && COACH_CUSTOM_SLOT_MAX === 80,
+    '自定义时段最多 20 条,每条最多 80 字');
+foreach ([[], null, ''] as $given) {
+    $assert($prof($full(['custom_slots' => $given]))['custom_slots'] === '[]',
+        'custom_slots 空输入存空 JSON 列表：' . var_export($given, true));
+}
+$assert($prof($full(['custom_slots' => ['  ', "\t\n"]]))['custom_slots'] === '[]',
+    'custom_slots 空白条目不落库');
+$assert($prof($full(['custom_slots' => [' 周一 19:00 ', '周三/六 20:00', '周一 19:00']]))['custom_slots']
+    === '["周一 19:00","周三/六 20:00"]', 'custom_slots 去首尾空白、去重且保留添加顺序');
+$twentySlots = array_map(static fn ($i) => '时段 ' . $i, range(1, COACH_CUSTOM_SLOTS_MAX));
+$assert($prof($full(['custom_slots' => $twentySlots]))['custom_slots']
+    === json_encode($twentySlots, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+    'custom_slots 恰好 20 条收得住');
+$assert($profBad($full(['custom_slots' => [...$twentySlots, '额外时段']]))
+    === ['bad_profile', 'custom_slots'], 'custom_slots 第 21 条 → bad_profile');
+$assert($prof($full(['custom_slots' => [str_repeat('马', COACH_CUSTOM_SLOT_MAX)]])) !== null,
+    '单条自定义时段恰好 80 个汉字收得住');
+$assert($profBad($full(['custom_slots' => [str_repeat('马', COACH_CUSTOM_SLOT_MAX + 1)]]))
+    === ['long_custom_slot', 'custom_slots'], '单条自定义时段 81 个汉字 → long_custom_slot');
+$assert($profBad($full(['custom_slots' => [str_repeat('a', COACH_CUSTOM_SLOT_MAX + 1)]]))
+    === ['long_custom_slot', 'custom_slots'], '单条自定义时段按码点量,纯 ASCII 超限也一样');
+foreach (['周一 19:00', 123, true, (object) []] as $given) {
+    $assert($profBad($full(['custom_slots' => $given])) === ['bad_profile', 'custom_slots'],
+        'custom_slots 外层只收数组：' . var_export($given, true));
+}
+foreach ([[123], [true], [null], [['周一']]] as $given) {
+    $assert($profBad($full(['custom_slots' => $given])) === ['bad_profile', 'custom_slots'],
+        'custom_slots 每一条只收字符串：' . var_export($given, true));
+}
+$assert($profBad($full(['custom_slots' => ["周一\xa0"]])) === ['bad_custom_slots', 'custom_slots'],
+    'custom_slots 不收坏字节,避免 INSERT 失败');
+$assert(coach_custom_slots_public('["周一", "", 7, null, "周三"]') === ['周一', '周三'],
+    '公开解码自定义时段时丢掉空串和非字符串');
+foreach ([null, '', '不是 JSON', '"文本"', '[1,null,""]'] as $given) {
+    $assert(coach_custom_slots_public($given) === [], '非法或空自定义时段 JSON 公开读成空列表：'
+        . var_export($given, true));
+}
 
 /* --- 图片文件名：形状判死,路径根本进不来 --- */
 foreach ([$imgA, $imgB, $imgC] as $name) {
@@ -604,6 +682,9 @@ $assert($profBad($full(['certificates' => ['../' . $imgA]]))
 $row = coach_profile_public($p);
 $assert($row['levels'] === ['zero', 'amateur5'], '回界面时多选变数组');
 $assert($row['teaching_focus'] === '擅长把战术题拆成几步提问', '教学补充说明按公开形状带回');
+$assert($row['goals_note'] === '基础 战术 与赛前辅导', '自填授课方向按公开形状带回');
+$assert($row['custom_slots'] === ['周一 19:00', '周三/六 20:00'],
+    '自定义时段 JSON 公开解码成有序数组');
 $assert($row['photos'] === [$imgB], '照片变数组,顺序还是那一列');
 $assert($row['certificates'] === [$imgD], '证书变数组,公开主页拿得到');
 $assert($row['elo'] === 2210 && $row['years'] === 7, '整数带回去');
@@ -616,6 +697,8 @@ $assert($empty['title'] === '' && $empty['levels'] === [] && $empty['photos'] ==
     && $empty['certificates'] === [] && $empty['elo'] === null && $empty['updated_at'] === null,
     '空行不会给界面 undefined');
 $assert($empty['teaching_focus'] === '', '旧资料行缺教学补充说明时保持空串');
+$assert($empty['goals_note'] === '' && $empty['custom_slots'] === [],
+    '旧资料行缺自填授课方向与自定义时段时保持空值');
 $assert($empty['enrollment_notes'] === '' && $empty['tuition_text'] === ''
     && $empty['schedule_text'] === '' && $empty['hourly_rate_cny'] === null,
     '旧资料行缺新字段时保持空值');
@@ -640,6 +723,8 @@ $entry = coach_directory_entry([
     'elo' => '2210',
     'years' => '7',
     'teaching_focus' => '擅长把战术题拆成几步提问',
+    'goals_note' => '基础 战术 与赛前辅导',
+    'custom_slots' => '["周一 19:00","周三/六 20:00"]',
     'enrollment_notes' => '先发水平与目标，周末可约',
     'tuition_text' => '每小时 300 元，可单次约课',
     'schedule_text' => '周六日 14:00 后',
@@ -657,6 +742,9 @@ $assert($entry['nickname'] === '青瓷' && $entry['rating'] === 1450, '名头和
 $assert($entry['profile']['levels'] === ['zero', 'amateur5'], '资料那一坨按 public 的形状');
 $assert($entry['profile']['teaching_focus'] === '擅长把战术题拆成几步提问',
     '名录也带得出教学补充说明');
+$assert($entry['profile']['goals_note'] === '基础 战术 与赛前辅导'
+    && $entry['profile']['custom_slots'] === ['周一 19:00', '周三/六 20:00'],
+    '名录也带得出自填授课方向与自定义时段');
 $assert($entry['profile']['photos'] === [$imgB, $imgC], '照片是数组,第一张当封面');
 $assert($entry['profile']['certificates'] === [$imgD], '证书按 public 的形状上主页');
 $assert($entry['profile']['hourly_rate_cny'] === 300 && $entry['profile']['tuition_text'] !== '',
@@ -674,17 +762,23 @@ $bare = coach_directory_entry(['player_id' => 3]);
 $assert($bare['has_profile'] === false, '只有 id 的一行 = 还没填资料');
 $assert($bare['nickname'] === '' && $bare['rating'] === null, '缺字段给空值,界面不用判 undefined');
 $assert($bare['profile']['elo'] === null && $bare['profile']['photos'] === [], '资料整坨是默认形状');
-$assert(coach_directory_entry(['player_id' => 4, 'rating' => ''])['rating'] === null,
-    '没登记等级分是 null,不是 0 —— 0 分会被读成"很弱"');
+foreach ([[null, null], ['', null], [0, 0], ['0', 0], ['1450', 1450]] as [$given, $want]) {
+    $got = coach_directory_entry(['player_id' => 4, 'rating' => $given])['rating'];
+    $assert($got === $want, '公开名录 rating ' . var_export($given, true) . ' → ' . var_export($want, true));
+}
 $assert(coach_profile_filled(coach_profile_public(['elo' => 0])) === true,
     'elo 0 也是填过了：0 和没填不是一回事');
 $assert(coach_profile_filled(coach_profile_public(['years' => 0])) === true, '0 年教龄同上');
 $assert(coach_profile_filled(coach_profile_public(['hourly_rate_cny' => 0])) === true,
     '0 元价格也算填过,不和没填混淆');
-foreach (['teaching_focus', 'enrollment_notes', 'tuition_text', 'schedule_text'] as $field) {
+foreach (['teaching_focus', 'goals_note', 'enrollment_notes', 'tuition_text', 'schedule_text'] as $field) {
     $assert(coach_profile_filled(coach_profile_public([$field => '已填写'])) === true,
         "只填 {$field} 也算填过资料");
 }
+$assert(coach_profile_filled(coach_profile_public(['custom_slots' => '["周一 19:00"]'])) === true,
+    '只填自定义时段也算填过资料');
+$assert(coach_profile_filled(coach_profile_public(['custom_slots' => '[]'])) === false,
+    '自定义时段空列表不算填过资料');
 $assert(coach_profile_filled(coach_profile_public(['photos' => $imgA])) === true,
     '只传了一张照片也算填过（那一行是先建起来的）');
 $assert(coach_profile_filled(coach_profile_public(['certificates' => $imgA])) === true,

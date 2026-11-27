@@ -6,7 +6,7 @@
  */
 
 import { LEARN_TOPICS, learnTopicProgress } from '../game/learnContent.js';
-import { getAllProgress, recordAttempt } from '../game/tacticsStore.js';
+import { getAllProgress, getReadTopics, markTopicRead, recordAttempt } from '../game/tacticsStore.js';
 import { SETUP_QUIZ_ID, mountSetupQuiz } from './setupQuiz.js';
 import { COORDINATE_QUIZ_ID, mountCoordinateQuiz } from './coordinateQuiz.js';
 import { PIECE_RANGE_QUIZ_ID, mountPieceRangeQuiz } from './pieceRangeQuiz.js';
@@ -19,8 +19,9 @@ const QUIZ_MOUNTS = {
 };
 
 function progressLabel(progress) {
+  if (progress.complete) return '已完成';
   if (progress.total === 0) return '阅读课';
-  return progress.complete ? '已完成' : `练习 ${progress.solved}/${progress.total}`;
+  return `练习 ${progress.solved}/${progress.total}`;
 }
 
 export function mountLearnPanel({ onPractice } = {}) {
@@ -42,10 +43,11 @@ export function mountLearnPanel({ onPractice } = {}) {
 
   function paintCard() {
     const progress = getAllProgress();
+    const readTopics = getReadTopics();
     for (const button of card.querySelectorAll('[data-learn-topic]')) {
       const topic = LEARN_TOPICS.find((item) => item.id === button.dataset.learnTopic);
       if (!topic) continue;
-      const state = learnTopicProgress(topic, progress);
+      const state = learnTopicProgress(topic, progress, readTopics);
       const label = document.createElement('span');
       label.textContent = topic.label;
       const badge = document.createElement('span');
@@ -59,7 +61,7 @@ export function mountLearnPanel({ onPractice } = {}) {
 
   function updatePractice(topic) {
     const progress = getAllProgress();
-    const state = learnTopicProgress(topic, progress);
+    const state = learnTopicProgress(topic, progress, getReadTopics());
     practiceStatus.textContent = `本节${progressLabel(state)}`;
     practiceStatus.classList.toggle('is-complete', state.complete);
     if (practiceButton) {
@@ -135,6 +137,20 @@ export function mountLearnPanel({ onPractice } = {}) {
       practiceButton.className = `btn ${topic.quizzes?.length ? 'btn-ghost' : 'btn-primary'} learn-practice`;
       practiceButton.addEventListener('click', () => onPractice(topic.id));
       el.body.appendChild(practiceButton);
+    }
+    if (!topic.practiceIds?.length && !topic.quizzes?.length) {
+      const readButton = document.createElement('button');
+      readButton.type = 'button';
+      readButton.className = 'btn btn-ghost learn-practice learn-read-complete';
+      const complete = learnTopicProgress(topic, getAllProgress(), getReadTopics()).complete;
+      readButton.textContent = complete ? '已完成' : '我已读完，标记完成';
+      readButton.disabled = complete;
+      readButton.addEventListener('click', () => {
+        markTopicRead(topic.id);
+        paintCard();
+        paint();
+      });
+      el.body.appendChild(readButton);
     }
     updatePractice(topic);
 

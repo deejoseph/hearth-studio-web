@@ -33,6 +33,9 @@ export const COACH_YEARS_MAX = 60;
 export const COACH_ENROLLMENT_NOTES_MAX = 2000;
 export const COACH_TUITION_TEXT_MAX = 1000;
 export const COACH_SCHEDULE_TEXT_MAX = 1000;
+export const COACH_GOALS_NOTE_MAX = 300;
+export const COACH_CUSTOM_SLOTS_MAX = 20;
+export const COACH_CUSTOM_SLOT_MAX = 80;
 /** 单张图的字节上限（后端 COACH_IMAGE_BYTES_MAX）。界面上先拦一道，省一次上传往返。 */
 export const COACH_IMAGE_BYTES_MAX = 2 * 1024 * 1024;
 
@@ -58,7 +61,7 @@ export const COACH_TITLES = [
 /** 每一组选几个。全都能留空 —— 资料不是门槛，够不够格看的是申请状态。 */
 export const COACH_PROFILE_RULES = {
   levels: { min: 0, max: 4 },
-  goals: { min: 0, max: 3 },
+  goals: { min: 0, max: 5 },
   formats: { min: 0, max: 3 },
   slots: { min: 0, max: 4 },
 };
@@ -79,6 +82,8 @@ export const COACH_PROFILE_TITLES = {
   schedule_text: '上课时段',
   levels: '可以接受什么水平的学生',
   goals: '擅长教什么',
+  goals_note: '自填擅长方向',
+  custom_slots: '自定义时段',
   teaching_focus: '补充说明（选填）',
   formats: '上课形式',
   slots: '方便的时间段',
@@ -181,6 +186,10 @@ export function validateCoachProfile(form) {
   if (honors.error) return fail('honors', honors.error);
   const teachingFocus = text('teaching_focus', COACH_TEACHING_FOCUS_MAX);
   if (teachingFocus.error) return fail('teaching_focus', teachingFocus.error);
+  const goalsNote = text('goals_note', COACH_GOALS_NOTE_MAX);
+  if (goalsNote.error) return fail('goals_note', goalsNote.error);
+  const customSlots = customSlotList(source.custom_slots);
+  if (customSlots.error) return fail('custom_slots', customSlots.error);
   const enrollmentNotes = text('enrollment_notes', COACH_ENROLLMENT_NOTES_MAX);
   if (enrollmentNotes.error) return fail('enrollment_notes', enrollmentNotes.error);
   const tuitionText = text('tuition_text', COACH_TUITION_TEXT_MAX);
@@ -204,6 +213,8 @@ export function validateCoachProfile(form) {
     tagline: tagline.value,
     honors: honors.value,
     teaching_focus: teachingFocus.value,
+    goals_note: goalsNote.value,
+    custom_slots: customSlots.value,
     enrollment_notes: enrollmentNotes.value,
     hourly_rate_cny: hourlyRate.value,
     tuition_text: tuitionText.value,
@@ -238,6 +249,23 @@ export function validateCoachProfile(form) {
     const allowed = coachKeys(group);
     return [...new Set(list.map((key) => String(key).trim()).filter(Boolean))]
       .filter((key) => allowed.includes(key));
+  }
+
+  function customSlotList(value) {
+    const list = Array.isArray(value) ? value : [];
+    if (list.length > COACH_CUSTOM_SLOTS_MAX) {
+      return { error: `自定义时段最多 ${COACH_CUSTOM_SLOTS_MAX} 条。` };
+    }
+    const kept = [];
+    for (const item of list) {
+      if (typeof item !== 'string') return { error: '自定义时段请一行填一条。' };
+      const slot = item.replace(/[\u3000\s]+/g, ' ').trim();
+      if ([...slot].length > COACH_CUSTOM_SLOT_MAX) {
+        return { error: `每一条自定义时段请写在 ${COACH_CUSTOM_SLOT_MAX} 个字以内。` };
+      }
+      if (slot && !kept.includes(slot)) kept.push(slot);
+    }
+    return { value: kept };
   }
 
   /**
@@ -304,6 +332,12 @@ export function coachProfileRows(coach) {
   for (const group of COACH_PROFILE_GROUPS) {
     const labels = coachProfileLabels(group, profile[group]);
     if (labels.length) rows.push({ label: COACH_PROFILE_TITLES[group], text: labels.join('、') });
+    if (group === 'goals' && String(profile.goals_note ?? '').trim()) {
+      rows.push({ label: COACH_PROFILE_TITLES.goals_note, text: profile.goals_note });
+    }
+    if (group === 'slots' && (profile.custom_slots ?? []).length) {
+      rows.push({ label: COACH_PROFILE_TITLES.custom_slots, text: profile.custom_slots.join('、') });
+    }
   }
   if (String(profile.teaching_focus ?? '').trim()) {
     rows.push({ label: COACH_PROFILE_TITLES.teaching_focus, text: profile.teaching_focus });

@@ -25,6 +25,7 @@ function loadStore() {
       if (data.userRating === undefined) {
         data.userRating = DEFAULT_RATING;
       }
+      if (!Array.isArray(data.readTopics)) data.readTopics = [];
       return data;
     }
   } catch (e) {
@@ -35,6 +36,7 @@ function loadStore() {
     progress: {},
     problemSets: {},
     userRating: DEFAULT_RATING,
+    readTopics: [],
   };
 }
 
@@ -124,6 +126,18 @@ export function getProgress(problemId) {
 export function getAllProgress() {
   const store = loadStore();
   return { ...store.progress };
+}
+
+export function getReadTopics() {
+  return [...loadStore().readTopics];
+}
+
+export function markTopicRead(topicId) {
+  const store = loadStore();
+  if (!store.readTopics.includes(topicId)) {
+    store.readTopics.push(topicId);
+    saveStore(store);
+  }
 }
 
 /**

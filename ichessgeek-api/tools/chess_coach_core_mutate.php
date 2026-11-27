@@ -7,8 +7,9 @@
  * 和 chess_class_core_mutate.php 同一个道理：一份"全绿"既可能说明规则层对，
  * 也可能说明测试压根没在看。这里挑的每一处都是一条独立规则 ——
  * 介绍的下限/上限（含边界差一个）、非字符串、够不够格、大小写、状态机的两头的门、
- * 回给申请人/管理员的形状、资料与预约的边界、撤销优先级，以及申诉的哈希和
- * 公开/私有白名单。抓到就说明那条规则真在被覆盖；漏了要补用例，不是改规则层。
+ * 回给申请人/管理员的形状、资料与预约的边界、撤销优先级、自填授课方向、自定义时段、
+ * 未设置 rating 的空值语义，以及申诉的哈希和公开/私有白名单。
+ * 抓到就说明那条规则真在被覆盖；漏了要补用例，不是改规则层。
  *
  * 规则层和测试各拷一份到系统临时目录，保持 v1/ 与 tools/ 的相对位置 ——
  * 测试里的 require 才会指向被改坏的那一份，仓库里的真文件一个字都不动。
@@ -154,7 +155,7 @@ $mutations = [
         '        return (int) $value ?: null;',
     ],
     'M27 擅长方向上限放到 9（全勾也收）' => [
-        'const COACH_GOALS_MAX_COACH = 3;',
+        'const COACH_GOALS_MAX_COACH = 5;',
         'const COACH_GOALS_MAX_COACH = 9;',
     ],
     'M28 多选不再把空串当"一个都没选"' => [
@@ -188,8 +189,8 @@ $mutations = [
         '',
     ],
     'M35 只传证书不算填过资料' => [
-        "    foreach (['levels', 'goals', 'formats', 'slots', 'photos', 'certificates'] as \$key) {",
-        "    foreach (['levels', 'goals', 'formats', 'slots', 'photos'] as \$key) {",
+        "    foreach (['levels', 'goals', 'formats', 'slots', 'custom_slots', 'photos', 'certificates'] as \$key) {",
+        "    foreach (['levels', 'goals', 'formats', 'slots', 'custom_slots', 'photos'] as \$key) {",
     ],
 
     /* --- 学员预算、详细时间与教练公开资料 --- */
@@ -205,9 +206,9 @@ $mutations = [
         "function coach_money_opt(\$value, \$min, \$max, \$field, \$code) {\n    if (\$value === null || \$value === '') {\n        return [null, \$field, null];\n    }",
         "function coach_money_opt(\$value, \$min, \$max, \$field, \$code) {\n    if (\$value === null || \$value === '') {\n        return [0, \$field, null];\n    }",
     ],
-    'M39 详细时间上限放到 501' => [
-        'const COACH_SCHEDULE_NOTE_MAX = 500;',
-        'const COACH_SCHEDULE_NOTE_MAX = 501;',
+    'M39 详细时间上限放到 241' => [
+        'const COACH_SCHEDULE_NOTE_MAX = 240;',
+        'const COACH_SCHEDULE_NOTE_MAX = 241;',
     ],
     'M40 详细时间漏传变成 null' => [
         "            'schedule_note' => \$scheduleNote,",
@@ -230,8 +231,8 @@ $mutations = [
         "        'hourly_rate_cny' => (\$row['hourly_rate_cny'] ?? null) ?: null,",
     ],
     'M45 新文字字段不算填过资料' => [
+        "    foreach (['title', 'tagline', 'honors', 'teaching_focus', 'goals_note', 'enrollment_notes', 'tuition_text',\n        'schedule_text', 'language', 'timezone', 'avatar'] as \$key) {",
         "    foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text',\n        'schedule_text', 'language', 'timezone', 'avatar'] as \$key) {",
-        "    foreach (['title', 'tagline', 'honors', 'language', 'timezone', 'avatar'] as \$key) {",
     ],
     'M46 0 元价格不算填过资料' => [
         "    return (\$profile['elo'] ?? null) !== null || (\$profile['years'] ?? null) !== null\n        || (\$profile['hourly_rate_cny'] ?? null) !== null;",
@@ -240,6 +241,100 @@ $mutations = [
     'M47 公开资料把 email 带出去' => [
         "        'certificates' => \$list(\$row['certificates'] ?? ''),\n        'updated_at' => \$row['updated_at'] ?? null,",
         "        'certificates' => \$list(\$row['certificates'] ?? ''),\n        'email' => \$row['email'] ?? '',\n        'updated_at' => \$row['updated_at'] ?? null,",
+    ],
+
+    /* --- 自填授课方向、自定义时段与未设置 rating --- */
+    'G1 自填方向上限放到 301' => [
+        'const COACH_GOALS_NOTE_MAX = 300;',
+        'const COACH_GOALS_NOTE_MAX = 301;',
+    ],
+    'G2 自填方向超长报错码跑偏' => [
+        "'goals_note', 'long_goals_note', 'bad_goals_note'",
+        "'goals_note', 'long_tagline', 'bad_goals_note'",
+    ],
+    'G3 自填方向坏字节报错码跑偏' => [
+        "'goals_note', 'long_goals_note', 'bad_goals_note'",
+        "'goals_note', 'long_goals_note', 'bad_tagline'",
+    ],
+    'G4 公开资料漏掉自填方向' => [
+        "        'goals_note' => (string) (\$row['goals_note'] ?? ''),\n",
+        '',
+    ],
+    'G5 只填自填方向不算填过资料' => [
+        "'teaching_focus', 'goals_note', 'enrollment_notes'",
+        "'teaching_focus', 'enrollment_notes'",
+    ],
+    'G6 学生偏好也跟着放宽到五项' => [
+        'const COACH_GOALS_MAX = 3;',
+        'const COACH_GOALS_MAX = 5;',
+    ],
+    'S1 自定义时段条数上限放到 21' => [
+        'const COACH_CUSTOM_SLOTS_MAX = 20;',
+        'const COACH_CUSTOM_SLOTS_MAX = 21;',
+    ],
+    'S2 单条自定义时段上限放到 81' => [
+        'const COACH_CUSTOM_SLOT_MAX = 80;',
+        'const COACH_CUSTOM_SLOT_MAX = 81;',
+    ],
+    'S3 自定义时段不再归一空白' => [
+        '        $slot = coach_trim($item);',
+        '        $slot = $item;',
+    ],
+    'S4 自定义时段不再去重' => [
+        "        if (\$slot !== '' && !in_array(\$slot, \$kept, true)) {",
+        '        if (true) {',
+    ],
+    'S5 自定义时段空条目也落库' => [
+        "        if (\$slot !== '' && !in_array(\$slot, \$kept, true)) {",
+        '        if (!in_array($slot, $kept, true)) {',
+    ],
+    'S6 自定义时段不再判坏字节' => [
+        "        if (\$slot !== '' && !coach_is_utf8(\$slot)) {",
+        '        if (false) {',
+    ],
+    'S7 自定义时段超长报错码跑偏' => [
+        "            return ['[]', 'custom_slots', 'long_custom_slot'];",
+        "            return ['[]', 'custom_slots', 'long_custom_slots'];",
+    ],
+    'S8 自定义时段坏字节报错码跑偏' => [
+        "            return ['[]', 'custom_slots', 'bad_custom_slots'];",
+        "            return ['[]', 'custom_slots', 'bad_profile'];",
+    ],
+    'S9 公开自定义时段不再解码 JSON' => [
+        '    $list = json_decode($text, true);',
+        '    $list = $text;',
+    ],
+    'S10 公开自定义时段不过滤脏条目' => [
+        "    return array_values(array_filter(\$list, static fn (\$one) => is_string(\$one) && \$one !== ''));",
+        '    return array_values($list);',
+    ],
+    'S11 只填自定义时段不算填过资料' => [
+        "'slots', 'custom_slots', 'photos'",
+        "'slots', 'photos'",
+    ],
+    'S12 自定义时段不再限 20 条' => [
+        '    if (!is_array($value) || count($value) > COACH_CUSTOM_SLOTS_MAX) {',
+        '    if (!is_array($value)) {',
+    ],
+    'S13 自定义时段条目不再要求字符串' => [
+        '        if (!is_string($item)) {',
+        '        if (false) {',
+    ],
+    'S14 自定义时段中文被转义落库' => [
+        '    $json = json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);',
+        '    $json = json_encode($kept, JSON_UNESCAPED_SLASHES);',
+    ],
+    'R1 管理列表把未设置 rating 兜成 1200' => [
+        "        'rating' => \$rating === null || \$rating === '' ? null : (int) \$rating,\n        'has_pref' =>",
+        "        'rating' => (int) (\$rating ?? 1200),\n        'has_pref' =>",
+    ],
+    'R2 管理列表把未设置 rating 兜成 0' => [
+        "        'rating' => \$rating === null || \$rating === '' ? null : (int) \$rating,\n        'has_pref' =>",
+        "        'rating' => (int) (\$rating ?? 0),\n        'has_pref' =>",
+    ],
+    'R3 公开名录把未设置 rating 兜成 0' => [
+        "        'nickname' => (string) (\$row['nickname'] ?? ''),\n        'rating' => \$rating === null || \$rating === '' ? null : (int) \$rating,\n        'profile' =>",
+        "        'nickname' => (string) (\$row['nickname'] ?? ''),\n        'rating' => (int) (\$rating ?? 0),\n        'profile' =>",
     ],
 
     /* --- 预约请求 --- */

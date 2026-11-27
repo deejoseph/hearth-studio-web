@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LEARN_TOPICS, learnTopicProgress } from '../src/game/learnContent.js';
-import { getProgress, recordAttempt } from '../src/game/tacticsStore.js';
+import { getProgress, getReadTopics, markTopicRead, recordAttempt } from '../src/game/tacticsStore.js';
 import { indexToSquare } from '../src/engine/chess.js';
 import { SETUP_QUIZ_ID, standardSetupBoard } from '../src/ui/setupQuiz.js';
 import { COORDINATE_QUIZ_ID, squareColor } from '../src/ui/coordinateQuiz.js';
@@ -160,6 +160,32 @@ describe('教程练习进度', () => {
     expect(findText(body, '本节阅读课')).toBeTruthy();
     expect(text(body)).not.toContain('练一练');
     expect(text(topics[6])).toContain('阅读课');
+  });
+
+  it('阅读课标记已读后立即完成，重新挂载仍保留完成状态', () => {
+    const { panel, topics, body } = mount();
+    panel.open('etiquette');
+    findText(body, '我已读完，标记完成').emit('click');
+
+    expect(getReadTopics()).toEqual(['etiquette']);
+    expect(text(topics[5])).toContain('已完成');
+    expect(topics[5].classList.contains('is-complete')).toBe(true);
+    expect(findText(body, '本节已完成')).toBeTruthy();
+    expect(findText(body, '已完成').disabled).toBe(true);
+
+    const stored = JSON.parse(localStorage.getItem('chess-tactics-store'));
+    const remounted = mount({ stored });
+    expect(text(remounted.topics[5])).toContain('已完成');
+    remounted.panel.open('etiquette');
+    expect(findText(remounted.body, '本节已完成')).toBeTruthy();
+  });
+
+  it('阅读课标记幂等，不影响练习课完成规则', () => {
+    mount();
+    markTopicRead('etiquette');
+    markTopicRead('etiquette');
+    expect(getReadTopics()).toEqual(['etiquette']);
+    expect(learnTopicProgress(LEARN_TOPICS.find((topic) => topic.id === 'pieces'), {}, ['etiquette']).complete).toBe(false);
   });
 
   it('新增规则、开局、战术与价值内容都能在教程中读到', () => {

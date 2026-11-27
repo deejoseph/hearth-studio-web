@@ -91,6 +91,8 @@
           <h1 class="brand-name">国际象棋<span class="visually-hidden"> —— 浏览器里免费练棋、复盘、导棋谱</span></h1>
         </a>
         <div class="topbar-right">
+          <a class="btn btn-ghost btn-sm feedback-link" href="mailto:admin@ichessgeek.com?subject=%E5%9B%BD%E8%B1%A1%E5%B9%B3%E5%8F%B0%E5%BB%BA%E8%AE%AE"
+             title="给开发者发邮件：admin@ichessgeek.com">建议直通车</a>
           <span class="topbar-note" id="topbar-note">电脑对弈</span>
           <button class="account-chip" id="account-chip" type="button" aria-haspopup="dialog" aria-controls="account-dialog">
             <i data-lucide="user"></i>
@@ -115,6 +117,18 @@
         <aside class="sidebar sidebar-left">
           <!-- 教程、题库和测验都在弹窗里，主页面只保留入口。 -->
           <div class="learn-panes">
+            <section class="card platform-promo" aria-labelledby="platform-promo-title">
+              <div class="card-head">
+                <h2 class="card-title" id="platform-promo-title">在这里，学棋可以很简单</h2>
+                <span class="learn-tag">免费</span>
+              </div>
+              <ul class="platform-promo-list">
+                <li><strong>复制棋局，就能复盘。</strong>无需安装任何软件，随时将你的棋局复制过来，获取 AI 复盘分析结果。</li>
+                <li><strong>自学不收费。</strong>无需任何费用，你就可以在这里自学国际象棋。</li>
+                <li><strong>开班也不收平台费。</strong>无需任何费用，你就可以在这里开班教棋；平台只是希望你能给学生更好的性价比。</li>
+                <li><strong>专业棋手有专属方向。</strong>如果你是专业棋手，平台可以为你设计度身定制的提升计划。</li>
+              </ul>
+            </section>
             <section class="card learn-card" id="learn-card" aria-label="国象自学教程">
               <div class="card-head">
                 <h2 class="card-title">国象自学教程</h2>
@@ -998,6 +1012,15 @@
         <div class="pref-choices" id="cp-goals-choices"></div>
       </fieldset>
 
+      <label class="field pref-group pref-note-block" id="cp-goals-note-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-goals-note-legend"></span>
+          <span class="pref-counter" id="cp-goals-note-count">0 / 300</span>
+        </span>
+        <textarea class="pref-note" id="cp-goals-note" rows="2" maxlength="380"
+                  placeholder="例如：成人零基础、学生赛前集训、退役棋手复棋"></textarea>
+      </label>
+
       <fieldset class="pref-group" id="cp-formats-group">
         <legend class="pref-legend" id="cp-formats-legend"></legend>
         <div class="pref-choices" id="cp-formats-choices"></div>
@@ -1006,6 +1029,21 @@
       <fieldset class="pref-group" id="cp-slots-group">
         <legend class="pref-legend" id="cp-slots-legend"></legend>
         <div class="pref-choices" id="cp-slots-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="cp-custom-slots-group">
+        <legend class="pref-legend">
+          <span class="pref-legend-text" id="cp-custom-slots-legend"></span>
+          <span class="pref-hint">有时差也可以按自己的时区添加</span>
+        </legend>
+        <div class="custom-slots-editor">
+          <div class="custom-slots-add">
+            <input type="text" id="cp-custom-slot-input" maxlength="100" autocomplete="off"
+                   placeholder="例如：北京时间周三 21:00–22:00">
+            <button class="btn btn-ghost" id="cp-custom-slot-add" type="button">添加时段</button>
+          </div>
+          <ul class="custom-slots-list" id="cp-custom-slots-list"></ul>
+        </div>
       </fieldset>
 
       <div class="field pref-group" id="cp-language-group">

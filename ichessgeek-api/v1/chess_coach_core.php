@@ -417,6 +417,7 @@ function coach_app_public($row) {
  * 是管理员判"是学员还是来打广告"时最省事的一条线索。
  */
 function coach_app_admin($row) {
+    $rating = $row['rating'] ?? null;
     return [
         'player_id' => (int) ($row['player_id'] ?? 0),
         'status' => $row['status'] ?? 'pending',
@@ -424,7 +425,7 @@ function coach_app_admin($row) {
         'nickname' => $row['nickname'] ?? '',
         'email' => $row['email'] ?? '',
         'verified' => ($row['verified_at'] ?? null) !== null,
-        'rating' => (int) ($row['rating'] ?? 1200),
+        'rating' => $rating === null || $rating === '' ? null : (int) $rating,
         'has_pref' => (int) ($row['has_pref'] ?? 0) > 0,
         'title' => (string) ($row['title'] ?? ''),
         'elo' => $row['elo'] ?? null,
@@ -470,6 +471,9 @@ const COACH_YEARS_MAX = 60;
 const COACH_TAGLINE_MAX = 80;
 const COACH_HONORS_MAX = 300;
 const COACH_TEACHING_FOCUS_MAX = 300;
+const COACH_GOALS_NOTE_MAX = 300;
+const COACH_CUSTOM_SLOTS_MAX = 20;
+const COACH_CUSTOM_SLOT_MAX = 80;
 
 /** 教练接收的学生水平。旧 key 只在读/写边界换算，不再落库。 */
 const COACH_ACCEPT_LEVELS = ['zero', 'amateur5', 'amateur1', 'master'];
@@ -504,16 +508,15 @@ const COACH_IMAGE_BYTES_MAX = 2 * 1024 * 1024;
 const COACH_IMAGE_SIDE_MAX = 4000;
 
 /**
- * 多选上限：能带的水平 1–4、擅长方向 1–3、上课形式 1–3、时段 0–4（时段可以不填）。
+ * 多选上限：能带的水平 1–4、擅长方向 0–5、上课形式 1–3、时段 0–4（时段可以不填）。
  *
  * levels/formats 这两个数和白名单一样长，意思是"全列都允许"：确实有人就是从零基础
  * 带到有等级分，也确实有人三种形式都开 —— 那不是超卖。留着这两个数而不是写死
  * count()，是因为白名单以后加一档时这两个口径不该跟着自动放宽。
- * goals 收到 3 条（白名单有 5 项）：五项全勾在名录上等于什么都没标，
- * 而这份资料存在的理由就是让人看出这个人擅长什么。
+ * 教练的五项授课方向可以全选，也可以用 goals_note 自填；学生的偏好仍最多三项。
  */
 const COACH_LEVELS_MAX = 4;
-const COACH_GOALS_MAX_COACH = 3;
+const COACH_GOALS_MAX_COACH = 5;
 const COACH_FORMATS_MAX_COACH = 3;
 
 /**
@@ -657,6 +660,49 @@ function coach_many_opt($value, array $allowed, $max, $field, $code = 'bad_profi
     return $csv === null ? ['', $field, $code] : [$csv, $field, null];
 }
 
+function coach_custom_slots($value) {
+    if ($value === null || $value === '') {
+        return ['[]', 'custom_slots', null];
+    }
+    if (!is_array($value) || count($value) > COACH_CUSTOM_SLOTS_MAX) {
+        return ['[]', 'custom_slots', 'bad_profile'];
+    }
+    $kept = [];
+    foreach ($value as $item) {
+        if (!is_string($item)) {
+            return ['[]', 'custom_slots', 'bad_profile'];
+        }
+        $slot = coach_trim($item);
+        if ($slot !== '' && !coach_is_utf8($slot)) {
+            return ['[]', 'custom_slots', 'bad_custom_slots'];
+        }
+        if (coach_len($slot) > COACH_CUSTOM_SLOT_MAX) {
+            return ['[]', 'custom_slots', 'long_custom_slot'];
+        }
+        if ($slot !== '' && !in_array($slot, $kept, true)) {
+            $kept[] = $slot;
+        }
+    }
+    $json = json_encode($kept, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return [$json === false ? '[]' : $json, 'custom_slots', null];
+}
+
+/** 自定义时段库里存 JSON；旧行空串按空列表读。 */
+function coach_custom_slots_public($value) {
+    if (is_array($value)) {
+        return $value;
+    }
+    $text = trim((string) ($value ?? ''));
+    if ($text === '') {
+        return [];
+    }
+    $list = json_decode($text, true);
+    if (!is_array($list)) {
+        return [];
+    }
+    return array_values(array_filter($list, static fn ($one) => is_string($one) && $one !== ''));
+}
+
 /** 接收水平：兼容旧表单发来的 key，返回时只留新白名单里的规范值。 */
 function coach_accept_levels($value) {
     if ($value === null || $value === '') {
@@ -783,6 +829,13 @@ function coach_profile_normalize($data) {
         return $fail($code, $field);
     }
 
+    [$out['goals_note'], $field, $code] = coach_text_opt(
+        $data['goals_note'] ?? '', COACH_GOALS_NOTE_MAX, 'goals_note', 'long_goals_note', 'bad_goals_note'
+    );
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
     [$out['enrollment_notes'], $field, $code] = coach_text_opt(
         $data['enrollment_notes'] ?? '', COACH_ENROLLMENT_NOTES_MAX, 'enrollment_notes',
         'long_enrollment_notes', 'bad_enrollment_notes'
@@ -848,6 +901,11 @@ function coach_profile_normalize($data) {
         return $fail($code, $field);
     }
 
+    [$out['custom_slots'], $field, $code] = coach_custom_slots($data['custom_slots'] ?? []);
+    if ($code !== null) {
+        return $fail($code, $field);
+    }
+
     [$out['avatar'], $field, $code] = coach_image_name($data['avatar'] ?? '', 'avatar');
     if ($code !== null) {
         return $fail($code, $field);
@@ -887,6 +945,8 @@ function coach_profile_public($row) {
         'tagline' => (string) ($row['tagline'] ?? ''),
         'honors' => (string) ($row['honors'] ?? ''),
         'teaching_focus' => (string) ($row['teaching_focus'] ?? ''),
+        'goals_note' => (string) ($row['goals_note'] ?? ''),
+        'custom_slots' => coach_custom_slots_public($row['custom_slots'] ?? ''),
         'enrollment_notes' => (string) ($row['enrollment_notes'] ?? ''),
         'tuition_text' => (string) ($row['tuition_text'] ?? ''),
         'schedule_text' => (string) ($row['schedule_text'] ?? ''),
@@ -912,13 +972,13 @@ function coach_profile_public($row) {
  * 还全是默认值。所以这里判的是内容，不是有没有行。
  */
 function coach_profile_filled($profile) {
-    foreach (['title', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'tuition_text',
+    foreach (['title', 'tagline', 'honors', 'teaching_focus', 'goals_note', 'enrollment_notes', 'tuition_text',
         'schedule_text', 'language', 'timezone', 'avatar'] as $key) {
         if ((string) ($profile[$key] ?? '') !== '') {
             return true;
         }
     }
-    foreach (['levels', 'goals', 'formats', 'slots', 'photos', 'certificates'] as $key) {
+    foreach (['levels', 'goals', 'formats', 'slots', 'custom_slots', 'photos', 'certificates'] as $key) {
         if ((array) ($profile[$key] ?? []) !== []) {
             return true;
         }

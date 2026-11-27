@@ -2963,6 +2963,97 @@ select:focus-visible {
   color: var(--danger);
 }
 
+.custom-slots-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.custom-slots-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.custom-slots-add input {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+}
+
+.custom-slots-add .btn {
+  flex: none;
+}
+
+.custom-slots-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.custom-slots-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.pref-group.invalid .custom-slots-add input,
+.pref-group.invalid .custom-slots-list li {
+  border-color: var(--danger);
+}
+
+.platform-promo {
+  padding: 16px;
+}
+
+.platform-promo .card-head {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.platform-promo-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.platform-promo-list li {
+  padding-left: 2px;
+}
+
+.platform-promo-list strong {
+  color: var(--text);
+}
+
+.feedback-link {
+  flex: none;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .feedback-link {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .topbar-right {
+    gap: 8px;
+  }
+}
+
 .pref-note-head {
   display: flex;
   align-items: baseline;

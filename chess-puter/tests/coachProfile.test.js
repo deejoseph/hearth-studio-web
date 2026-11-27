@@ -3,6 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   COACH_CERTIFICATES_MAX,
+  COACH_CUSTOM_SLOT_MAX,
+  COACH_CUSTOM_SLOTS_MAX,
+  COACH_GOALS_NOTE_MAX,
   COACH_ACCEPT_LEVELS,
   COACH_ELO_MAX,
   COACH_ELO_MIN,
@@ -29,7 +32,7 @@ import {
  * 教练资料的数据层（src/game/coachProfile.js）+ 名录的隐私底线。
  *
  * 盯四件事：
- * 1. 一份表单发出去的形状（十九个键）和后端 coach_profile_normalize 一致；
+ * 1. 一份表单发出去的形状（二十一个键）和后端 coach_profile_normalize 一致；
  * 2. 数字和字数的口径 —— 空、0、超一个字的边界，这三样最容易各写一套；
  * 3. 界面要的元素 id 在 index.html 里都在（两边只改一边就会"打开面板就报错"）；
  * 4. 🔴 公开那一行永远不带 email、也不带申请时写给管理员看的 intro。
@@ -61,6 +64,8 @@ const good = (over = {}) => ({
   tagline: '把战术讲成人话',
   honors: '带出过三位省赛冠军',
   teaching_focus: '擅长把战术题拆成几步提问',
+  goals_note: '退役棋手复棋',
+  custom_slots: ['柏林时间周二 06:30–07:15'],
   language: 'zh',
   timezone: 'Asia/Shanghai',
   levels: ['amateur5', 'amateur1'],
@@ -74,16 +79,18 @@ const good = (over = {}) => ({
 });
 
 describe('一份教练资料能不能发出去', () => {
-  it('十九项全发：整份覆盖，后端才分得出"清空"和"没带这个键"', () => {
+  it('二十一项全发：整份覆盖，后端才分得出"清空"和"没带这个键"', () => {
     const result = validateCoachProfile(good());
     expect(result.ok).toBe(true);
     expect(Object.keys(result.payload).sort()).toEqual([
       'avatar',
       'certificates',
+      'custom_slots',
       'elo',
       'enrollment_notes',
       'formats',
       'goals',
+      'goals_note',
       'honors',
       'hourly_rate_cny',
       'language',
@@ -149,13 +156,47 @@ describe('一份教练资料能不能发出去', () => {
     expect(validateCoachProfile(good({ years: ' 09 ' })).payload.years).toBe('9');
   });
 
-  it('多选超过上限时把数字一起报出来', () => {
-    expect(
-      validateCoachProfile(good({ goals: ['basics', 'tactics', 'opening', 'endgame'] })),
-    ).toEqual({
+  it('教练固定授课方向可全选，未知项不会从 DOM 混进请求', () => {
+    const all = ['basics', 'tactics', 'opening', 'endgame', 'contest'];
+    expect(validateCoachProfile(good({ goals: all })).payload.goals).toEqual(all);
+    expect(validateCoachProfile(good({ goals: [...all, 'mindgames'] })).payload.goals).toEqual(all);
+  });
+
+  it('自填授课方向可留空，也按码点量限制', () => {
+    expect(validateCoachProfile(good({ goals_note: '' })).payload.goals_note).toBe('');
+    const text = '棋'.repeat(COACH_GOALS_NOTE_MAX);
+    expect(validateCoachProfile(good({ goals_note: text })).ok).toBe(true);
+    expect(validateCoachProfile(good({ goals_note: `${text}棋` }))).toEqual({
       ok: false,
-      field: 'goals',
-      text: '「擅长教什么」最多选 3 项，现在选了 4 项。',
+      field: 'goals_note',
+      text: `自填擅长方向请写在 ${COACH_GOALS_NOTE_MAX} 个字以内（现在 ${COACH_GOALS_NOTE_MAX + 1} 个字）。`,
+    });
+  });
+
+  it('自定义时段可添加任意时间文本，去重并保留逗号原样', () => {
+    const slots = ['  柏林时间　周二 06:30–07:15 ', '北京时间周五 21:00 后，可换时段', '柏林时间 周二 06:30–07:15'];
+    expect(validateCoachProfile(good({ custom_slots: slots })).payload.custom_slots).toEqual([
+      '柏林时间 周二 06:30–07:15', '北京时间周五 21:00 后，可换时段',
+    ]);
+  });
+
+  it('自定义时段限制条数、单条长度和输入类型', () => {
+    const slots = Array.from({ length: COACH_CUSTOM_SLOTS_MAX }, (_, at) => `时段 ${at}`);
+    expect(validateCoachProfile(good({ custom_slots: slots })).payload.custom_slots).toEqual(slots);
+    expect(validateCoachProfile(good({ custom_slots: [...slots, '再来一条'] }))).toEqual({
+      ok: false,
+      field: 'custom_slots',
+      text: `自定义时段最多 ${COACH_CUSTOM_SLOTS_MAX} 条。`,
+    });
+    expect(validateCoachProfile(good({ custom_slots: ['时'.repeat(COACH_CUSTOM_SLOT_MAX + 1)] }))).toEqual({
+      ok: false,
+      field: 'custom_slots',
+      text: `每一条自定义时段请写在 ${COACH_CUSTOM_SLOT_MAX} 个字以内。`,
+    });
+    expect(validateCoachProfile(good({ custom_slots: [123] }))).toEqual({
+      ok: false,
+      field: 'custom_slots',
+      text: '自定义时段请一行填一条。',
     });
   });
 
@@ -288,6 +329,7 @@ describe('名录卡片与主页上那几句话', () => {
 
   it('教练自己登记的等级分优先，没有才用站内那个 rating', () => {
     expect(coachBadges(coach({ elo: 1500 }, { rating: 2210 }))).toContain('等级分 1500');
+    expect(coachBadges(coach({}, { rating: null }))).toEqual([]);
   });
 
   it('卡片上的接收档位与方向标签最多两样，多了读不完', () => {
@@ -313,6 +355,19 @@ describe('名录卡片与主页上那几句话', () => {
       { label: COACH_PROFILE_TITLES.timezone, text: '中国（UTC+8）' },
     ]);
     expect(coachProfileRows(coach({}))).toEqual([]);
+  });
+
+  it('主页展示全部授课方向和自定义时段，逗号不会被拆成多项', () => {
+    const rows = coachProfileRows(coach({
+      goals: ['basics', 'tactics', 'opening', 'endgame', 'contest'],
+      goals_note: '退役棋手复棋',
+      custom_slots: ['柏林时间周二 06:30–07:15', '北京时间周五 21:00 后，可换时段'],
+    }));
+    expect(rows).toEqual([
+      { label: COACH_PROFILE_TITLES.goals, text: '打基础、补战术、学开局、学残局、准备比赛' },
+      { label: COACH_PROFILE_TITLES.goals_note, text: '退役棋手复棋' },
+      { label: COACH_PROFILE_TITLES.custom_slots, text: '柏林时间周二 06:30–07:15、北京时间周五 21:00 后，可换时段' },
+    ]);
   });
 
   it('库里出来一个界面不认的 key 时原样印出来，好排查', () => {
@@ -375,6 +430,9 @@ describe('界面与后端的契约', () => {
     expect(COACH_TAGLINE_MAX).toBe(phpNum('COACH_TAGLINE_MAX'));
     expect(COACH_HONORS_MAX).toBe(phpNum('COACH_HONORS_MAX'));
     expect(COACH_TEACHING_FOCUS_MAX).toBe(phpNum('COACH_TEACHING_FOCUS_MAX'));
+    expect(COACH_GOALS_NOTE_MAX).toBe(phpNum('COACH_GOALS_NOTE_MAX'));
+    expect(COACH_CUSTOM_SLOTS_MAX).toBe(phpNum('COACH_CUSTOM_SLOTS_MAX'));
+    expect(COACH_CUSTOM_SLOT_MAX).toBe(phpNum('COACH_CUSTOM_SLOT_MAX'));
     expect(COACH_PHOTOS_MAX).toBe(phpNum('COACH_PHOTOS_MAX'));
     expect(COACH_CERTIFICATES_MAX).toBe(phpNum('COACH_CERTIFICATES_MAX'));
   });
@@ -404,7 +462,7 @@ describe('界面与后端的契约', () => {
 
   it('每一栏都有中文标题，报错时点名点得出', () => {
     for (const key of [...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors',
-      'teaching_focus', 'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
+      'teaching_focus', 'goals_note', 'custom_slots', 'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
       'language', 'timezone', 'avatar', 'photos', 'certificates']) {
       expect(COACH_PROFILE_TITLES[key], key).toBeTruthy();
     }

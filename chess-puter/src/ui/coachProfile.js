@@ -23,7 +23,10 @@ import { COACH_OPTIONS, normalizeCoachText } from '../game/coachPref.js';
 import {
   COACH_ACCEPT_LEVELS,
   COACH_CERTIFICATES_MAX,
+  COACH_CUSTOM_SLOTS_MAX,
+  COACH_CUSTOM_SLOT_MAX,
   COACH_ENROLLMENT_NOTES_MAX,
+  COACH_GOALS_NOTE_MAX,
   COACH_HONORS_MAX,
   COACH_IMAGE_BYTES_MAX,
   COACH_PHOTOS_MAX,
@@ -45,7 +48,7 @@ const $ = (id) => document.getElementById(id);
 /** 会亮红框的那些栏：四组多选 + 公开文字与费率 + 三类图片。 */
 const SECTIONS = [
   ...COACH_PROFILE_GROUPS, 'title', 'elo', 'years', 'tagline', 'honors', 'teaching_focus',
-  'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
+  'goals_note', 'custom_slots', 'enrollment_notes', 'hourly_rate_cny', 'tuition_text', 'schedule_text',
   'language', 'timezone', 'avatar', 'photos', 'certificates',
 ];
 
@@ -126,8 +129,9 @@ function hintOf(group) {
   const hint = document.createElement('span');
   hint.className = 'pref-hint';
   // 上限就是这一组全部选项时不用报数字（"最多 4 项"面对四个选项是废话）
-  hint.textContent = max >= (group === 'levels' ? COACH_ACCEPT_LEVELS : COACH_OPTIONS[group]).length
-    ? '可多选' : `可不填，最多 ${max} 项`;
+  hint.textContent = group === 'goals' ? '可多选，不限数量'
+    : max >= (group === 'levels' ? COACH_ACCEPT_LEVELS : COACH_OPTIONS[group]).length
+      ? '可多选' : `可不填，最多 ${max} 项`;
   return hint;
 }
 
@@ -160,8 +164,8 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   }
   // 自由填写那几栏的标题同样只有一处出处（COACH_PROFILE_TITLES）。
   for (const key of [
-    'elo', 'years', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'hourly_rate_cny',
-    'tuition_text', 'schedule_text', 'avatar', 'photos', 'certificates',
+    'elo', 'years', 'tagline', 'honors', 'teaching_focus', 'goals_note', 'enrollment_notes', 'hourly_rate_cny',
+    'tuition_text', 'schedule_text', 'custom_slots', 'avatar', 'photos', 'certificates',
   ]) {
     const legend = $(`cp-${key.replaceAll('_', '-')}-legend`);
     if (legend) legend.textContent = COACH_PROFILE_TITLES[key];
@@ -180,6 +184,11 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     honorsCount: $('cp-honors-count'),
     teachingFocus: $('cp-teaching-focus'),
     teachingFocusCount: $('cp-teaching-focus-count'),
+    goalsNote: $('cp-goals-note'),
+    goalsNoteCount: $('cp-goals-note-count'),
+    customSlotInput: $('cp-custom-slot-input'),
+    customSlotAdd: $('cp-custom-slot-add'),
+    customSlotsList: $('cp-custom-slots-list'),
     enrollmentNotes: $('cp-enrollment-notes'),
     enrollmentNotesCount: $('cp-enrollment-notes-count'),
     hourlyRate: $('cp-hourly-rate-cny'),
@@ -216,6 +225,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
   let mutation = 0;
   let gateContext = null;
   let dialogContext = null;
+  let customSlots = [];
 
   function context() {
     return { id: player()?.id ?? null, teach: canTeach() };
@@ -243,6 +253,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     busy = false;
     profile = null;
     hasFilled = false;
+    customSlots = [];
     fill();
     idleSave();
   }
@@ -268,6 +279,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     counterOf(el.tagline, el.taglineCount, COACH_TAGLINE_MAX);
     counterOf(el.honors, el.honorsCount, COACH_HONORS_MAX);
     counterOf(el.teachingFocus, el.teachingFocusCount, COACH_TEACHING_FOCUS_MAX);
+    counterOf(el.goalsNote, el.goalsNoteCount, COACH_GOALS_NOTE_MAX);
     counterOf(el.enrollmentNotes, el.enrollmentNotesCount, COACH_ENROLLMENT_NOTES_MAX);
     counterOf(el.tuitionText, el.tuitionTextCount, COACH_TUITION_TEXT_MAX);
     counterOf(el.scheduleText, el.scheduleTextCount, COACH_SCHEDULE_TEXT_MAX);
@@ -348,6 +360,56 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     return btn;
   }
 
+  function paintCustomSlots() {
+    el.customSlotsList.replaceChildren();
+    for (const slot of customSlots) {
+      const row = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = slot;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn-ghost btn-sm';
+      remove.textContent = '删除';
+      remove.setAttribute('aria-label', `删除时段：${slot}`);
+      remove.addEventListener('click', () => {
+        customSlots = customSlots.filter((one) => one !== slot);
+        paintCustomSlots();
+        clearError();
+      });
+      row.append(label, remove);
+      el.customSlotsList.appendChild(row);
+    }
+    el.customSlotAdd.disabled = customSlots.length >= COACH_CUSTOM_SLOTS_MAX;
+  }
+
+  function addCustomSlot() {
+    const slot = el.customSlotInput.value.replace(/[\u3000\s]+/g, ' ').trim();
+    if (!slot) {
+      showError('先写下要添加的时段。', 'custom_slots');
+      el.customSlotInput.focus();
+      return;
+    }
+    if ([...slot].length > COACH_CUSTOM_SLOT_MAX) {
+      showError(`每一条自定义时段请写在 ${COACH_CUSTOM_SLOT_MAX} 个字以内。`, 'custom_slots');
+      el.customSlotInput.focus();
+      return;
+    }
+    if (customSlots.includes(slot)) {
+      showError('这个时段已经添加过了。', 'custom_slots');
+      el.customSlotInput.focus();
+      return;
+    }
+    if (customSlots.length >= COACH_CUSTOM_SLOTS_MAX) {
+      showError(`自定义时段最多 ${COACH_CUSTOM_SLOTS_MAX} 条。`, 'custom_slots');
+      return;
+    }
+    customSlots.push(slot);
+    el.customSlotInput.value = '';
+    paintCustomSlots();
+    clearError();
+    el.customSlotInput.focus();
+  }
+
   function formState() {
     return {
       title: el.title.value,
@@ -356,6 +418,8 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       tagline: el.tagline.value,
       honors: el.honors.value,
       teaching_focus: el.teachingFocus.value,
+      goals_note: el.goalsNote.value,
+      custom_slots: [...customSlots],
       enrollment_notes: el.enrollmentNotes.value,
       hourly_rate_cny: el.hourlyRate.value,
       tuition_text: el.tuitionText.value,
@@ -378,6 +442,9 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     el.tagline.value = one.tagline ?? '';
     el.honors.value = one.honors ?? '';
     el.teachingFocus.value = one.teaching_focus ?? '';
+    el.goalsNote.value = one.goals_note ?? '';
+    customSlots = Array.isArray(one.custom_slots) ? [...one.custom_slots] : [];
+    el.customSlotInput.value = '';
     el.enrollmentNotes.value = one.enrollment_notes ?? '';
     el.hourlyRate.value = one.hourly_rate_cny ?? '';
     el.tuitionText.value = one.tuition_text ?? '';
@@ -388,6 +455,7 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
       setChosen(group, group === 'levels' ? normalizeCoachAcceptLevels(one[group]) : one[group]);
     }
     paintCounters();
+    paintCustomSlots();
     paintPhotos();
   }
 
@@ -568,7 +636,16 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     paintCounters();
     if (!el.error.hidden) clearError();
   });
-  for (const input of [el.honors, el.teachingFocus]) {
+  el.customSlotAdd.addEventListener('click', addCustomSlot);
+  el.customSlotInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    addCustomSlot();
+  });
+  el.customSlotInput.addEventListener('input', () => {
+    if (!el.error.hidden) clearError();
+  });
+  for (const input of [el.honors, el.teachingFocus, el.goalsNote]) {
     input.addEventListener('input', () => {
       paintCounters();
       if (!el.error.hidden) clearError();

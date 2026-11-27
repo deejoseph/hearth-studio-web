@@ -438,11 +438,12 @@ export function learnTopic(id) {
   return LEARN_TOPICS.find((topic) => topic.id === id) ?? null;
 }
 
-export function learnTopicProgress(topic, progress = {}) {
+export function learnTopicProgress(topic, progress = {}, readTopics = []) {
   const ids = [
     ...(topic?.practiceIds ?? []),
     ...(topic?.quizzes ?? []).map((quiz) => quiz.id),
   ];
   const solved = ids.filter((id) => progress[id]?.solved).length;
-  return { solved, total: ids.length, complete: ids.length > 0 && solved === ids.length };
+  const complete = ids.length > 0 ? solved === ids.length : readTopics.includes(topic?.id);
+  return { solved, total: ids.length, complete };
 }

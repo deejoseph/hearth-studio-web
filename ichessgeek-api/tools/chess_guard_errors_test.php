@@ -35,6 +35,12 @@ $statuses = [
     'bad_budget' => 400,
     'long_schedule' => 400,
     'bad_schedule' => 400,
+    'long_teaching_focus' => 400,
+    'bad_teaching_focus' => 400,
+    'long_goals_note' => 400,
+    'bad_goals_note' => 400,
+    'long_custom_slot' => 400,
+    'bad_custom_slots' => 400,
     'long_enrollment_notes' => 400,
     'bad_enrollment_notes' => 400,
     'long_tuition' => 400,
@@ -74,6 +80,25 @@ foreach ($statuses as $code => $status) {
     $assert(($row[1] ?? null) === $status, "错误码状态码：{$code}");
     $assert(($row[0] ?? '') !== CHESS_ERRORS['server'][0], "错误码不落通用文案：{$code}");
 }
+$expectedMessages = [
+    'long_goals_note' => '授课方向说明太长了，请缩到 ' . COACH_GOALS_NOTE_MAX . ' 个字以内',
+    'bad_goals_note' => '授课方向说明里有打不出来的字符，重写一遍就好',
+    'long_custom_slot' => '自定义上课时段太长了，每条请缩到 ' . COACH_CUSTOM_SLOT_MAX . ' 个字以内',
+    'bad_custom_slots' => '自定义上课时段里有打不出来的字符，重写一遍就好',
+];
+foreach ($expectedMessages as $code => $message) {
+    $assert((CHESS_ERRORS[$code][0] ?? null) === $message, "错误码中文文案准确：{$code}");
+}
+
+/* --- rating：未设置是 null,已设置的 0 仍是 0 --- */
+$player = ['id' => '7', 'email' => 'a@b.c', 'nickname' => '青瓷', 'verified_at' => null,
+    'created_at' => '2026-11-20 08:00:00'];
+foreach ([[null, null], ['', null], [0, 0], ['0', 0], ['1450', 1450]] as [$given, $want]) {
+    $publicPlayer = chess_public_row($player + ['rating' => $given]);
+    $assert($publicPlayer['rating'] === $want,
+        '账号公开输出 rating ' . var_export($given, true) . ' → ' . var_export($want, true));
+}
+$assert(chess_public_row($player)['rating'] === null, '账号公开输出缺 rating 时保持未设置');
 
 $codes = [];
 $endpointFiles = array_merge(
@@ -129,6 +154,98 @@ $profileWrite = strpos($profileSave, 'chess_profile_write(');
 $assert(strpos($profileSave, 'chess_transaction_retry(') !== false
     && $profileLock !== false && $profileWrite !== false && $profileLock < $profileWrite,
     '资料保存锁资格后才整份写入');
+
+/* --- 新账号 rating 的建表、迁移、注册 INSERT 与三条账号输出路径 --- */
+$playersSchemaStart = strpos($guard, 'function chess_schema(');
+$playersSchema = substr($guard, $playersSchemaStart,
+    strpos($guard, 'function chess_start_session(', $playersSchemaStart) - $playersSchemaStart);
+$assert(strpos($playersSchema, 'rating INT NULL DEFAULT NULL') !== false,
+    '新账号表的 rating 建为可空且数据库默认 NULL');
+$assert(strpos($playersSchema, "SHOW COLUMNS FROM chess_players LIKE 'rating'") !== false
+    && strpos($playersSchema, "\$rating['Default'] !== null") !== false
+    && strpos($playersSchema, 'ALTER TABLE chess_players MODIFY rating INT NULL DEFAULT NULL') !== false,
+    '旧表迁移同时修正可空性和默认值,避免省略 rating 时仍写入旧默认分');
+$register = (string) file_get_contents(__DIR__ . '/../v1/chess_register.php');
+$registerInsertStart = strpos($register, 'INSERT INTO chess_players');
+$registerInsertEnd = strpos($register, 'VALUES', $registerInsertStart);
+$registerInsert = substr($register, $registerInsertStart, $registerInsertEnd - $registerInsertStart);
+$assert($registerInsertStart !== false && $registerInsertEnd !== false
+    && strpos($registerInsert, 'rating') === false,
+    '新注册 INSERT 不写 rating,由数据库默认 NULL');
+foreach (['chess_register.php', 'chess_login.php', 'chess_me.php'] as $endpoint) {
+    $source = (string) file_get_contents(__DIR__ . '/../v1/' . $endpoint);
+    $assert(strpos($source, 'chess_public_row(') !== false,
+        "{$endpoint} 的账号输出统一经过 rating 空值转换");
+}
+$appListStart = strpos($guard, 'function chess_app_list(');
+$appList = substr($guard, $appListStart,
+    strpos($guard, 'function chess_app_decide(', $appListStart) - $appListStart);
+$assert(strpos($appList, 'p.rating') !== false, '管理申请列表读取真实 rating,NULL 交由输出层保留');
+$coachRowsStart = strpos($guard, 'function chess_coach_rows(');
+$coachRows = substr($guard, $coachRowsStart,
+    strpos($guard, 'function chess_coach_directory(', $coachRowsStart) - $coachRowsStart);
+$assert(strpos($coachRows, 'p.rating') !== false
+    && strpos($coachRows, 'COALESCE(p.rating') === false,
+    '公开名录 SELECT 不把未设置 rating 补成默认分');
+
+/* --- chess_profile_write：列、占位符、类型串、绑定顺序逐项对齐 --- */
+$writeStart = strpos($guard, 'function chess_profile_write(');
+$writeEnd = strpos($guard, '/**', $writeStart);
+$writeSource = substr($guard, $writeStart, $writeEnd - $writeStart);
+$expectedColumns = [
+    'player_id', 'title', 'elo', 'years', 'tagline', 'honors', 'teaching_focus', 'goals_note', 'custom_slots',
+    'enrollment_notes', 'tuition_text', 'schedule_text', 'hourly_rate_cny', 'language', 'timezone', 'levels',
+    'goals', 'formats', 'slots', 'avatar', 'photos', 'certificates', 'created_at', 'updated_at',
+];
+$expectedTypes = [
+    'i', 's', 'i', 'i', 's', 's', 's', 's', 's', 's', 's', 's', 'i',
+    's', 's', 's', 's', 's', 's', 's', 's', 's',
+];
+$writeMatch = [];
+$hasInsert = preg_match('/INSERT INTO chess_coach_profiles\s*\((.*?)\)\s*VALUES\s*\((.*?)\)\s*ON DUPLICATE/s',
+    $writeSource, $writeMatch) === 1;
+$assert($hasInsert, '资料写入 SQL 能解析出完整列清单与 VALUES');
+$columns = $hasInsert ? array_map('trim', explode(',', $writeMatch[1])) : [];
+$values = $hasInsert ? $writeMatch[2] : '';
+$assert($columns === $expectedColumns, '资料 INSERT 列顺序包含新字段且与绑定契约一致');
+$placeholderCount = substr_count($values, '?');
+$assert($placeholderCount === count($expectedColumns) - 2 && substr_count($values, 'NOW()') === 2,
+    '资料 INSERT 有 22 个占位符,created_at/updated_at 由 NOW() 写入');
+$typeMatch = [];
+$hasTypes = preg_match('/->bind_param\(\s*"([^"]+)"/s', $writeSource, $typeMatch) === 1;
+$types = $hasTypes ? $typeMatch[1] : '';
+$assert(str_split($types) === $expectedTypes,
+    'bind_param 类型串为 i/s/i/i + 八个 s + i + 九个 s,共 22 位');
+$bindStart = strpos($writeSource, '->bind_param(');
+$bindSource = substr($writeSource, $bindStart);
+$bindArgs = substr($bindSource, 0, strpos($bindSource, ');'));
+$bindingMatches = [];
+preg_match_all("/\\$(?:playerId|profile\\['[a-z_]+'\\])/", $bindArgs, $bindingMatches);
+$expectedBindings = ['$playerId'];
+foreach (array_slice($expectedColumns, 1, -2) as $column) {
+    $expectedBindings[] = "\$profile['{$column}']";
+}
+$assert($bindingMatches[0] === $expectedBindings,
+    'bind_param 参数顺序与 SQL 列一一对应,goals_note/custom_slots 未错位');
+$assert(count($bindingMatches[0]) === $placeholderCount && strlen($types) === $placeholderCount,
+    'bind_param 类型数量、参数数量与占位符数量相同');
+foreach (['goals_note', 'custom_slots'] as $column) {
+    $assert(strpos($writeSource, "{$column} = VALUES({$column})") !== false,
+        "资料覆盖保存更新 {$column}");
+}
+$profileRowStart = strpos($guard, 'function chess_profile_row(');
+$profileRow = substr($guard, $profileRowStart,
+    strpos($guard, 'function chess_profile_ensure(', $profileRowStart) - $profileRowStart);
+$assert(strpos($profileRow, 'goals_note, custom_slots') !== false,
+    '资料读取 SELECT 带回 goals_note/custom_slots');
+$profileSchemaStart = strpos($guard, 'function chess_profile_schema(');
+$profileSchema = substr($guard, $profileSchemaStart,
+    strpos($guard, 'function chess_profile_row(', $profileSchemaStart) - $profileSchemaStart);
+$assert(strpos($profileSchema, 'goals_note VARCHAR(') !== false
+    && strpos($profileSchema, "'custom_slots', 'TEXT NOT NULL'") !== false,
+    '资料表为 goals_note/custom_slots 建列并提供旧表补列迁移');
+$assert(strpos($coachRows, 'f.goals_note, f.custom_slots') !== false,
+    '公开名录 JOIN 读取 goals_note/custom_slots');
 
 $photoSave = (string) file_get_contents(__DIR__ . '/../v1/chess_coach_photo_save.php');
 $photoBegin = strpos($photoSave, '$conn->begin_transaction()');
