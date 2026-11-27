@@ -1,5 +1,14 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { parseSavedGame } from '../src/game/persistence.js';
+
+const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+
+function startupSource() {
+  const match = mainSource.match(/function startApp\([^]*?\n\}/)?.[0];
+  if (!match) throw new Error('main.js 里找不到 startApp');
+  return match;
+}
 
 /** The shape main.js writes, which everything here starts from. */
 const valid = () => ({
@@ -89,5 +98,48 @@ describe('reading a saved game', () => {
     expect(withSave({ clockStack: 'nope' }).clockStack).toEqual([]);
     expect(withSave({ clockStack: [[1, 2], [3, 'x'], [5, 6]] }).clockStack).toEqual([]);
     expect(withSave({ clockStack: undefined }).clockStack).toEqual([]);
+  });
+});
+
+describe('first render after reload', () => {
+  function harness(mode, { invited = null, hasSave = false } = {}) {
+    const calls = [];
+    const { startApp } = new Function(
+      'mode', 'invited', 'enterOnlineIdle', 'enterClassIdle', 'restoreGame', 'newGame',
+      `${startupSource()}
+       return { startApp };`,
+    )(
+      mode,
+      invited,
+      (options) => calls.push(['online', options]),
+      () => calls.push(['class']),
+      () => { calls.push(['restore']); return hasSave; },
+      () => calls.push(['new']),
+    );
+    return { startApp, calls };
+  }
+
+  it('initializes the classroom instead of calling the no-op newGame', () => {
+    const { startApp, calls } = harness('class');
+    startApp();
+    expect(calls).toEqual([['class']]);
+  });
+
+  it('keeps an online invite in the online idle setup', () => {
+    const { startApp, calls } = harness('online', { invited: 'ABCD' });
+    startApp();
+    expect(calls).toEqual([['online', { inviteCode: 'ABCD' }]]);
+  });
+
+  it.each(['computer', 'local'])('starts a new %s game when no save restores', (mode) => {
+    const { startApp, calls } = harness(mode);
+    startApp();
+    expect(calls).toEqual([['restore'], ['new']]);
+  });
+
+  it.each(['computer', 'local'])('renders the restored %s game without starting over', (mode) => {
+    const { startApp, calls } = harness(mode, { hasSave: true });
+    startApp();
+    expect(calls).toEqual([['restore']]);
   });
 });

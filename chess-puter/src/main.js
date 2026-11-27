@@ -4925,5 +4925,10 @@ applyTheme();
 const invited = normalizeCode(window.location.hash);
 if (invited) mode = 'online';
 
-if (mode === 'online') enterOnlineIdle({ inviteCode: invited });
-else if (!restoreGame()) newGame(); // nothing stored, or what is stored no longer replays
+function startApp() {
+  if (mode === 'online') enterOnlineIdle({ inviteCode: invited });
+  else if (mode === 'class') enterClassIdle();
+  else if (!restoreGame()) newGame();
+}
+
+startApp();
