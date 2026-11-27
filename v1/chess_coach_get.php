@@ -14,14 +14,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
     chess_err('method');
 }
 
-$coachId = (int) ($_GET['c'] ?? 0);
+$coachId = coach_positive_id($_GET['c'] ?? null);
 $conn = chess_db();
 
 try {
-    $coach = $coachId > 0 ? chess_coach_one($conn, $coachId) : null;
+    $coach = $coachId === null ? null : chess_coach_one($conn, $coachId);
     if ($coach === null) {
         chess_err('no_such_coach');
     }
+    $coach['complaints'] = chess_coach_complaints_public($conn, $coachId);
     chess_json(['ok' => true, 'coach' => $coach]);
 } catch (Throwable $e) {
     chess_fail($e, 'coach profile read');

@@ -28,7 +28,9 @@ try {
         'ok' => true,
         'app' => $row === null ? null : coach_app_public($row),
         'admin' => $admin,
-        'can_teach' => $admin || coach_can_teach($row['status'] ?? null),
+        'can_teach' => chess_player_can_teach($conn, $playerId),
+        'was_teacher' => chess_coach_was_teacher($conn, $playerId),
+        'revoked' => chess_player_is_revoked($conn, $playerId),
     ]);
 } catch (Throwable $e) {
     chess_fail($e, 'coach app get');

@@ -70,7 +70,7 @@ $mutations = [
         "    if (false) {\n        return ['err' => null, 'class' => \$class, 'event' => null];\n    }\n    \$newStatus = \$approve ? CHESS_HAND_APPROVED : CHESS_HAND_NONE;",
     ],
     'M8 公开视图角色判定错' => [
-        "            \$canMove = (\$m['role'] === CHESS_CLASS_TEACHER) || (\$m['hand_status'] === CHESS_HAND_APPROVED);",
+        "            \$canMove = (\$m['role'] === CHESS_CLASS_TEACHER && \$teacherCanTeach)\n                || (\$m['hand_status'] === CHESS_HAND_APPROVED);",
         "            \$canMove = false;",
     ],
     'M9 回合读取错' => [
@@ -80,6 +80,10 @@ $mutations = [
     'M10 已批准不能再举不判' => [
         "        if (\$currentHandStatus === CHESS_HAND_APPROVED) {\n            return ['err' => 'already_approved', 'class' => \$class, 'event' => null];",
         "        if (false) {\n            return ['err' => null, 'class' => \$class, 'event' => null];",
+    ],
+    'M11 公开视图无视教练资格' => [
+        "            \$canMove = (\$m['role'] === CHESS_CLASS_TEACHER && \$teacherCanTeach)\n                || (\$m['hand_status'] === CHESS_HAND_APPROVED);",
+        "            \$canMove = (\$m['role'] === CHESS_CLASS_TEACHER)\n                || (\$m['hand_status'] === CHESS_HAND_APPROVED);",
     ],
     '控制：一个字都不改' => [null, null],
 ];
@@ -164,5 +168,5 @@ if ($failures) {
     echo "\n反向验证不成立：" . implode('、', $failures) . "\n";
     exit(1);
 }
-echo "\n十处变异全部变红，控制组全绿 —— 上面那些规则确实逐条在被测试覆盖。\n";
+echo "\n" . (count($mutations) - 1) . " 处变异全部变红，控制组全绿 —— 上面那些规则确实逐条在被测试覆盖。\n";
 exit(0);

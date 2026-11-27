@@ -95,3 +95,118 @@ function chess_send_verification($to, $nickname, $token) {
         return false;
     }
 }
+
+function chess_mail_deliver($to, $subject, $text, $html, $replyTo = null) {
+    $cfg = chess_mail_config();
+    if ($cfg === false || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    if ($replyTo !== null && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+        return false;
+    }
+    try {
+        $mail = new PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host = $cfg['host'];
+        $mail->Port = (int) ($cfg['port'] ?? 465);
+        $mail->SMTPAuth = true;
+        $mail->Username = $cfg['user'];
+        $mail->Password = $cfg['pass'];
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->CharSet = PHPMailer::CHARSET_UTF8;
+        $mail->Timeout = 15;
+        $mail->setFrom($cfg['from'] ?? $cfg['user'], $cfg['from_name'] ?? 'iChessGeek');
+        $mail->addAddress($to);
+        if ($replyTo !== null) {
+            $mail->addReplyTo($replyTo);
+        }
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body = $html;
+        $mail->AltBody = $text;
+        $mail->send();
+        return true;
+    } catch (Throwable $e) {
+        error_log('chess marketplace mail failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function chess_inquiry_preference_text(array $pref) {
+    $budgetMin = $pref['budget_min_cny'] ?? null;
+    $budgetMax = $pref['budget_max_cny'] ?? null;
+    if ($budgetMin !== null && $budgetMax !== null) {
+        $budget = $budgetMin . '–' . $budgetMax . ' 元 / 60 分钟';
+    } elseif ($budgetMin !== null) {
+        $budget = $budgetMin . ' 元以上 / 60 分钟';
+    } elseif ($budgetMax !== null) {
+        $budget = $budgetMax . ' 元以内 / 60 分钟';
+    } else {
+        $budget = '未填写';
+    }
+    $lines = [
+        '当前水平：' . ($pref['level'] ?? '未填写'),
+        '学习目标：' . ($pref['goals'] ?? '未填写'),
+        '上课形式：' . ($pref['formats'] ?? '未填写'),
+        '方便时段：' . ($pref['slots'] ?? '未填写'),
+        '时区：' . ($pref['timezone'] ?? '未填写'),
+        '授课语言：' . ($pref['language'] ?? '未填写'),
+        '预算：' . $budget,
+        '详细时间：' . ($pref['schedule_note'] ?? ''),
+        '自我介绍：' . ($pref['note'] ?? ''),
+    ];
+    return implode("\n", $lines);
+}
+
+/** 先交给教练，再给学员回执；学员回执不包含教练邮箱。 */
+function chess_send_coach_inquiry($coachEmail, $coachName, $studentEmail, $studentName, $message, array $pref) {
+    $preferenceText = chess_inquiry_preference_text($pref);
+    $coachText = "你好 {$coachName}：\n\n"
+        . "有学员通过 ichessgeek 预约你的课程。\n\n"
+        . "学员：{$studentName}\n"
+        . "学员邮箱：{$studentEmail}\n\n"
+        . "预约说明：\n{$message}\n\n"
+        . "学员偏好：\n{$preferenceText}\n\n"
+        . "请直接回复这封邮件联系学员。\n";
+    $coachHtml = '<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;'
+        . 'max-width:640px;margin:0 auto;padding:24px 16px;color:#222;line-height:1.7">'
+        . '<p>你好 ' . htmlspecialchars($coachName, ENT_QUOTES, 'UTF-8') . '：</p>'
+        . '<p>有学员通过 ichessgeek 预约你的课程。</p>'
+        . '<p><strong>学员：</strong>' . htmlspecialchars($studentName, ENT_QUOTES, 'UTF-8') . '<br>'
+        . '<strong>学员邮箱：</strong>' . htmlspecialchars($studentEmail, ENT_QUOTES, 'UTF-8') . '</p>'
+        . '<p><strong>预约说明：</strong><br>' . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) . '</p>'
+        . '<p><strong>学员偏好：</strong><br>' . nl2br(htmlspecialchars($preferenceText, ENT_QUOTES, 'UTF-8')) . '</p>'
+        . '<p>请直接回复这封邮件联系学员。</p></div>';
+    $coachSent = chess_mail_deliver(
+        $coachEmail,
+        'ichessgeek 学员预约',
+        $coachText,
+        $coachHtml,
+        $studentEmail
+    );
+    if (!$coachSent) {
+        return ['coach' => false, 'student' => false];
+    }
+
+    $studentText = "你好 {$studentName}：\n\n"
+        . "你的预约已通过 ichessgeek 转交给教练 {$coachName}。\n"
+        . "教练会直接回复你的账号邮箱；平台不会公开教练的邮箱。\n\n"
+        . "如果一直没有收到回复，你可以检查垃圾邮件文件夹。\n";
+    $studentHtml = '<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;'
+        . 'max-width:520px;margin:0 auto;padding:24px 16px;color:#222;line-height:1.7">'
+        . '<p>你好 ' . htmlspecialchars($studentName, ENT_QUOTES, 'UTF-8') . '：</p>'
+        . '<p>你的预约已通过 ichessgeek 转交给教练 '
+        . htmlspecialchars($coachName, ENT_QUOTES, 'UTF-8') . '。</p>'
+        . '<p>教练会直接回复你的账号邮箱；平台不会公开教练的邮箱。</p>'
+        . '<p>如果一直没有收到回复，你可以检查垃圾邮件文件夹。</p></div>';
+    $studentSent = chess_mail_deliver(
+        $studentEmail,
+        'ichessgeek 预约已转交',
+        $studentText,
+        $studentHtml
+    );
+    if (!$studentSent) {
+        error_log('chess inquiry confirmation failed after coach delivery');
+    }
+    return ['coach' => true, 'student' => $studentSent];
+}

@@ -24,32 +24,50 @@ try {
     if (!$row) {
         chess_err('no_such_class');
     }
-    $class = chess_class_from_row($row);
+    chess_coach_standing_schema($conn);
 
-    $member = chess_class_member($conn, $class['id'], $id);
-    if (!$member) {
-        chess_err('not_class_member');
-    }
-    if ($member['role'] === CHESS_CLASS_TEACHER) {
-        chess_err('teacher_no_hand');
-    }
+    $result = chess_transaction_retry($conn, static function () use ($conn, $row, $id, $action) {
+        $locked = chess_class_for_update($conn, (int) $row['id']);
+        if (!$locked) {
+            return ['ok' => false, 'code' => 'no_such_class'];
+        }
+        $class = chess_class_from_row($locked);
+        $member = chess_class_member_for_update($conn, $class['id'], $id);
+        if (!$member) {
+            return ['ok' => false, 'code' => 'not_class_member'];
+        }
+        if ($member['role'] === CHESS_CLASS_TEACHER) {
+            return ['ok' => false, 'code' => 'teacher_no_hand'];
+        }
+        chess_lock_player_standing($conn, $class['teacher_id']);
+        $teacherCanTeach = chess_player_can_teach($conn, $class['teacher_id']);
 
-    $result = chess_class_hand($class, $id, $action, $member['hand_status']);
-    if ($result['err'] !== null) {
-        chess_json(['ok' => false, 'code' => $result['err']]);
-    }
+        $hand = chess_class_hand($class, $id, $action, $member['hand_status']);
+        if ($hand['err'] !== null) {
+            return ['ok' => false, 'code' => $hand['err']];
+        }
+        $updated = $hand['class'];
+        if (!chess_write_class($conn, $updated, $class['seq'])) {
+            return ['ok' => false, 'code' => 'stale'];
+        }
+        if (!chess_class_set_hand($conn, $updated['id'], $id, $hand['hand_status'])) {
+            throw new RuntimeException('class hand update failed');
+        }
+        if (!chess_class_insert_event($conn, $updated['id'], $hand['event'])) {
+            throw new RuntimeException('class hand event failed');
+        }
+        return ['ok' => true, 'class' => chess_class_public(
+            $updated,
+            chess_class_members($conn, $updated['id']),
+            $id,
+            $teacherCanTeach
+        )];
+    });
 
-    $updated = $result['class'];
-    if (!chess_write_class($conn, $updated, $row['seq'])) {
-        chess_err('stale');
+    if (!$result['ok']) {
+        chess_err($result['code']);
     }
-    chess_class_set_hand($conn, $updated['id'], $id, $result['hand_status']);
-    chess_class_insert_event($conn, $updated['id'], $result['event']);
-
-    chess_json([
-        'ok' => true,
-        'class' => chess_class_public($updated, chess_class_members($conn, $updated['id']), $id),
-    ]);
+    chess_json(['ok' => true, 'class' => $result['class']]);
 } catch (Throwable $e) {
     chess_fail($e, 'class_hand');
 }

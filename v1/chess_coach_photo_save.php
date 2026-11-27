@@ -5,8 +5,8 @@
  * 一次一张而不是整批：传完当场就能在界面上看到那一张，而"整批替换"那种写法
  * 会让一次网络中断把已有照片清空 —— 照片是不可再生成的东西。
  *
- * 三道门按顺序过：登录且邮箱验证过 → 够不够格（chess_player_can_teach）→
- * 这张图是不是真图片。够格这一步放在读文件之前：不合格的人连临时文件都不该碰。
+ * 三道门按顺序过：登录且邮箱验证过 → 这张图是不是真图片 → 事务内复核教练资格。
+ * 图片先做轻量校验，资格行加锁后再落盘，避免校验期间被撤销后仍写入。
  *
  * 🔴 类型只认 getimagesize() 读出来的（它看文件头），不认浏览器给的 Content-Type：
  * 那一个是客户端字段，把 .php 改名成 .jpg 再标 image/jpeg 照样能过。
@@ -22,6 +22,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 }
 
 $playerId = chess_require_verified();
+$conn = chess_db();
 
 // kind 只决定写哪一列。别的值退到头像，不拼进 SQL，也不当成目录名。
 $kind = $_POST['kind'] ?? '';
@@ -45,68 +46,85 @@ if ($bytes < 1 || $bytes > COACH_IMAGE_BYTES_MAX) {
 // getimagesize 对不是图的东西返回 false，不抛异常 —— 那份 false 交给规则层判。
 $info = @getimagesize($tmp);
 
-$conn = chess_db();
-
+$storedName = null;
 try {
-    if (!chess_player_can_teach($conn, $playerId)) {
-        chess_err('teacher_only');
-    }
-    $ip = chess_client_ip();
-    if (chess_attempt_count($conn, 'photo', $ip, CHESS_PHOTO_WINDOW) >= CHESS_PHOTO_LIMIT) {
-        chess_err('too_many_uploads');
-    }
-
-    [$name, $code] = coach_image_store_name($info, $bytes, bin2hex(random_bytes(12)));
-    if ($code !== null) {
-        chess_err($code, ['field' => $field]);
-    }
-
-    $old = chess_profile_row($conn, $playerId) ?? [];
-    if ($field !== 'avatar') {
-        $isCertificate = $field === 'certificates';
-        $max = $isCertificate ? COACH_CERTIFICATES_MAX : COACH_PHOTOS_MAX;
-        $tooMany = $isCertificate ? 'too_many_certificates' : 'too_many_photos';
-        $existing = array_values(array_filter(array_map('trim',
-            explode(',', (string) ($old[$field] ?? '')))));
-        [$value, , $bad] = coach_image_list(array_merge($existing, [$name]),
-            $max, $field, 'bad_image', $tooMany);
-        if ($bad !== null) {
-            chess_err($bad, ['field' => $field]);
+    // 文件落盘不能随 SQL 回滚，所以这里不自动重试整个上传；失败时由 catch 清掉新文件。
+    $conn->begin_transaction();
+    $result = (static function () use ($conn, $playerId, $field, $info, $bytes, $tmp, &$storedName) {
+        chess_lock_player_standing($conn, $playerId);
+        if (chess_player_is_revoked($conn, $playerId)) {
+            return ['ok' => false, 'code' => 'coach_revoked'];
         }
-    } else {
-        $value = $name;
+        if (!chess_player_can_teach($conn, $playerId)) {
+            return ['ok' => false, 'code' => 'teacher_only'];
+        }
+        $ip = chess_client_ip();
+        if (chess_attempt_count($conn, 'photo', $ip, CHESS_PHOTO_WINDOW) >= CHESS_PHOTO_LIMIT) {
+            return ['ok' => false, 'code' => 'too_many_uploads'];
+        }
+
+        [$name, $code] = coach_image_store_name($info, $bytes, bin2hex(random_bytes(12)));
+        if ($code !== null) {
+            return ['ok' => false, 'code' => $code, 'field' => $field];
+        }
+
+        $old = chess_profile_row($conn, $playerId, true) ?? [];
+        if ($field !== 'avatar') {
+            $isCertificate = $field === 'certificates';
+            $max = $isCertificate ? COACH_CERTIFICATES_MAX : COACH_PHOTOS_MAX;
+            $tooMany = $isCertificate ? 'too_many_certificates' : 'too_many_photos';
+            $existing = array_values(array_filter(array_map('trim',
+                explode(',', (string) ($old[$field] ?? '')))));
+            [$value, , $bad] = coach_image_list(array_merge($existing, [$name]),
+                $max, $field, 'bad_image', $tooMany);
+            if ($bad !== null) {
+                return ['ok' => false, 'code' => $bad, 'field' => $field];
+            }
+        } else {
+            $value = $name;
+        }
+
+        $dir = chess_coach_media_dir($playerId);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            $why = error_get_last();
+            error_log('chess coach media: mkdir failed for player ' . $playerId
+                . ' (' . ($why['message'] ?? 'unknown') . ')');
+            throw new RuntimeException('coach media mkdir failed');
+        }
+        if (!move_uploaded_file($tmp, $dir . '/' . $name)) {
+            error_log('chess coach media: move failed for player ' . $playerId);
+            throw new RuntimeException('coach media move failed');
+        }
+        $storedName = $name;
+        if (!chess_profile_set_image($conn, $playerId, $field, $value)) {
+            throw new RuntimeException('coach profile image update failed');
+        }
+
+        $row = chess_profile_row($conn, $playerId, true);
+        if ($row === null) {
+            throw new RuntimeException('coach profile image written but missing');
+        }
+        chess_record_attempt($conn, 'photo', $ip);
+        return ['ok' => true, 'row' => $row];
+    })();
+    $conn->commit();
+    $storedName = null;
+    if (!$result['ok']) {
+        chess_err($result['code'], isset($result['field']) ? ['field' => $result['field']] : []);
     }
 
-    $dir = chess_coach_media_dir($playerId);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
-        $why = error_get_last();
-        error_log('chess coach media: mkdir failed for player ' . $playerId
-            . ' (' . ($why['message'] ?? 'unknown') . ')');
-        chess_err('server');
-    }
-    if (!move_uploaded_file($tmp, $dir . '/' . $name)) {
-        // 这一步失败通常是主机权限，不是人发来的东西有问题：日志里要说清是哪一条
-        error_log('chess coach media: move failed for player ' . $playerId);
-        chess_err('server');
-    }
-    if (!chess_profile_set_image($conn, $playerId, $field, $value)) {
-        @unlink($dir . '/' . $name);
-        chess_err('server');
-    }
-
-    // 这一行不再引用的那些（被换掉的头像、被删的照片）从盘上清掉。
-    // 注意 $wanted 是写之前读的那一份，所以新名字的旧版本一定会被算进来。
-    $row = chess_profile_row($conn, $playerId);
-    $kept = chess_coach_media_names($row);
-    chess_coach_media_prune($playerId, $kept);
-
-    chess_record_attempt($conn, 'photo', $ip);   // 只记真落盘的：失败的尝试不该计额度
+    $row = $result['row'];
+    chess_coach_media_prune($playerId, chess_coach_media_names($row));
     chess_json([
         'ok' => true,
-        'profile' => coach_profile_public($row ?? []),
-        'filled' => coach_profile_filled(coach_profile_public($row ?? [])),
+        'profile' => coach_profile_public($row),
+        'filled' => coach_profile_filled(coach_profile_public($row)),
         'listed' => true,
     ]);
 } catch (Throwable $e) {
+    $conn->rollback();
+    if ($storedName !== null) {
+        @unlink(chess_coach_media_dir($playerId) . '/' . $storedName);
+    }
     chess_fail($e, 'coach photo save');
 }

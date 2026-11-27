@@ -20,25 +20,50 @@ try {
     if (!$row) {
         chess_err('no_such_class');
     }
-    $class = chess_class_from_row($row);
+    chess_coach_standing_schema($conn);
 
-    if ($class['status'] !== CHESS_CLASS_OPEN) {
-        chess_err('class_closed');
+    $result = chess_transaction_retry($conn, static function () use ($conn, $row, $id) {
+        $locked = chess_class_for_update($conn, (int) $row['id']);
+        if (!$locked) {
+            return ['ok' => false, 'code' => 'no_such_class'];
+        }
+        $class = chess_class_from_row($locked);
+        if ($class['status'] !== CHESS_CLASS_OPEN) {
+            return ['ok' => false, 'code' => 'class_closed'];
+        }
+        $member = chess_class_member_for_update($conn, $class['id'], $id);
+        if ($member && $member['role'] === CHESS_CLASS_STUDENT) {
+            chess_lock_player_standing($conn, $class['teacher_id']);
+            $teacherCanTeach = chess_player_can_teach($conn, $class['teacher_id']);
+        } else {
+            $problem = chess_class_teacher_problem($conn, $class, $id === $class['teacher_id'] ? $id : $class['teacher_id']);
+            if ($problem !== null) {
+                return ['ok' => false, 'code' => $problem === 'not_teacher' ? 'teacher_unavailable' : $problem];
+            }
+            $teacherCanTeach = true;
+        }
+        if (!$member) {
+            $role = $id === $class['teacher_id'] ? CHESS_CLASS_TEACHER : CHESS_CLASS_STUDENT;
+            if (!chess_class_add_member($conn, $class['id'], $id, $role)) {
+                throw new RuntimeException('class join insert failed');
+            }
+        }
+        return ['ok' => true, 'payload' => [
+            'ok' => true,
+            'class' => chess_class_public(
+                $class,
+                chess_class_members($conn, $class['id']),
+                $id,
+                $teacherCanTeach
+            ),
+            'events' => chess_class_events($conn, $class['id'], 0),
+        ]];
+    });
+
+    if (!$result['ok']) {
+        chess_err($result['code']);
     }
-
-    $existing = chess_class_member($conn, $class['id'], $id);
-    if (!$existing) {
-        $role = ($id === $class['teacher_id']) ? CHESS_CLASS_TEACHER : CHESS_CLASS_STUDENT;
-        chess_class_add_member($conn, $class['id'], $id, $role);
-    }
-
-    chess_json([
-        'ok' => true,
-        'class' => chess_class_public($class, chess_class_members($conn, $class['id']), $id),
-        // 半堂课已经下过去了：把记录一并给出，学生进来就能看到棋谱，
-        // 不用等第一次轮询、也不会先看到一盘空棋盘。
-        'events' => chess_class_events($conn, $class['id'], 0),
-    ]);
+    chess_json($result['payload']);
 } catch (Throwable $e) {
     chess_fail($e, 'class_join');
 }
