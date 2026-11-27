@@ -1,0 +1,21 @@
+{
+  "name": "国际象棋自学 —— 浏览器里练棋、复盘、导棋谱",
+  "short_name": "国际象棋",
+  "description": "浏览器里免费练棋：和电脑下（三档难度）、课堂或报房间码和朋友在线下，走完一手一手回看，棋谱能复制或存成 PGN 文件。",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#f4f5f9",
+  "background_color": "#f4f5f9",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

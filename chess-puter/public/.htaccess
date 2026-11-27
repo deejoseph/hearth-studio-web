@@ -1,0 +1,79 @@
+# Served from https://www.ichessgeek.com/chess/ — this file applies to that
+# directory and everything below it. It is authored in public/ so that Vite
+# copies it into every build.
+#
+# The site root keeps its own .htaccess for the React app; the SPA fallback
+# there is guarded by "REQUEST_FILENAME !-f / !-d", so this real directory is
+# never rewritten into it. The root app's service worker carries a matching
+# navigateFallbackDenylist, otherwise it would answer this navigation with the
+# cached root index.html and the board would never load.
+
+# The root .htaccess has no DirectoryIndex statement we can rely on, and this
+# build is a single index.html, so name it explicitly.
+DirectoryIndex index.html
+
+# Everything the game needs is same-origin: the engine, the AI, the piece art,
+# the fonts, the saved game in localStorage, and the account and room endpoints
+# under /api/v1/. There is no analytics, so the policy below allows nothing
+# else. Playing the computer still asks for no account of any kind — signing up
+# only opens what is built on top of it: the rooms, and the email that verifies
+# a seat in one.
+#
+# script-src carries one hash, for the inline script in index.html that picks
+# the theme before first paint. Vite copies that script into the build
+# verbatim, so the hash only changes when its text changes. Recompute with:
+#   python3 -c "import re,hashlib,base64;[print('sha256-'+base64.b64encode(hashlib.sha256(s.encode()).digest()).decode()) for s in re.findall(r'<script>(.*?)</script>',open('dist/index.html').read(),re.S)]"
+# (The JSON-LD block is a non-executing data block; CSP does not apply to it.)
+#
+# style-src needs no 'unsafe-inline': the app styles through CSSOM and class
+# toggles, never with style attributes or injected <style> elements.
+#
+# frame-src is left to default-src, which means this game may frame pages of
+# our own site and nothing else. frame-ancestors is '*' so any site may embed
+# the board in an iframe, ours included. There is deliberately no
+# X-Frame-Options header: it has no wildcard equivalent, and any value it can
+# carry would block framing in the browsers that honour it (browsers that
+# support frame-ancestors ignore it anyway).
+#
+# script-src also carries 'wasm-unsafe-eval', which Stockfish needs to compile
+# its .wasm. Chrome lets a same-origin WebAssembly.instantiateStreaming
+# (verified: the worker boots under the policy without this token) but Firefox
+# and Safari read the spec strictly and refuse it, so the token is what makes
+# the analyzer work in those browsers. It grants WebAssembly compilation only —
+# no inline script, no remote script — and the module bytes are still held to
+# 'self' plus the correct MIME type below.
+<IfModule mod_headers.c>
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-Ae92DMlvhX2of26U5jhemEEtmQDwlfAX4yVGQ8Mrsfc='; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *; upgrade-insecure-requests"
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  # No includeSubDomains: RFC 6797 says a UA must ignore that directive when
+  # the policy arrives from a path other than "/", and this is /chess/.
+  Header set Strict-Transport-Security "max-age=31536000"
+</IfModule>
+
+# WebAssembly has to arrive as application/wasm: the compile call rejects any
+# other type, and a host that has never heard of the extension serves the
+# module as text/plain. That is a whole-feature failure with a confusing
+# symptom, so the type is stated here instead of assumed. Whether the server
+# already got it right is only checkable once the file is on it — see the
+# curl -I note in the analysis task.
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+</IfModule>
+
+# The engine's file names carry its version, so a different engine is a
+# different URL and max-age can never serve the wrong bytes: changing these
+# files means renaming them. Worth a year, because the 1.8MB module is the
+# entire cost of the analyzer and is paid once per device — the progress bar
+# in the UI exists for that first visit, not for these.
+#
+# This is the only <FilesMatch> section here, and a host that forbids one in
+# .htaccess answers the whole directory with 500. It is verified with curl -I
+# after every upload; if /chess ever goes 500 on a deploy, this block is the
+# first thing to delete.
+<IfModule mod_headers.c>
+  <FilesMatch "^stockfish-.*\.(js|wasm)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

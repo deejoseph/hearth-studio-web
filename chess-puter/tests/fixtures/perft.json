@@ -1,0 +1,112 @@
+[
+  {
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "depths": [
+      {
+        "depth": 1,
+        "nodes": 20,
+        "reference": 20
+      },
+      {
+        "depth": 2,
+        "nodes": 400,
+        "reference": 400
+      },
+      {
+        "depth": 3,
+        "nodes": 8902,
+        "reference": 8902
+      },
+      {
+        "depth": 4,
+        "nodes": 197281,
+        "reference": 197281
+      }
+    ]
+  },
+  {
+    "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+    "depths": [
+      {
+        "depth": 1,
+        "nodes": 48,
+        "reference": 48
+      },
+      {
+        "depth": 2,
+        "nodes": 2039,
+        "reference": 2039
+      },
+      {
+        "depth": 3,
+        "nodes": 97862,
+        "reference": 97862
+      }
+    ]
+  },
+  {
+    "fen": "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+    "depths": [
+      {
+        "depth": 1,
+        "nodes": 14,
+        "reference": 14
+      },
+      {
+        "depth": 2,
+        "nodes": 191,
+        "reference": 191
+      },
+      {
+        "depth": 3,
+        "nodes": 2812,
+        "reference": null
+      },
+      {
+        "depth": 4,
+        "nodes": 43238,
+        "reference": 43238
+      }
+    ]
+  },
+  {
+    "fen": "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+    "depths": [
+      {
+        "depth": 1,
+        "nodes": 6,
+        "reference": 6
+      },
+      {
+        "depth": 2,
+        "nodes": 264,
+        "reference": null
+      },
+      {
+        "depth": 3,
+        "nodes": 9467,
+        "reference": 9467
+      }
+    ]
+  },
+  {
+    "fen": "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
+    "depths": [
+      {
+        "depth": 1,
+        "nodes": 44,
+        "reference": 44
+      },
+      {
+        "depth": 2,
+        "nodes": 1486,
+        "reference": 1486
+      },
+      {
+        "depth": 3,
+        "nodes": 62379,
+        "reference": 62379
+      }
+    ]
+  }
+]

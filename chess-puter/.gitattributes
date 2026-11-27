@@ -1,0 +1,5 @@
+# The Stockfish build under public/engine is vendored byte-for-byte, and
+# src/engine/stockfish.js records the sha256 of both files. Line endings would
+# change them, so no conversion may touch this directory on checkout -- the
+# working copies here run with core.autocrlf=true.
+public/engine/** binary

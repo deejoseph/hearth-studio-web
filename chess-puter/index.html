@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="给自学者的一副国际象棋棋盘，浏览器里直接下，免费、无广告、不用装东西。和电脑练（三档难度），两个人用一台设备讲解，或报房间码和朋友在线下，走完一手一手回看，棋谱能复制或存成 PGN 文件。" />
+    <link rel="canonical" href="https://www.ichessgeek.com/chess/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="国际象棋" />
+    <meta property="og:url" content="https://www.ichessgeek.com/chess/" />
+    <meta property="og:title" content="国际象棋自学 —— 浏览器里练棋、复盘、导棋谱" />
+    <meta property="og:description" content="免费、不用装东西。和电脑练，或者报房间码和朋友在线下；走完一手一手回看，棋谱一键复制或存成 PGN。" />
+    <!-- 1200x630 (1.91:1) is the ratio Facebook, LinkedIn, Slack, and X's
+         large card all render. Built from tools/og-image.html.
+         The name carries a v2 because crawlers and the CDN key the picture on
+         its URL: overwriting og-image.png would keep serving the old card for a
+         week, and links shared earlier still point at that URL, so it stays. -->
+    <meta property="og:image" content="https://www.ichessgeek.com/chess/og-image-v2.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="国际象棋自学 —— 浏览器里免费。一张走出将死的棋盘。" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="国际象棋自学 —— 浏览器里练棋、复盘、导棋谱" />
+    <meta name="twitter:description" content="免费、不用装东西。和电脑练，或者报房间码和朋友在线下；走完一手一手回看，棋谱一键复制或存成 PGN。" />
+    <meta name="twitter:image" content="https://www.ichessgeek.com/chess/og-image-v2.png" />
+    <meta name="twitter:image:alt" content="国际象棋自学 —— 浏览器里免费。一张走出将死的棋盘。" />
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="manifest" href="site.webmanifest" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#13151b" media="(prefers-color-scheme: dark)" />
+    <title>国际象棋自学 —— 浏览器里练棋、复盘、导棋谱</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": ["WebApplication", "VideoGame"],
+        "name": "国际象棋自学 —— 浏览器里练棋、复盘、导棋谱",
+        "url": "https://www.ichessgeek.com/chess/",
+        "description": "给自学者的一副国际象棋棋盘，浏览器里直接下，免费、无广告、不用装东西。和电脑练（三档难度），两个人用一台设备讲解，或报房间码和朋友在线下，走完一手一手回看，棋谱能复制或存成 PGN 文件。",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "任何系统",
+        "browserRequirements": "需要 JavaScript",
+        "genre": "棋类",
+        "gamePlatform": "网页浏览器",
+        "playMode": ["SinglePlayer", "MultiPlayer"],
+        "image": "https://www.ichessgeek.com/chess/icon-512.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
+    <script>
+      // Resolve the theme before first paint to avoid a flash. main.js keeps
+      // the attribute in sync afterwards; "system" follows the OS setting.
+      (function () {
+        var theme;
+        try {
+          theme = (JSON.parse(localStorage.getItem('chess-settings')) || {}).theme;
+        } catch (e) {
+          /* fall through to system */
+        }
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <!-- Plausible 是上游站的统计，脚本里写的是他们的站点 id，在我们域名上只会
+         404；src/analytics.js 的 track() 用 window.plausible?.()，没有存根也只是
+         什么都不做，所以这里整段去掉，不替换成别的统计。 -->
+  </head>
+  <body>
+    <noscript>
+      <p class="noscript-note">
+        这副棋盘完全在浏览器里运行，需要开启 JavaScript 才能用。
+        开启之后就能和电脑对弈，或者两个人用一台设备讲解对弈。
+      </p>
+    </noscript>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="国际象棋 —— 返回 ichessgeek.com 首页">
+          <span class="brand-back" aria-hidden="true">←</span>
+          <span class="brand-mark"><img src="icon-128.png" alt="" width="128" height="128" /></span>
+          <h1 class="brand-name">国际象棋<span class="visually-hidden"> —— 浏览器里免费练棋、复盘、导棋谱</span></h1>
+        </a>
+        <div class="topbar-right">
+          <span class="topbar-note" id="topbar-note">电脑对弈</span>
+          <button class="account-chip" id="account-chip" type="button" aria-haspopup="dialog" aria-controls="account-dialog">
+            <i data-lucide="user"></i>
+            <span class="account-chip-name" id="account-chip-label">登录</span>
+            <span class="account-flag" id="account-flag" title="邮箱还没确认" aria-hidden="true" hidden>!</span>
+          </button>
+          <div class="theme-toggle" role="group" aria-label="主题">
+            <button type="button" data-theme-choice="light" title="浅色主题" aria-label="浅色主题">
+              <i data-lucide="sun"></i>
+            </button>
+            <button type="button" data-theme-choice="dark" title="深色主题" aria-label="深色主题">
+              <i data-lucide="moon"></i>
+            </button>
+            <button type="button" data-theme-choice="system" title="跟随系统主题" aria-label="跟随系统主题">
+              <i data-lucide="monitor"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="sidebar sidebar-left">
+          <!-- 左边这一栏永远先是自学教程（人人可看），题库打开时把教程和题库并成一列，
+               走法回到右边单独一列 —— 题目列表放在走法框左侧，教练一眼能挑题。 -->
+          <div class="learn-panes">
+            <section class="card learn-card" id="learn-card" aria-label="国象自学教程">
+              <div class="card-head">
+                <h2 class="card-title">国象自学教程</h2>
+                <span class="learn-tag">从零开始</span>
+              </div>
+              <div class="learn-topics">
+                <button type="button" class="learn-topic" data-learn-topic="setup">摆好棋盘</button>
+                <button type="button" class="learn-topic" data-learn-topic="pieces">棋子怎么走</button>
+                <button type="button" class="learn-topic" data-learn-topic="rules">特殊规则</button>
+                <button type="button" class="learn-topic" data-learn-topic="opening">开局三原则</button>
+                <button type="button" class="learn-topic" data-learn-topic="tactics">常见战术</button>
+                <button type="button" class="learn-topic" data-learn-topic="etiquette">国象礼仪</button>
+                <button type="button" class="learn-topic" data-learn-topic="ai">国际象棋与 AI</button>
+              </div>
+            </section>
+            <section class="card tactics-card hidden" id="tactics-card" aria-label="题库练习">
+              <div id="tactics-panel-container"></div>
+            </section>
+          </div>
+          <section class="card moves-card" id="moves-card">
+            <div class="card-head">
+              <h2 class="card-title">走法</h2>
+              <div class="card-actions">
+                <button class="icon-btn icon-btn-sm" id="pgn-copy-btn" type="button" title="复制 PGN 棋谱" aria-label="复制 PGN 棋谱" disabled>
+                  <i data-lucide="clipboard-copy"></i>
+                </button>
+                <button class="icon-btn icon-btn-sm" id="pgn-download-btn" type="button" title="下载 PGN 文件" aria-label="下载 PGN 文件" disabled>
+                  <i data-lucide="download"></i>
+                </button>
+                <button class="icon-btn icon-btn-sm" id="library-btn" type="button" title="棋谱库：下过的局都在这里" aria-label="打开棋谱库">
+                  <i data-lucide="library"></i>
+                </button>
+              </div>
+            </div>
+            <div class="review-bar">
+              <div class="review-nav" role="group" aria-label="回看棋局">
+                <button class="icon-btn icon-btn-sm" id="review-first-btn" type="button" title="开局局面" aria-label="回到开局局面" disabled>
+                  <i data-lucide="chevron-first"></i>
+                </button>
+                <button class="icon-btn icon-btn-sm" id="review-prev-btn" type="button" title="上一步" aria-label="回看上一步" disabled>
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <button class="icon-btn icon-btn-sm" id="review-next-btn" type="button" title="下一步" aria-label="前进到下一步" disabled>
+                  <i data-lucide="chevron-right"></i>
+                </button>
+                <button class="icon-btn icon-btn-sm" id="review-last-btn" type="button" title="最新局面" aria-label="回到最新局面" disabled>
+                  <i data-lucide="chevron-last"></i>
+                </button>
+              </div>
+              <p class="review-note" id="review-note"></p>
+              <div class="review-modes">
+                <button class="btn btn-ghost analysis-toggle" id="analysis-btn" type="button" aria-pressed="false">
+                  <i data-lucide="activity"></i>分析
+                </button>
+                <button class="btn btn-ghost review-toggle" id="review-game-btn" type="button" disabled>
+                  <i data-lucide="scan-search"></i>复盘
+                </button>
+                <button class="btn btn-ghost tactics-toggle" id="tactics-btn" type="button" aria-pressed="false">
+                  <i data-lucide="target"></i>题库
+                </button>
+              </div>
+            </div>
+            <ol class="move-list" id="move-list"></ol>
+            <p class="moves-empty" id="moves-empty">还没有走法 —— 白方先走。</p>
+            <section class="analysis hidden" id="analysis-panel" aria-label="引擎评估">
+              <div class="eval-row">
+                <div class="eval-bar" aria-hidden="true"><span class="eval-fill" id="eval-fill"></span></div>
+                <span class="eval-score" id="eval-score"></span>
+              </div>
+              <ol class="eval-lines" id="eval-lines"></ol>
+              <p class="eval-note" id="eval-note"></p>
+            </section>
+          </section>
+        </aside>
+
+        <section class="board-column">
+          <div class="board-frame">
+            <div id="board" class="board" role="grid" aria-label="国际象棋棋盘"></div>
+          </div>
+          <div class="annotation-toolbar" id="annotation-toolbar" role="toolbar" aria-label="棋盘工具">
+            <button type="button" data-tool="square" aria-pressed="false" title="格子高亮：点击格子添加/移除高亮">
+              <i data-lucide="square"></i>
+            </button>
+            <button type="button" data-tool="arrow" aria-pressed="false" title="箭头：从起点拖到终点画箭头">
+              <i data-lucide="arrow-right"></i>
+            </button>
+            <button type="button" data-tool="erase" aria-pressed="false" title="擦除：点击格子或箭头擦除">
+              <i data-lucide="eraser"></i>
+            </button>
+            <!-- 翻转是看棋的事，不是画笔，但挨着画笔放最顺手；只在讲解模式里出现
+                 （见 updateModeUi），跟着工具那一组走，窄屏也不会多占一行。 -->
+            <button type="button" id="flip-board-btn" class="hidden" title="翻转棋盘" aria-label="翻转棋盘">
+              <i data-lucide="flip-vertical-2"></i>
+            </button>
+            <span class="separator"></span>
+            <button type="button" class="color-swatch" data-color="yellow" aria-pressed="true" aria-label="黄色（当前选中）" title="黄色"></button>
+            <button type="button" class="color-swatch" data-color="green" aria-pressed="false" aria-label="绿色" title="绿色"></button>
+            <button type="button" class="color-swatch" data-color="red" aria-pressed="false" aria-label="红色" title="红色"></button>
+            <button type="button" class="color-swatch" data-color="blue" aria-pressed="false" aria-label="蓝色" title="蓝色"></button>
+            <span class="separator"></span>
+            <button type="button" id="annotation-clear" title="清空当前局面所有标注">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
+          <!-- 主线带支线的棋谱另开一页，放在棋盘正下方：走法区是记录本，只记走出来的
+               那一条线，括号里的另一条得另放才看得清（写法照 ChessBase 的注释窗）。 -->
+          <section class="pgn-sheet hidden" id="pgn-sheet" aria-label="棋谱：主线与支线">
+            <div class="pgn-head">
+              <h2 class="pgn-title">棋谱</h2>
+              <p class="pgn-note">括号里是当时另走过的一条线，点一下就能跳过去。</p>
+            </div>
+            <div class="pgn-body" id="pgn-body"></div>
+          </section>
+          <!-- 复盘报告放在棋盘下方而不是左侧走法卡里：那一栏只有 280px，评估曲线
+               挤成一条看不清起伏，多分支棋谱和教练的批注更放不下。 -->
+          <section class="review-progress-section hidden" id="review-progress-section">
+            <div id="review-progress-container"></div>
+          </section>
+          <section class="review-sheet hidden" id="review-result-panel" aria-label="复盘报告">
+            <div class="review-panel" id="review-panel-container"></div>
+          </section>
+        </section>
+
+        <aside class="sidebar">
+          <div class="mode-switch" role="group" aria-label="对弈模式">
+            <button type="button" data-mode="computer" aria-pressed="true">
+              <i data-lucide="cpu"></i>电脑
+            </button>
+            <button type="button" data-mode="local" aria-pressed="false">
+              <i data-lucide="users"></i>讲解
+            </button>
+            <button type="button" data-mode="online" aria-pressed="false">
+              <i data-lucide="globe"></i>在线
+            </button>
+            <button type="button" data-mode="class" aria-pressed="false">
+              <i data-lucide="school"></i>课堂
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-secondary" id="import-btn">
+            <i data-lucide="upload"></i>导入 PGN/FEN
+          </button>
+
+          <div id="result-banner" class="result-banner hidden"></div>
+
+          <section class="card online-card hidden" id="online-card" aria-label="在线对弈设置">
+            <div class="online-section" id="online-idle">
+              <h2 class="card-title">和朋友下一局</h2>
+              <p class="online-note" id="online-invite-note" hidden>
+                有人约你对弈 —— 按「进入」就能坐下。
+              </p>
+              <button class="btn btn-primary btn-block" id="host-btn" type="button">
+                <i data-lucide="plus"></i><span id="host-btn-label">开一局</span>
+              </button>
+              <div class="online-divider" aria-hidden="true"><span>或者用房间码加入</span></div>
+              <form class="join-row" id="join-form">
+                <label class="visually-hidden" for="join-input">房间码</label>
+                <!-- Room codes are six characters from an alphabet with no I, O,
+                     0 or 1, and served uppercase. The referee folds case, but a
+                     phone keyboard that starts in lowercase shows the player a
+                     code that does not look like the one they were sent. -->
+                <input
+                  id="join-input"
+                  name="code"
+                  placeholder="房间码"
+                  autocomplete="off"
+                  autocapitalize="characters"
+                  autocorrect="off"
+                  spellcheck="false"
+                />
+                <button class="btn btn-ghost" id="join-btn" type="submit">进入</button>
+              </form>
+              <p class="online-error" id="online-error" role="alert" hidden></p>
+            </div>
+
+            <div class="online-section hidden" id="online-hosting">
+              <h2 class="card-title">把房间码发给朋友</h2>
+              <div class="invite-box">
+                <code class="invite-code" id="invite-code"></code>
+                <button class="icon-btn" id="copy-code-btn" type="button" title="复制房间码" aria-label="复制房间码">
+                  <i data-lucide="copy" class="icon-copy"></i>
+                  <i data-lucide="check" class="icon-check hidden"></i>
+                </button>
+              </div>
+              <button class="btn btn-primary btn-block" id="copy-link-btn" type="button">
+                <i data-lucide="link"></i><span id="copy-link-label">复制邀请链接</span>
+              </button>
+              <p class="online-wait"><span class="spinner" aria-hidden="true"></span>正在等对方进来……</p>
+              <button class="btn btn-ghost btn-block" id="cancel-host-btn" type="button">取消</button>
+            </div>
+
+            <div class="online-section hidden" id="online-joining">
+              <h2 class="card-title">正在进入对局</h2>
+              <p class="online-wait"><span class="spinner" aria-hidden="true"></span>正在连到对方的房间……</p>
+              <button class="btn btn-ghost btn-block" id="cancel-join-btn" type="button">取消</button>
+            </div>
+          </section>
+
+          <section class="card class-card hidden" id="class-card" aria-label="课堂">
+            <div class="online-section" id="class-idle">
+              <h2 class="card-title">课堂</h2>
+              <p class="online-note">老师开课堂，学生用 4 位码进来旁听。学生举手，老师批准后能走一步。</p>
+              <button class="btn btn-primary btn-block" id="class-create-btn" type="button">
+                <i data-lucide="plus"></i>开课堂
+              </button>
+              <!-- 开课堂的资格由服务端判（chess_class_create.php 里的
+                   chess_require_teacher）。下面这两行只负责把"为什么按不动"说明白，
+                   并把申请入口摆在旁边 —— 它们不是门，删掉也拦不住任何人。
+                   内容由 src/ui/coachApp.js 按服务端回的那一态填，没取到就整块收起。 -->
+              <p class="class-teacher-note" id="class-teacher-note" hidden></p>
+              <button class="btn btn-ghost btn-block" id="coach-apply-btn" type="button"
+                      aria-haspopup="dialog" aria-controls="coach-app-dialog">
+                <i data-lucide="badge-check"></i><span id="coach-apply-label">申请成为教练</span>
+              </button>
+              <div class="online-divider" aria-hidden="true"><span>或者用课堂码加入</span></div>
+              <form class="join-row" id="class-join-form">
+                <label class="visually-hidden" for="class-join-input">课堂码</label>
+                <input
+                  id="class-join-input"
+                  name="code"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  maxlength="4"
+                  pattern="\d{4}"
+                  placeholder="4 位数字"
+                />
+                <button class="btn btn-ghost" id="class-join-btn" type="submit">进入</button>
+              </form>
+              <p class="online-error" id="class-error" role="alert" hidden></p>
+            </div>
+
+            <div class="online-section hidden" id="class-active">
+              <h2 class="card-title">课堂码：<span id="class-code-display"></span></h2>
+              <div id="class-students" class="class-students"></div>
+              <button class="btn btn-ghost btn-block" id="class-leave-btn" type="button">离开课堂</button>
+            </div>
+
+            <div class="online-section hidden" id="class-student-panel">
+              <h2 class="card-title">旁听中</h2>
+              <p class="online-note" id="class-student-status">等待老师走子……</p>
+              <button class="btn btn-primary btn-block" id="class-hand-btn" type="button">
+                <i data-lucide="hand"></i><span class="class-hand-label">举手</span>
+              </button>
+              <button class="btn btn-ghost btn-block" id="class-student-leave-btn" type="button">离开课堂</button>
+            </div>
+          </section>
+
+          <!-- Shown only for a signed-in player whose email is not confirmed
+               yet: the one thing standing between them and a game online. -->
+          <section class="card verify-card hidden" id="verify-card" aria-labelledby="verify-title">
+            <h2 class="card-title" id="verify-title">去邮箱确认一下</h2>
+            <p class="verify-note">
+              点一下我们发给
+              <span class="verify-mail" id="verify-email"></span>
+              的那封邮件里的链接，把账号确认了。确认之后才能和人在线对弈；
+              和电脑下棋不用确认也能玩。
+            </p>
+            <button class="btn btn-ghost btn-block" id="resend-btn" type="button">重发邮件</button>
+            <p class="online-error" id="verify-error" role="alert" hidden></p>
+          </section>
+
+          <section class="card player-card" id="card-top">
+            <span class="player-icon">
+              <i data-lucide="cpu" class="icon-cpu"></i>
+              <i data-lucide="user" class="icon-user hidden"></i>
+            </span>
+            <div class="player-info">
+              <p class="player-line">
+                <span class="player-name" id="top-name">电脑</span>
+                <span class="player-note" id="top-caption">中级</span>
+                <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+              </p>
+              <p class="player-taken">
+                <span class="caps" id="captures-top"></span>
+                <span class="material" id="material-top"></span>
+              </p>
+            </div>
+            <!-- role="timer" is readable on demand but never announced, which
+                 is what a value changing ten times a second wants to be. -->
+            <span class="clock hidden" id="clock-top" role="timer"></span>
+            <span class="turn-dot" aria-hidden="true"></span>
+          </section>
+
+          <section class="card player-card" id="card-bottom">
+            <span class="player-icon"><i data-lucide="user"></i></span>
+            <div class="player-info">
+              <p class="player-line">
+                <span class="player-name" id="bottom-name">你</span>
+                <span class="player-note" id="bottom-caption">执白</span>
+              </p>
+              <p class="player-taken">
+                <span class="caps" id="captures-bottom"></span>
+                <span class="material" id="material-bottom"></span>
+              </p>
+            </div>
+            <span class="clock hidden" id="clock-bottom" role="timer"></span>
+            <span class="turn-dot" aria-hidden="true"></span>
+          </section>
+
+          <section class="controls" id="controls">
+            <div class="field-row" id="field-row">
+              <label class="field" id="level-field">
+                <span class="field-label">难度</span>
+                <select id="level-select">
+                  <option value="easy">入门</option>
+                  <option value="medium" selected>中级</option>
+                  <option value="hard">高级</option>
+                </select>
+              </label>
+              <label class="field" id="time-field">
+                <span class="field-label">时限</span>
+                <!-- Options are built from TIME_CONTROLS in src/game/clock.js,
+                     so the ids that cross the wire and land in saved games
+                     have exactly one definition. -->
+                <select id="time-select"></select>
+              </label>
+              <label class="field" id="color-field">
+                <span class="field-label" id="color-label">执子</span>
+                <select id="color-select">
+                  <option value="w" selected>白方</option>
+                  <option value="b">黑方</option>
+                  <option value="random">随机</option>
+                </select>
+              </label>
+            </div>
+            <div class="button-row" id="button-row">
+              <button class="btn btn-primary" id="new-game-btn" type="button">
+                <i data-lucide="plus"></i>新的一局
+              </button>
+              <button class="btn btn-ghost" id="undo-btn" type="button" disabled>
+                <i data-lucide="undo-2"></i>悔棋
+              </button>
+              <button class="btn btn-ghost hidden" id="draw-btn" type="button">
+                <i data-lucide="handshake"></i>和棋
+              </button>
+              <button class="btn btn-ghost btn-danger hidden" id="resign-btn" type="button">
+                <i data-lucide="flag"></i>认输
+              </button>
+              <button class="btn btn-ghost hidden" id="leave-btn" type="button">
+                <i data-lucide="log-out"></i>离开
+              </button>
+            </div>
+            <p class="controls-hint" id="controls-hint">颜色和时限在开始新的一局时生效。</p>
+          </section>
+
+          <!-- 默认收起，名录变长也不会把上面的下棋功能键推远。 -->
+          <details class="card coach-card" id="coach-card">
+            <summary class="coach-head" id="coach-title" aria-label="推荐教练">
+              <span class="coach-title">
+                <i data-lucide="megaphone" class="coach-icon" aria-hidden="true"></i>推荐教练
+              </span>
+              <span class="coach-summary-meta">
+                <span class="coach-tag">推广</span>
+                <i data-lucide="chevron-down" class="coach-chevron" aria-hidden="true"></i>
+              </span>
+            </summary>
+            <div class="coach-card-body">
+              <p class="coach-note">
+                想找人带一带？这里列出营地认证的国际象棋教练，按你填的水平和目标排序。
+              </p>
+
+              <div class="coach-list" id="coach-list" hidden></div>
+              <p class="coach-coming-soon" id="coach-empty">教练入驻中，敬请期待。</p>
+              <p class="coach-state" id="coach-state" role="status" hidden></p>
+
+              <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-pref-btn" type="button"
+                      aria-haspopup="dialog" aria-controls="coach-pref-dialog">
+                <i data-lucide="target"></i><span class="coach-pref-btn-label">我想找什么样的教练</span>
+              </button>
+              <p class="coach-pref-state hidden" id="coach-pref-state"></p>
+
+              <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-profile-btn" type="button" hidden
+                      aria-haspopup="dialog" aria-controls="coach-profile-dialog">
+                <i data-lucide="badge-check"></i><span class="coach-profile-btn-label">填我的教练资料</span>
+              </button>
+
+              <button class="btn btn-ghost btn-block coach-pref-btn" id="coach-refresh-btn" type="button" hidden>
+                <i data-lucide="rotate-cw"></i><span>刷新名录</span>
+              </button>
+            </div>
+          </details>
+        </aside>
+      </main>
+    </div>
+
+    <!-- Announces moves, check, and game results to assistive technology. -->
+    <div class="visually-hidden" role="status" id="sr-status"></div>
+
+    <!-- Transient notices (copied link, opponent events, connection errors). -->
+    <div class="toast" id="toast" role="status"></div>
+
+    <dialog class="dialog promo-dialog" id="promo-dialog" aria-labelledby="promo-title">
+      <h2 class="dialog-title" id="promo-title">升变成</h2>
+      <div class="promo-choices">
+        <button type="button" data-promo="q" autofocus><img alt="后" /></button>
+        <button type="button" data-promo="r"><img alt="车" /></button>
+        <button type="button" data-promo="b"><img alt="象" /></button>
+        <button type="button" data-promo="n"><img alt="马" /></button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog gameover-dialog" id="gameover-dialog" aria-labelledby="gameover-title" aria-describedby="gameover-sub">
+      <span class="gameover-icon" id="gameover-icon-win"><i data-lucide="trophy"></i></span>
+      <span class="gameover-icon" id="gameover-icon-loss"><i data-lucide="flag"></i></span>
+      <span class="gameover-icon" id="gameover-icon-draw"><i data-lucide="handshake"></i></span>
+      <h2 class="dialog-title" id="gameover-title">对局结束</h2>
+      <p class="dialog-sub" id="gameover-sub"></p>
+      <div class="dialog-buttons">
+        <button class="btn btn-primary" id="gameover-new" type="button" autofocus>新的一局</button>
+        <button class="btn btn-ghost" id="gameover-close" type="button">回看棋盘</button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog" id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-sub">
+      <h2 class="dialog-title" id="confirm-title"></h2>
+      <p class="dialog-sub" id="confirm-sub"></p>
+      <div class="dialog-buttons">
+        <button class="btn btn-danger-solid" id="confirm-yes" type="button"></button>
+        <button class="btn btn-ghost" id="confirm-no" type="button" autofocus>取消</button>
+      </div>
+    </dialog>
+
+    <!-- 对方的提和。Esc 关不掉（见 main.js 的 cancel 处理）：关掉等于既不接受
+         也不拒绝，而服务器那条提和还挂着，下一次轮询又把它摆回来。 -->
+    <dialog class="dialog" id="draw-offer-dialog" aria-labelledby="draw-offer-title" aria-describedby="draw-offer-sub">
+      <h2 class="dialog-title" id="draw-offer-title">对方提议和棋</h2>
+      <p class="dialog-sub" id="draw-offer-sub">接受就握手言和；拒绝就接着下。</p>
+      <div class="dialog-buttons">
+        <button class="btn btn-primary" id="draw-accept-btn" type="button">接受和棋</button>
+        <button class="btn btn-ghost" id="draw-reject-btn" type="button" autofocus>拒绝</button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog import-dialog" id="import-dialog" aria-labelledby="import-title">
+      <h2 class="dialog-title" id="import-title">导入棋局</h2>
+      <p class="dialog-sub">粘贴 PGN 或 FEN 字符串，导入棋局或局面。</p>
+      <textarea id="import-textarea" rows="8" placeholder="例如：&#10;1. e4 e5 2. Nf3 Nc6 *&#10;&#10;或 FEN：&#10;rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"></textarea>
+      <p class="import-error hidden" id="import-error"></p>
+      <div class="dialog-buttons">
+        <button class="btn btn-primary" id="import-confirm" type="button">导入</button>
+        <button class="btn btn-ghost" id="import-cancel" type="button">取消</button>
+      </div>
+    </dialog>
+
+    <dialog class="dialog account-dialog" id="account-dialog" aria-labelledby="account-title">
+      <h2 class="dialog-title" id="account-title">登录</h2>
+
+      <div class="account-tabs" role="group" aria-label="登录或注册" id="account-tabs">
+        <button type="button" data-pane="signin" class="selected" aria-pressed="true">登录</button>
+        <button type="button" data-pane="signup" aria-pressed="false">注册</button>
+      </div>
+
+      <!-- novalidate: a browser's own "please fill out this field" bubble comes
+           in the browser's language and pops over there, not in the line this
+           panel already has for it. The server checks everything anyway. -->
+      <form class="account-pane" id="signin-pane" novalidate>
+        <label class="field">
+          <span class="field-label">邮箱</span>
+          <input id="signin-email" name="email" type="email" autocomplete="username" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field-label">密码</span>
+          <input id="signin-password" name="password" type="password" autocomplete="current-password" />
+        </label>
+        <p class="online-error" id="signin-error" role="alert" hidden></p>
+        <button class="btn btn-primary btn-block" id="signin-btn" type="submit">登录</button>
+      </form>
+
+      <form class="account-pane hidden" id="signup-pane" novalidate>
+        <label class="field">
+          <span class="field-label">昵称</span>
+          <!-- The server caps the nickname at 30 characters; the field says so
+               up front rather than letting a long name be quietly cut. -->
+          <input id="signup-nickname" name="nickname" maxlength="30" autocomplete="nickname" />
+        </label>
+        <label class="field">
+          <span class="field-label">邮箱</span>
+          <input id="signup-email" name="email" type="email" autocomplete="username" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field-label">密码</span>
+          <input id="signup-password" name="password" type="password" autocomplete="new-password" />
+        </label>
+        <p class="account-hint">至少 8 位。我们会发一封邮件确认这个地址 —— 现在就能开始下棋。</p>
+        <p class="online-error" id="signup-error" role="alert" hidden></p>
+        <p class="account-note" id="signup-note" hidden></p>
+        <button class="btn btn-primary btn-block" id="signup-btn" type="submit">注册</button>
+      </form>
+
+      <div class="account-pane hidden" id="account-pane">
+        <p class="account-name" id="account-name"></p>
+        <p class="account-mail" id="account-mail"></p>
+        <p class="account-state" id="account-state"></p>
+        <div class="dialog-buttons">
+          <button class="btn btn-ghost" id="account-signout-btn" type="button">
+            <i data-lucide="log-out"></i>退出登录
+          </button>
+          <button class="btn btn-primary" id="account-close-btn" type="button">关闭</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="dialog library-dialog" id="library-dialog" aria-labelledby="library-title">
+      <h2 class="dialog-title" id="library-title">棋谱库</h2>
+      <p class="dialog-sub" id="library-note">下完的局存在这台设备上（最多 60 局）。勾选后一次导出成一个 PGN 文件。</p>
+
+      <div class="library-bar hidden" id="library-bar">
+        <label class="library-all" id="library-all">
+          <input type="checkbox" id="library-select-all" />
+          <span>全选</span>
+        </label>
+        <p class="library-picked" id="library-picked" role="status"></p>
+      </div>
+
+      <ul class="library-list" id="library-list"></ul>
+      <p class="library-empty" id="library-empty">还没有下完的局 —— 赢、输、和、认输都算，终局之后就会出现在这里。</p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-primary btn-block" id="library-export-btn" type="button">
+          <i data-lucide="download"></i>导出勾选的棋谱
+        </button>
+      </div>
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="library-clear-btn" type="button">清空</button>
+        <button class="btn btn-ghost" id="library-close-btn" type="button">关闭</button>
+      </div>
+    </dialog>
+
+    <!-- 教练偏好。六组选项的控件、legend 的措辞和那句"选几项"的提示，全由
+         src/ui/coachPref.js 按 src/game/coachPref.js 那张表生成 —— 选项与上限只在
+         一处定义，加一档水平或改个数量上限都不用动这里。这里只留容器。 -->
+    <dialog class="dialog coach-pref-dialog" id="coach-pref-dialog" aria-labelledby="coach-pref-title">
+      <h2 class="dialog-title" id="coach-pref-title">我想找什么样的教练</h2>
+      <p class="dialog-sub">
+        想法会变，这张表随时能改。填不填都能下棋 —— 它只影响教练入驻之后给你推荐谁。
+      </p>
+
+      <fieldset class="pref-group" id="pref-level-group">
+        <legend class="pref-legend" id="pref-level-legend"></legend>
+        <div class="pref-choices" id="pref-level-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="pref-goals-group">
+        <legend class="pref-legend" id="pref-goals-legend"></legend>
+        <div class="pref-choices" id="pref-goals-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="pref-formats-group">
+        <legend class="pref-legend" id="pref-formats-legend"></legend>
+        <div class="pref-choices" id="pref-formats-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="pref-slots-group">
+        <legend class="pref-legend" id="pref-slots-legend"></legend>
+        <div class="pref-choices" id="pref-slots-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="pref-timezone-group">
+        <legend class="pref-legend" id="pref-timezone-legend"></legend>
+        <div class="pref-choices" id="pref-timezone-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="pref-language-group">
+        <legend class="pref-legend" id="pref-language-legend"></legend>
+        <div class="pref-choices" id="pref-language-choices"></div>
+      </fieldset>
+
+      <label class="field pref-group pref-note-block" id="pref-note-group">
+        <span class="field-label pref-note-head">
+          <span>补充说明</span>
+          <span class="pref-counter" id="pref-note-count">0 / 240</span>
+        </span>
+        <!-- maxlength 故意放宽到 300（真上限是 240 个字）：卡死在 240 的话，人只
+             会觉得"打字打不上去"，看不到自己超了。计数变红再说清一次更好懂。 -->
+        <textarea class="pref-note" id="pref-note" rows="3" maxlength="300"
+                  placeholder="想解决什么问题、孩子多大、上过什么课……都可以写"></textarea>
+      </label>
+
+      <label class="pref-contact" id="pref-contact-group">
+        <input type="checkbox" id="pref-contact" />
+        <span>可以发邮件联系我（发到账号那个邮箱）。不勾也行，只是教练没法主动找你。</span>
+      </label>
+
+      <p class="pref-privacy">
+        这张表里没有邮箱、没有密码；能不能联系到你，只看上面那个勾。
+      </p>
+
+      <p class="online-error" id="coach-pref-error" role="alert" hidden></p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="coach-pref-close-btn" type="button">关闭</button>
+        <button class="btn btn-primary" id="coach-pref-save-btn" type="button">保存</button>
+      </div>
+    </dialog>
+
+    <!-- 教练名录上某一位的主页。谁都能看（chess_coach_directory.php / chess_coach_get.php
+         是公开端点），内容全部由 src/ui/coachDirectory.js 按服务端回的那一行填。
+         这里没有邮箱、也没有申请时写给管理员看的那段：名录行里就没有那两样。 -->
+    <dialog class="dialog coach-pref-dialog coach-home-dialog" id="coach-home-dialog"
+            aria-labelledby="coach-home-name">
+      <div class="coach-home-head">
+        <span class="coach-avatar big" id="coach-home-avatar"></span>
+        <div class="coach-home-id">
+          <h2 class="dialog-title" id="coach-home-name"></h2>
+          <p class="coach-home-badges" id="coach-home-badges" hidden></p>
+        </div>
+      </div>
+
+      <p class="coach-home-tagline" id="coach-home-tagline" hidden></p>
+      <div class="coach-home-rows" id="coach-home-rows" hidden></div>
+      <p class="coach-home-label" id="coach-home-honors-label" hidden></p>
+      <p class="coach-home-honors" id="coach-home-honors" hidden></p>
+      <p class="coach-home-label" id="coach-home-certificates-label" hidden></p>
+      <div class="coach-home-photos" id="coach-home-certificates" hidden></div>
+      <div class="coach-home-photos" id="coach-home-photos" hidden></div>
+      <p class="coach-home-state" id="coach-home-state" role="status" hidden></p>
+
+      <p class="pref-privacy">
+        名录上不写邮箱。想约课就请教练在【课堂】里给你发一个课堂码，不用离开这个网站。
+      </p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="coach-home-close-btn" type="button">关闭</button>
+        <button class="btn btn-primary" id="coach-home-edit-btn" type="button" hidden
+                aria-haspopup="dialog" aria-controls="coach-profile-dialog">改我的资料</button>
+      </div>
+    </dialog>
+
+    <!-- 教练自己那份公开资料。多选那四组的控件、各组标题和"选几项"那句都由
+         src/ui/coachProfile.js 按 src/game/coachProfile.js 那张表生成，这里只留容器；
+         图片那三栏是即时写（上传即生效、移除即生效），文字那几栏按【保存】整份覆盖。 -->
+    <dialog class="dialog coach-pref-dialog coach-profile-dialog" id="coach-profile-dialog"
+            aria-labelledby="coach-profile-title">
+      <h2 class="dialog-title" id="coach-profile-title">我的教练资料</h2>
+      <p class="dialog-sub">
+        这些会印在名录和你的主页上。每一项都可以留空 —— 资料不是入驻资格，
+        资格看的是那份申请；填得全只是让人更容易找到你。
+      </p>
+
+      <div class="field pref-group" id="cp-title-group">
+        <span class="field-label" id="cp-title-legend"></span>
+        <span class="cp-select-box" id="cp-title-box"></span>
+      </div>
+
+      <div class="coach-numbers">
+        <label class="field pref-group" id="cp-elo-group">
+          <span class="field-label" id="cp-elo-legend"></span>
+          <input type="text" id="cp-elo" inputmode="numeric" maxlength="4" autocomplete="off"
+                 placeholder="没有就空着">
+        </label>
+        <label class="field pref-group" id="cp-years-group">
+          <span class="field-label" id="cp-years-legend"></span>
+          <input type="text" id="cp-years" inputmode="numeric" maxlength="2" autocomplete="off"
+                 placeholder="刚起步填 0">
+        </label>
+      </div>
+
+      <label class="field pref-group" id="cp-tagline-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-tagline-legend"></span>
+          <span class="pref-counter" id="cp-tagline-count"></span>
+        </span>
+        <!-- maxlength 比真上限留出余量：卡在硬上限上，人只会觉得"打字打不上去"，
+             看不到自己超了；计数变红再说清一次更好懂。 -->
+        <input type="text" id="cp-tagline" maxlength="120" autocomplete="off"
+               placeholder="一句话说明你怎么带学生">
+      </label>
+
+      <label class="field pref-group pref-note-block" id="cp-honors-group">
+        <span class="field-label pref-note-head">
+          <span id="cp-honors-legend"></span>
+          <span class="pref-counter" id="cp-honors-count"></span>
+        </span>
+        <textarea class="pref-note" id="cp-honors" rows="4" maxlength="380"
+                  placeholder="带出过什么成绩、教龄里的例子……写你愿意公开的那部分"></textarea>
+      </label>
+
+      <fieldset class="pref-group" id="cp-levels-group">
+        <legend class="pref-legend" id="cp-levels-legend"></legend>
+        <div class="pref-choices" id="cp-levels-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="cp-goals-group">
+        <legend class="pref-legend" id="cp-goals-legend"></legend>
+        <div class="pref-choices" id="cp-goals-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="cp-formats-group">
+        <legend class="pref-legend" id="cp-formats-legend"></legend>
+        <div class="pref-choices" id="cp-formats-choices"></div>
+      </fieldset>
+
+      <fieldset class="pref-group" id="cp-slots-group">
+        <legend class="pref-legend" id="cp-slots-legend"></legend>
+        <div class="pref-choices" id="cp-slots-choices"></div>
+      </fieldset>
+
+      <div class="field pref-group" id="cp-language-group">
+        <span class="field-label" id="cp-language-legend"></span>
+        <span class="cp-select-box" id="cp-language-box"></span>
+      </div>
+
+      <div class="field pref-group" id="cp-timezone-group">
+        <span class="field-label" id="cp-timezone-legend"></span>
+        <span class="cp-select-box" id="cp-timezone-box"></span>
+      </div>
+
+      <div class="pref-group coach-photo-group" id="cp-avatar-group">
+        <p class="pref-legend">
+          <span class="pref-legend-text" id="cp-avatar-legend"></span>
+          <span class="pref-hint">传上去就生效</span>
+        </p>
+        <div class="coach-avatar-box" id="cp-avatar-box"></div>
+        <label class="coach-file">
+          <input type="file" id="cp-avatar-file" accept="image/png,image/jpeg,image/webp">
+          <span>换头像</span>
+        </label>
+      </div>
+
+      <div class="pref-group coach-photo-group" id="cp-photos-group">
+        <p class="pref-legend">
+          <span class="pref-legend-text" id="cp-photos-legend"></span>
+          <span class="pref-hint" id="cp-photo-hint"></span>
+        </p>
+        <div class="coach-photos" id="cp-photos-box"></div>
+        <label class="coach-file" id="cp-photo-add">
+          <input type="file" id="cp-photo-file" accept="image/png,image/jpeg,image/webp">
+          <span>添加照片</span>
+        </label>
+      </div>
+
+      <div class="pref-group coach-photo-group" id="cp-certificates-group">
+        <p class="pref-legend">
+          <span class="pref-legend-text" id="cp-certificates-legend"></span>
+          <span class="pref-hint" id="cp-certificate-hint"></span>
+        </p>
+        <div class="coach-photos" id="cp-certificates-box"></div>
+        <label class="coach-file" id="cp-certificate-add">
+          <input type="file" id="cp-certificate-file" accept="image/png,image/jpeg,image/webp">
+          <span>添加证书图片</span>
+        </label>
+      </div>
+
+      <p class="pref-privacy">
+        这里只写你愿意公开的东西：邮箱、申请时写给管理员的那段经历，都不会出现在名录或主页上。
+        照片和证书都会公开，别放身份证件或不想让别人看到的个人信息。
+      </p>
+
+      <p class="online-error" id="coach-profile-error" role="alert" hidden></p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="coach-profile-close-btn" type="button">关闭</button>
+        <button class="btn btn-primary" id="coach-profile-save-btn" type="button">保存</button>
+      </div>
+    </dialog>
+
+    <!-- 教练申请。只有一段话，所以这张框是写死的，不像偏好面板那样由数据生成。
+         每一态的措辞在 src/game/coachApp.js，填框和提交在 src/ui/coachApp.js。
+         宽度和 coach-pref-dialog 共用一档样式，避免两种框并排看着不像一处。 -->
+    <dialog class="dialog coach-pref-dialog coach-app-dialog" id="coach-app-dialog"
+            aria-labelledby="coach-app-title">
+      <h2 class="dialog-title" id="coach-app-title">申请成为营地教练</h2>
+      <p class="dialog-sub" id="coach-app-hint"></p>
+      <p class="coach-app-when" id="coach-app-when" hidden></p>
+
+      <label class="field pref-group pref-note-block" id="coach-app-intro-group">
+        <span class="field-label pref-note-head">
+          <span>你的经历</span>
+          <span class="pref-counter" id="coach-app-count">0 / 400</span>
+        </span>
+        <!-- maxlength 比真上限（400 个字）留了四十多个字的余量：卡死在 400 的话，
+             人只会觉得"打不上去"，看不到自己超了。计数变红再说清一次更好懂。 -->
+        <textarea class="pref-note" id="coach-app-intro" rows="6" maxlength="450"
+                  placeholder="带过几个学生、教了多久、能带什么程度、一周大概能上几次"></textarea>
+      </label>
+
+      <p class="pref-privacy">
+        这段话只有管理员看得到，不会出现在棋盘上，也不会发给别的教练。
+      </p>
+
+      <p class="online-error" id="coach-app-error" role="alert" hidden></p>
+
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="coach-app-close-btn" type="button">关闭</button>
+        <button class="btn btn-primary" id="coach-app-save-btn" type="button">提交申请</button>
+      </div>
+    </dialog>
+
+    <!-- 自学教程的正文由 src/ui/learnPanel.js 按 game/learnContent.js 填进来：
+         教程对所有人开放，不经过教练资格那一道门。 -->
+    <dialog class="dialog learn-dialog" id="learn-dialog" aria-labelledby="learn-dialog-title">
+      <p class="learn-step" id="learn-dialog-step"></p>
+      <h2 class="dialog-title" id="learn-dialog-title"></h2>
+      <div class="learn-body" id="learn-dialog-body"></div>
+      <div class="dialog-buttons">
+        <button class="btn btn-ghost" id="learn-prev-btn" type="button">上一节</button>
+        <button class="btn btn-ghost" id="learn-close-btn" type="button">关闭</button>
+        <button class="btn btn-primary" id="learn-next-btn" type="button">下一节</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

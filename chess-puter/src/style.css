@@ -1,0 +1,4821 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f5f9;
+  --surface: #ffffff;
+  --border: #e2e4ed;
+  --text: #1d212e;
+  --muted: #666d81;
+  --accent: #002bb2;
+  --accent-strong: #002190;
+  --accent-tint: rgba(0, 43, 178, 0.1);
+  --danger: #c25450;
+  --danger-tint: rgba(194, 84, 80, 0.12);
+  --mistake: #b8531f;
+  --inaccuracy: #a8790a;
+  --good: #1e8e4e;
+  --sq-light: #e9ecf4;
+  --sq-dark: #7d90bb;
+  --hl-sel: rgba(246, 204, 90, 0.6);
+  --hl-last: rgba(246, 204, 90, 0.38);
+  --hint: rgba(16, 22, 42, 0.24);
+  --shadow-card: 0 1px 2px rgba(18, 24, 44, 0.05);
+  --shadow-board: 0 24px 48px -24px rgba(18, 24, 44, 0.5);
+  --shadow-dialog: 0 24px 60px -12px rgba(18, 24, 44, 0.35);
+}
+
+/* The effective theme is stamped on <html> as data-theme="light|dark":
+   resolved from the saved preference (or the OS setting when it is
+   "system") by an inline script before first paint, and kept in sync
+   by main.js afterwards. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #13151b;
+  --surface: #1b1e26;
+  --border: #2a2e3a;
+  --text: #e7e8ee;
+  --muted: #969cae;
+  --accent: #4165e0;
+  --accent-strong: #6c89f2;
+  --accent-tint: rgba(92, 122, 240, 0.16);
+  --danger: #d4726e;
+  --danger-tint: rgba(212, 114, 110, 0.16);
+  --mistake: #e08a4e;
+  --inaccuracy: #d6b64c;
+  --good: #56c98a;
+  --sq-light: #d3d8e5;
+  --sq-dark: #5f6f99;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-board: 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.6);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The app is sized to the viewport and never scrolls the page: a document
+   scrollbar that appears or disappears (a dialog opening, the sidebar growing
+   when an online game ends) would shift every column sideways. Anything that
+   can outgrow its space scrolls inside its own box instead — see .move-list,
+   and .layout on narrow screens or while the review report is open. */
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  height: 100dvh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+h1, h2, h3, p, ol {
+  margin: 0;
+}
+
+svg.lucide {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Screen-reader-only text (e.g. the descriptive part of the h1). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Only rendered when JavaScript is disabled. */
+.noscript-note {
+  max-width: 1080px;
+  margin: 16px auto 0;
+  padding: 12px 24px;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Header                                                              */
+/* ------------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 24px 12px;
+}
+
+/* The whole brand block is the way back to the rest of the site, so it is a
+   link rather than a heading wrapper. The arrow says "back" without needing
+   words, which matters on a page whose UI is English and whose visitors often
+   arrive from the Chinese navigation. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-back {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.brand:hover .brand-back {
+  color: var(--accent);
+}
+
+.brand:hover .brand-name {
+  text-decoration: underline;
+}
+
+.brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.brand-mark {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+}
+
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+}
+
+.brand-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.topbar-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.account-chip:hover {
+  background: var(--bg);
+}
+
+.account-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.account-chip svg.lucide {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+
+/* While a call is in flight the panel has already accepted the click. */
+.account-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A nickname is up to 30 characters and the top bar is one line. */
+.account-chip-name {
+  max-width: 12ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.theme-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.theme-toggle button svg.lucide {
+  width: 15px;
+  height: 15px;
+}
+
+.theme-toggle button:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.theme-toggle button.selected {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.theme-toggle button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The account chip shares the bar with the mode note, and on a phone the note
+   is the one that gives way — the chip is how a player finds out whether they
+   are signed in, which is the thing they can act on. */
+@media (max-width: 600px) {
+  .topbar-note {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout                                                              */
+/* ------------------------------------------------------------------ */
+
+/* Three-column layout for wide screens: left sidebar (moves), center (board), right sidebar (classroom). */
+.layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 280px minmax(0, 1fr) 280px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 28px;
+  width: 100%;
+  min-height: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 12px 24px 24px;
+}
+
+.sidebar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* 题库打开后左边变成两栏：教程/题库 | 走法，整个页面跟着放宽。
+   四栏加起来放不下时（<1400px）退回上下叠，走法留在原位。 */
+@media (min-width: 1400px) {
+  .layout.tactics-open {
+    grid-template-columns: minmax(0, 600px) minmax(0, 1fr) 280px;
+    max-width: 1780px;
+  }
+
+  .layout.tactics-open .sidebar-left {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  .layout.tactics-open .learn-panes {
+    min-height: 0;
+  }
+
+  .layout.tactics-open .tactics-card {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+  }
+}
+
+.learn-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.learn-card {
+  flex: none;
+  padding: 12px 14px;
+}
+
+.learn-card .card-head {
+  margin-bottom: 8px;
+}
+
+.learn-tag {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.learn-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.learn-topic {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.learn-topic:hover {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.learn-topic.is-complete {
+  border-color: var(--good);
+}
+
+.learn-topic-progress {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.learn-topic.is-complete .learn-topic-progress {
+  color: var(--good);
+}
+
+.tactics-card {
+  flex: none;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+/* 1024–1399px 还是三栏，放不下两列左侧栏：题库叠在走法上方，自己滚。 */
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .tactics-card {
+    max-height: 60vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+  }
+}
+
+/* 自学教程：正文放对话框里读，窄屏一屏放不下就框内滚。 */
+.learn-dialog {
+  width: min(94vw, 560px);
+  padding: 24px;
+  text-align: left;
+}
+
+.learn-dialog .dialog-title {
+  text-align: center;
+}
+
+.learn-step {
+  margin-bottom: 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.learn-body {
+  margin-top: 12px;
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.learn-body .learn-lead {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+.learn-practice-status {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.learn-practice-status.is-complete {
+  color: var(--good);
+}
+
+.learn-body h3 {
+  margin: 14px 0 6px;
+  font-size: 14.5px;
+}
+
+.learn-body h3:first-child {
+  margin-top: 0;
+}
+
+.learn-body ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+
+.learn-body li {
+  margin: 4px 0;
+}
+
+.learn-body code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12.5px;
+}
+
+.learn-practice {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.learn-mnemonic {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.learn-mnemonic strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+}
+
+.learn-quiz-back {
+  margin-bottom: 12px;
+}
+
+.setup-quiz-guide {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-tint);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.setup-quiz-palette {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.setup-quiz-piece {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.setup-quiz-piece img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.setup-quiz-piece[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.setup-quiz-tools {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.setup-quiz-board {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  width: min(100%, 360px);
+  margin: 0 auto;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.setup-quiz-row {
+  display: contents;
+}
+
+.setup-quiz-square {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.setup-quiz-square.light { background-color: var(--sq-light); }
+.setup-quiz-square.dark { background-color: var(--sq-dark); }
+
+.setup-quiz-square img {
+  position: absolute;
+  inset: 3%;
+  width: 94%;
+  height: 94%;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.setup-quiz-square.is-wrong {
+  background-image: linear-gradient(rgba(214, 69, 65, 0.65), rgba(214, 69, 65, 0.65));
+  box-shadow: inset 0 0 0 2px var(--danger);
+}
+
+.setup-quiz-square.is-selected {
+  background-image: linear-gradient(rgba(53, 122, 189, 0.55), rgba(53, 122, 189, 0.55));
+  box-shadow: inset 0 0 0 2px var(--accent-strong);
+}
+
+.setup-quiz-square.is-correct {
+  background-image: linear-gradient(rgba(46, 160, 110, 0.5), rgba(46, 160, 110, 0.5));
+  box-shadow: inset 0 0 0 2px var(--good);
+}
+
+.setup-quiz-square.is-missing {
+  background-image: linear-gradient(rgba(214, 69, 65, 0.65), rgba(214, 69, 65, 0.65));
+  box-shadow: inset 0 0 0 2px var(--danger);
+}
+
+.setup-quiz-square.is-extra {
+  background-image: linear-gradient(rgba(230, 148, 46, 0.7), rgba(230, 148, 46, 0.7));
+  box-shadow: inset 0 0 0 2px #e6942e;
+}
+
+.quiz-progress {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quiz-prompt {
+  margin: 8px 0;
+  font-weight: 700;
+}
+
+.quiz-guide {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quiz-color-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quiz-color-actions .btn {
+  flex: 1;
+}
+
+.setup-quiz-square[data-rank]::before,
+.setup-quiz-square[data-file]::after {
+  position: absolute;
+  z-index: 1;
+  font-size: clamp(8px, 2.4vw, 11px);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.setup-quiz-square[data-rank]::before {
+  content: attr(data-rank);
+  top: 2px;
+  left: 3px;
+}
+
+.setup-quiz-square[data-file]::after {
+  content: attr(data-file);
+  right: 3px;
+  bottom: 1px;
+}
+
+.setup-quiz-square.light[data-rank]::before,
+.setup-quiz-square.light[data-file]::after { color: var(--sq-dark); }
+.setup-quiz-square.dark[data-rank]::before,
+.setup-quiz-square.dark[data-file]::after { color: var(--sq-light); }
+
+.setup-quiz-square:focus-visible,
+.setup-quiz-piece:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: -3px;
+  z-index: 2;
+}
+
+.setup-quiz-piece:disabled,
+.setup-quiz-square:disabled {
+  cursor: default;
+}
+
+.setup-quiz-status {
+  min-height: 1.7em;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.setup-quiz-status.is-error { color: var(--danger); }
+.setup-quiz-status.is-success { color: var(--good); font-weight: 600; }
+
+.setup-quiz-actions {
+  margin-top: 8px;
+}
+
+.setup-quiz-actions .btn {
+  width: 100%;
+}
+
+@media (min-width: 560px) {
+  .learn-dialog {
+    width: min(94vw, 620px);
+  }
+
+  .setup-quiz-piece {
+    padding: 8px 4px;
+  }
+
+  .setup-quiz-piece img {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+.learn-dialog .dialog-buttons {
+  margin-top: 18px;
+}
+
+.board-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  gap: 12px;
+  overflow-y: auto;
+  /* Lets .board-frame read this column's height as 100cqh. */
+  container-type: size;
+}
+
+/* A square that fits whichever of the column's two axes is smaller. */
+.board-frame {
+  width: min(100%, calc(100dvh - 150px));
+  width: min(100%, 75cqh);
+  max-width: 680px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Annotation overlay sits on top of the board for drawing arrows/highlights */
+.annotation-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Annotation toolbar */
+.annotation-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.annotation-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.annotation-toolbar button:hover {
+  background: var(--surface-3);
+}
+
+.annotation-toolbar button[aria-pressed="true"] {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent-strong);
+}
+
+.annotation-toolbar button.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  padding: 0;
+  background-clip: content-box;
+}
+
+.annotation-toolbar button.color-swatch[data-color="yellow"] {
+  background: #ffeb3b !important;
+}
+
+.annotation-toolbar button.color-swatch[data-color="green"] {
+  background: #4caf50 !important;
+}
+
+.annotation-toolbar button.color-swatch[data-color="red"] {
+  background: #f44336 !important;
+}
+
+.annotation-toolbar button.color-swatch[data-color="blue"] {
+  background: #2196f3 !important;
+}
+
+.annotation-toolbar button.color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.annotation-toolbar button.color-swatch[aria-pressed="true"] {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+  transform: scale(1.1);
+}
+
+.annotation-toolbar button.color-swatch[aria-pressed="true"]::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+  z-index: 1;
+}
+
+.annotation-toolbar .separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Board                                                               */
+/* ------------------------------------------------------------------ */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-board), 0 0 0 1px var(--border);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Row wrappers exist for the ARIA grid structure; layout stays on .board. */
+.board-row {
+  display: contents;
+}
+
+.square {
+  position: relative;
+}
+
+.square:focus-visible {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: -3px;
+  box-shadow: inset 0 0 0 6px var(--surface);
+  z-index: 2;
+}
+
+.square.light { background-color: var(--sq-light); }
+.square.dark { background-color: var(--sq-dark); }
+
+.square.last {
+  background-image: linear-gradient(var(--hl-last), var(--hl-last));
+}
+
+.square.sel {
+  background-image: linear-gradient(var(--hl-sel), var(--hl-sel));
+}
+
+.square.check {
+  background-image: radial-gradient(
+    circle at 50% 50%,
+    rgba(214, 69, 65, 0.85) 0%,
+    rgba(214, 69, 65, 0.35) 48%,
+    transparent 72%
+  );
+}
+
+.square.lift {
+  z-index: 5;
+}
+
+/* Rank/file labels on the board edges */
+.square[data-rank]::before {
+  content: attr(data-rank);
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: clamp(9px, 1.6vmin, 12px);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.square[data-file]::after {
+  content: attr(data-file);
+  position: absolute;
+  right: 5px;
+  bottom: 2px;
+  font-size: clamp(9px, 1.6vmin, 12px);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.square.light::before, .square.light::after { color: var(--sq-dark); }
+.square.dark::before, .square.dark::after { color: var(--sq-light); }
+
+.piece {
+  position: absolute;
+  inset: 2.5%;
+  width: 95%;
+  height: 95%;
+  cursor: pointer;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.piece.drag-origin {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.drag-ghost {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  pointer-events: none;
+  z-index: 100;
+  cursor: grabbing;
+  filter: drop-shadow(0 8px 14px rgba(10, 14, 8, 0.4));
+}
+
+/* Legal-move markers */
+.mark {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.square.hint .mark {
+  width: 30%;
+  height: 30%;
+  background: var(--hint);
+}
+
+.square.capture-hint .mark {
+  width: 86%;
+  height: 86%;
+  border: 4px solid var(--hint);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Full-height panel: every card keeps its natural height.
+   overflow-y is a safety net for very short windows — the column is a fixed
+   width, so a scrollbar there can never move the board. */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* Cards keep their natural height rather than being squashed. */
+.sidebar > * {
+  flex: none;
+}
+
+/* Game-mode segmented control */
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mode-switch button svg.lucide {
+  width: 15px;
+  height: 15px;
+}
+
+.mode-switch button:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.mode-switch button.selected {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.mode-switch button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.result-banner {
+  padding: 11px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.result-banner.win { background: var(--accent-tint); color: var(--accent-strong); }
+.result-banner.loss { background: var(--danger-tint); color: var(--danger); }
+.result-banner.draw { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+
+/* Player cards */
+.player-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  transition: border-color 0.2s ease;
+}
+
+.player-card.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+/* 讲解模式下两张对局卡是视角开关：点哪一方，棋盘就把哪一方翻到下面。
+   它说的是"看哪一方"，和 .active 那道"轮到谁走"的蓝边是两回事，所以
+   悬停只把边框压深一点，不借用强调色。 */
+.player-card.pickable {
+  cursor: pointer;
+}
+
+/* 轮到谁走的那道蓝边优先：悬停它时不要被压成灰的。 */
+.player-card.pickable:not(.active):hover {
+  border-color: color-mix(in srgb, var(--text) 28%, var(--border));
+}
+
+.player-card.pickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.player-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.player-card.active .player-icon {
+  background: var(--accent-tint);
+  border-color: transparent;
+  color: var(--accent-strong);
+}
+
+/* Two lines' worth of room, always: the captured pieces come and go, and the
+   card has to be exactly as tall either way. Centred, so a card with nothing
+   captured yet sits balanced rather than leaving a hole under the name. */
+.player-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 42px;
+}
+
+/* Name line: who is playing, then the mode/color note and the thinking dots. */
+.player-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  min-height: 21px;
+}
+
+/* Opponent names come off the wire and can be 40 characters long: one line,
+   clipped, so a long one cannot wrap the card taller. It is the note beside it
+   that shrinks (below), so the name is only ever clipped when it fills the
+   line on its own — which is what max-width, rather than a shrink factor,
+   says. Sharing the squeeze between the two leaves both of them as stubs. */
+.player-name {
+  flex: none;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The note gives up all of its room before the name gives up any: the name is
+   the identity, the note repeats something already on screen. */
+.player-note {
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Clock face. Only shown in a timed game, so it is free to take the space it
+   needs: min-width is set for the widest reading it can hold (an hour, or the
+   tenths it switches to when the time gets low) so the digits never jump the
+   card's layout as they count down. */
+.clock {
+  flex: none;
+  min-width: 64px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* The clock that is actually running is the one worth reading. */
+.clock.running {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--surface);
+  color: var(--text);
+}
+
+.clock.low {
+  border-color: transparent;
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.clock.low.running {
+  animation: clock-low 1s infinite ease-in-out;
+}
+
+.clock.out {
+  background: var(--danger);
+  border-color: transparent;
+  color: #fff;
+  animation: none;
+}
+
+@keyframes clock-low {
+  50% { opacity: 0.6; }
+}
+
+.turn-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.player-card.active .turn-dot {
+  opacity: 1;
+}
+
+/* Thinking dots */
+.dots {
+  display: none;
+  align-items: center;
+  gap: 3px;
+}
+
+.player-card.thinking .dots {
+  display: inline-flex;
+}
+
+.dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: dot-pulse 1.1s infinite ease-in-out;
+}
+
+.dots span:nth-child(2) { animation-delay: 0.18s; }
+.dots span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes dot-pulse {
+  0%, 70%, 100% { opacity: 0.25; transform: translateY(0); }
+  35% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* Captured pieces get a line of their own, clear of the words above — mixed in
+   with the text they read as noise. The line is there only once something has
+   been taken; .player-info is already holding its height, so nothing moves. */
+.player-taken {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 21px;
+}
+
+.player-taken:not(:has(img)) {
+  display: none;
+}
+
+/* A full set (16 pieces) is still wider than the card even with the line to
+   itself, so the row overlaps them slightly and clips its own tail — the
+   pawns, which sort last. The material score stands for whatever gets clipped,
+   so it never shrinks. */
+.caps {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.caps img {
+  width: 21px;
+  height: 21px;
+  margin-left: -6px;
+}
+
+.caps img:first-child {
+  margin-left: 0;
+}
+
+.material {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.material:empty {
+  display: none;
+}
+
+/* Online setup card */
+.online-card {
+  padding: 16px;
+}
+
+.online-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.online-section .card-title {
+  margin-bottom: 0;
+}
+
+.online-note {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.online-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.online-divider::before,
+.online-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+}
+
+.join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.join-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.join-row input::placeholder {
+  color: var(--muted);
+}
+
+.join-row input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.online-error {
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--danger-tint);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 开课堂为什么按不动，这一行紧跟在那个按钮下面说。故意不再叠一层色块：
+   上面已经有一条 .online-note 是蓝底，再排一条就是两个方块，
+   读起来像两条并列的说明而不是一句注脚。 */
+.class-teacher-note {
+  margin: -4px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* The classroom panel borrows the online card's look but adds a roster of
+   students with a small hand-state badge and an approve button. */
+.class-card {
+  margin-top: 12px;
+}
+.class-students {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.class-student {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.class-student-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.class-hand-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--muted);
+  color: var(--fg);
+}
+.class-hand-badge.hand-raised {
+  background: #fff3cd;
+  color: #7a5a00;
+}
+.class-hand-badge.hand-approved {
+  background: #d4edda;
+  color: #1e5a2e;
+}
+.class-approve-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.invite-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.invite-code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.icon-btn svg.lucide {
+  width: 15px;
+  height: 15px;
+}
+
+/* Secondary icon buttons: the PGN actions in a card header and the review
+   controls under the move list, neither of which should outweigh the card. */
+.icon-btn-sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.icon-btn-sm svg.lucide {
+  width: 14px;
+  height: 14px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-btn:disabled:hover {
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.icon-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.icon-btn .icon-check {
+  color: var(--accent-strong);
+}
+
+.online-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Move list - in left sidebar */
+.moves-card {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  padding: 14px 16px;
+  min-height: 200px;
+  overflow-y: auto;
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* A card title with actions beside it. The margin moves to the row, and only
+   the move list may give up height when the card is squeezed. */
+.card-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.card-head .card-title {
+  margin-bottom: 0;
+}
+
+.card-actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* The one region that scrolls by design. Its gutter is reserved so the rows
+   don't jump sideways the first time the list outgrows the card mid-game;
+   where scrollbars are overlays this reserves nothing. */
+.move-list {
+  list-style: none;
+  flex: 1;
+  padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+/* Without moves the list must not push the "no moves yet" note down. */
+.move-list:empty {
+  flex: none;
+}
+
+.move-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  font-size: 13.5px;
+}
+
+/* Shading is keyed to the move number, not to the row's position: the sheet is
+   rebuilt whole on every render (and a row can be missing its white move), and
+   nth-child would re-stripe the whole thing whenever that happens. */
+.move-row.shade {
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+}
+
+.move-row .num {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Every played ply is a button that jumps the board to that position. The
+   half-move with no reply yet renders as a plain span, styled the same so the
+   two columns stay aligned. */
+.move-row .ply {
+  min-width: 0;
+  padding: 0 5px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.ply {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+button.ply:hover {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+button.ply:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 复盘结论的上色只有这一套类名（`CLASSIFY_ANNOT`）：走法区的 SAN、关键转折的
+   亏损数、统计圆点、曲线上的点都加同一个类。写成类而不是 JS 里的颜色字面量，
+   浅色/深色主题才各自吃自己的 token。
+   走法区那一份要重复一遍 `.move-row .ply`：它的基础规则比单类名更具体，光靠
+   `.annot-*` 会被压掉（红色变回正文色）。放在 `.ply.current` 之前，正在看的那一手
+   同特异性、后来者胜，照旧按高亮走。 */
+.annot-blunder,
+.move-row .ply.annot-blunder {
+  color: var(--danger);
+}
+
+.annot-mistake,
+.move-row .ply.annot-mistake {
+  color: var(--mistake);
+}
+
+.annot-inaccuracy,
+.move-row .ply.annot-inaccuracy {
+  color: var(--inaccuracy);
+}
+
+.annot-good,
+.annot-best,
+.move-row .ply.annot-good,
+.move-row .ply.annot-best {
+  color: var(--good);
+}
+
+/* The position on the board — the latest move while playing, the one being
+   looked at while reviewing. */
+.move-row .ply.current {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+/* Stands in for the list before the first move, and takes the space the list
+   would have had, so the review bar sits at the foot of the card either way
+   rather than stranding its divider halfway up an empty one. */
+.moves-empty {
+  flex: 1;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 主线带支线的棋谱，写在棋盘正下方：写法照 PGN/ChessBase —— 主线一段流水文字，
+   每条支线自己一行、套在括号里往右缩进，支线里再分出去的支线往里再套一层。走法
+   是按钮，点一下棋盘就跳到那一手。走法区是记录本，只记走出来的那条线。见 #107。 */
+.pgn-sheet {
+  width: min(100%, 680px);
+  padding: 12px 14px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+.pgn-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pgn-note {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pgn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* 支线一多就比棋盘还长，把棋谱按在卡片里自己滚，别把复盘报告顶出屏幕。 */
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  font-size: 14px;
+  line-height: 1.85;
+}
+
+.pgn-line {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 一条支线。嵌套的支线就住在这段里面，所以缩进是一层层自己叠上去的。 */
+.pgn-var {
+  display: block;
+  margin: 2px 0 2px 10px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.pgn-var.active {
+  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+
+.pgn-ply {
+  padding: 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+
+button.pgn-ply {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+button.pgn-ply:hover {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+button.pgn-ply:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.pgn-ply.current {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  font-weight: 700;
+}
+
+/* The review toolbar sits above the move list, so the three modes stay
+   reachable at any game length instead of sinking below a long list. Two rows:
+   the rewind buttons and their note, then the mode buttons across the card. */
+.review-bar {
+  display: grid;
+  flex: none;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-nav {
+  grid-area: 1 / 1;
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+/* Empty while the board shows the live position, so the bar reads as plain
+   navigation until it is actually saying something. */
+.review-note {
+  grid-area: 1 / 2;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-modes {
+  grid-area: 2 / 1 / 3 / 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-modes .btn {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* Stockfish's reading of the position the board is showing */
+.analysis {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.eval-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The bar is White's share of the position, which makes the track it runs in
+   Black's. Both halves are fixed colours rather than theme ones: they stand
+   for the two armies, not for the surface they happen to be drawn on. */
+.eval-bar {
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  background: #23262f;
+  overflow: hidden;
+}
+
+.eval-fill {
+  display: block;
+  height: 100%;
+  width: 50%;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(18, 24, 44, 0.18);
+  transition: width 0.12s ease;
+}
+
+.eval-score {
+  flex: none;
+  min-width: 52px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.eval-line {
+  display: flex;
+  gap: 8px;
+}
+
+.eval-line-score {
+  flex: none;
+  min-width: 46px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.eval-line-moves {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.eval-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Nothing to say while a search is simply running, so the panel does not keep
+   an empty line of its height. */
+.eval-note:empty {
+  display: none;
+}
+
+/* Nothing on the board can be picked up while an older position is shown. */
+.board.reviewing .piece {
+  cursor: default;
+}
+
+/* Utility: wins over any component display value (e.g. .btn, .online-section). */
+.moves-empty.hidden,
+.hidden {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Controls                                                            */
+/* ------------------------------------------------------------------ */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Flex (not grid) so that hiding one field lets the other fill the row. */
+.field-row {
+  display: flex;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 9px 32px 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23848b9f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn svg.lucide {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-strong);
+}
+
+.btn-ghost {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btn-ghost.btn-danger {
+  color: var(--danger);
+}
+
+.btn-ghost.btn-danger:hover:not(:disabled) {
+  background: var(--danger-tint);
+}
+
+.btn-danger-solid {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger-solid:hover {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.controls-hint {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogs                                                             */
+/* ------------------------------------------------------------------ */
+
+.dialog {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-dialog);
+  padding: 28px;
+  width: min(92vw, 380px);
+  /* Dialogs live in the top layer, so they cannot push the page around; this
+     only keeps a tall one from being clipped on a short window. */
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  text-align: center;
+}
+
+.dialog[open] {
+  animation: dialog-in 0.18s ease;
+}
+
+.dialog::backdrop {
+  background: rgba(12, 14, 22, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+@keyframes dialog-in {
+  from { opacity: 0; transform: scale(0.95) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dialog-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.dialog-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Flex (not grid) so a dialog with one button hidden — the game-over card's New
+   game, which an online game has no use for — shows the remaining button full
+   width. */
+.dialog-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dialog-buttons .btn {
+  flex: 1;
+}
+
+/* Import dialog */
+.import-dialog {
+  max-width: 500px;
+}
+
+.import-dialog textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-family: monospace;
+  resize: vertical;
+  margin-top: 12px;
+}
+
+.import-dialog textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.import-error {
+  color: var(--danger, #f44336);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Promotion picker */
+.promo-choices {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.promo-choices button {
+  width: 64px;
+  height: 64px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.promo-choices button:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.promo-choices img {
+  width: 100%;
+  height: 100%;
+}
+
+/* Game over dialog */
+.gameover-icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 14px;
+  border-radius: 16px;
+}
+
+.gameover-icon svg.lucide {
+  width: 26px;
+  height: 26px;
+}
+
+.gameover-icon.shown {
+  display: inline-flex;
+}
+
+#gameover-icon-win { background: var(--accent-tint); color: var(--accent-strong); }
+#gameover-icon-loss { background: var(--danger-tint); color: var(--danger); }
+#gameover-icon-draw { background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+
+/* ------------------------------------------------------------------ */
+/* Account                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Sidebar card for a signed-in player whose email is not confirmed yet. */
+.verify-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.verify-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.verify-mail {
+  color: var(--text);
+  font-weight: 600;
+  word-break: break-all;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+/* 推荐教练是附加位，不是功能：整块换成金色调，和功能卡的白/蓝表面一眼分开。 */
+.coach-card {
+  padding: 0;
+  border: 1px solid #e3bb57;
+  background: linear-gradient(135deg, #fff8e6 0%, #ffeec6 55%, #ffe5ab 100%);
+  box-shadow:
+    0 1px 2px rgba(120, 84, 8, 0.12),
+    0 0 0 3px rgba(246, 204, 90, 0.16);
+}
+
+:root[data-theme='dark'] .coach-card {
+  border-color: #7c6326;
+  background: linear-gradient(135deg, #2b2414 0%, #221d12 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(214, 182, 76, 0.14);
+}
+
+.coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: inherit;
+  cursor: pointer;
+  list-style: none;
+}
+
+.coach-head::-webkit-details-marker {
+  display: none;
+}
+
+.coach-head::marker {
+  content: '';
+}
+
+.coach-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.coach-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8a5c07;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+:root[data-theme='dark'] .coach-title {
+  color: #e8c86b;
+}
+
+.coach-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coach-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.coach-chevron {
+  width: 16px;
+  height: 16px;
+  color: #8a5c07;
+  transition: transform 0.18s ease;
+}
+
+:root[data-theme='dark'] .coach-chevron {
+  color: #e8c86b;
+}
+
+.coach-card[open] > .coach-head .coach-chevron {
+  transform: rotate(180deg);
+}
+
+.coach-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 16px;
+}
+
+.coach-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #5a3c02;
+  background: #f6cc5a;
+}
+
+:root[data-theme='dark'] .coach-tag {
+  color: #1d1808;
+  background: #d6b64c;
+}
+
+.coach-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a3a12;
+}
+
+:root[data-theme='dark'] .coach-note {
+  color: #e7e8ee;
+}
+
+.coach-coming-soon {
+  margin: 0;
+  font-size: 12px;
+  color: #8a6f28;
+  font-style: italic;
+}
+
+:root[data-theme='dark'] .coach-coming-soon {
+  color: #b6a26a;
+}
+
+/* 卡片里那颗按钮：金色底上不能再叠一层白表面，否则看着像别人家的控件。 */
+.coach-pref-btn {
+  border-color: #d9ae46;
+  background: rgba(255, 253, 245, 0.82);
+  color: #6f4a05;
+  font-size: 13px;
+}
+
+.coach-pref-btn:hover:not(:disabled) {
+  background: #fffdf6;
+  border-color: #c8992f;
+}
+
+:root[data-theme='dark'] .coach-pref-btn {
+  border-color: #8a6d2c;
+  background: rgba(24, 20, 10, 0.55);
+  color: #e8c86b;
+}
+
+:root[data-theme='dark'] .coach-pref-btn:hover:not(:disabled) {
+  background: rgba(45, 37, 18, 0.9);
+  border-color: #b6a26a;
+}
+
+/* 填过之后卡片上这一行替人记住"我说过想要什么"，不必再打开面板确认。 */
+.coach-pref-state {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b5313;
+}
+
+:root[data-theme='dark'] .coach-pref-state {
+  color: #cbb37a;
+}
+
+/* 名录：整张卡片是右栏里那块金色推广位，最窄只有 ~280px，所以一列竖排、
+   每张卡自己决定要不要换行。窄屏先写，宽屏只把头像放大一档。 */
+.coach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 一张卡 = 一个按钮（点哪儿都进主页）。卡片里不再嵌别的控件，
+   否则右栏那么窄，两个可点区域挨着一定按错。 */
+.coach-item {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(138, 92, 7, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 253, 245, 0.72);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+:root[data-theme='dark'] .coach-item {
+  border-color: rgba(182, 162, 106, 0.28);
+  background: rgba(24, 20, 10, 0.5);
+}
+
+.coach-item:hover {
+  border-color: rgba(138, 92, 7, 0.45);
+  background: #fffdf6;
+}
+
+:root[data-theme='dark'] .coach-item:hover {
+  border-color: rgba(214, 182, 76, 0.5);
+  background: rgba(45, 37, 18, 0.8);
+}
+
+.coach-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.coach-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 头像：有图裁成方，没图用昵称第一个字。尺寸固定，别让一个字把圈顶扁。 */
+.coach-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 1px solid rgba(138, 92, 7, 0.28);
+  border-radius: 999px;
+  background: #f7e7bf;
+  font-size: 15px;
+  font-weight: 700;
+  color: #6f4a05;
+}
+
+:root[data-theme='dark'] .coach-avatar {
+  border-color: rgba(182, 162, 106, 0.4);
+  background: #2f2716;
+  color: #e8c86b;
+}
+
+.coach-avatar img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.coach-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.coach-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.coach-self {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* 称号 · 等级分 · 教龄。这一列最宽也只有 170 来像素，两行封顶，多的去主页看。 */
+.coach-line {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4a3a12;
+  overflow-wrap: anywhere;
+}
+
+:root[data-theme='dark'] .coach-line {
+  color: #dcd9d0;
+}
+
+/* 简介单独一行、只给一行：它比徽章长得多，挤在一起时先被截断的总是等级分。
+   读不完的那半句本来就该去主页看。 */
+.coach-tagline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* 和你的偏好对了哪几样 —— 一行。这行说的是"为什么排在这儿"，比简介要紧，
+   但一屏要放四五张卡，所以和简介一样夹住，细则在主页。 */
+.coach-why {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 600;
+  color: #7a5a10;
+  overflow-wrap: anywhere;
+}
+
+:root[data-theme='dark'] .coach-why {
+  color: #cbb37a;
+}
+
+/* 没填偏好时这行说的是教练自己标的方向，不是"和你 matched"，压低一档。 */
+.coach-why.quiet {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* 整张卡本来就是一个按钮，这句只是给个"点下去还有东西"的提示，
+   所以让它自己占一行靠右 —— 挂在正文旁边会把文字栏挤到 120 像素。 */
+.coach-go {
+  align-self: flex-end;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a5c07;
+}
+
+:root[data-theme='dark'] .coach-go {
+  color: #e8c86b;
+}
+
+/* 取名录的那句状态（正在取 / 没取回来）。和"敬请期待"分开说，见 ui/coachDirectory.js。 */
+.coach-state {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* 偏好面板本体。窄屏优先：选项是 chips 横排自动换行，一组最多四五个也不会撑破。 */
+.coach-pref-dialog {
+  width: min(94vw, 470px);
+  padding: 22px;
+  text-align: left;
+}
+
+.coach-pref-dialog .dialog-title {
+  text-align: center;
+}
+
+.coach-pref-dialog .dialog-sub {
+  margin-top: 8px;
+  line-height: 1.55;
+}
+
+.pref-group {
+  margin: 15px 0 0;
+  padding: 0;
+  border: 0;
+  /* fieldset 默认的 min-inline-size 是 min-content，窄屏配长 legend 会把对话框顶宽 */
+  min-inline-size: 0;
+}
+
+.pref-legend {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pref-hint {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.8;
+}
+
+.pref-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.pref-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pref-choice input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* :has() 只是给"已选"加一层底色；原生 radio/checkbox 一直可见，
+   不支持 :has() 的浏览器照样看得出选了哪个。 */
+.pref-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  font-weight: 600;
+}
+
+.pref-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pref-group select {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+/* 说明那一组不是 chips 而是一个 textarea，红要落在框上。 */
+.pref-note-block.invalid .pref-note {
+  border-color: var(--danger);
+}
+
+.pref-note-block.invalid .pref-note-head {
+  color: var(--danger);
+}
+
+.pref-group.invalid .pref-choices {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.pref-group.invalid .pref-legend {
+  color: var(--danger);
+}
+
+.pref-note-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pref-counter {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.pref-counter.over {
+  color: var(--danger);
+}
+
+.pref-note {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.pref-note:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pref-contact {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 15px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pref-contact input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.pref-privacy {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.coach-pref-dialog .online-error {
+  margin-top: 14px;
+}
+
+/* 教练主页。外壳沿用偏好面板那一档宽度与内距：两种框并排看着像一处。
+   内容全部由 src/ui/coachDirectory.js 填，这里只管排。 */
+.coach-home-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.coach-home-id {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 名字挨着头像，不能跟面板标题一样居中（三条 .coach-pref-dialog 的选择器压得住）。 */
+.coach-home-dialog .coach-home-id .dialog-title {
+  text-align: left;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.coach-avatar.big {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+
+.coach-home-badges {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.coach-home-tagline {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.coach-home-rows {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* 窄屏一行两层（标签在上），宽屏才并排成两列 —— 面板只有 470px，
+   两个中文字宽的标签和七个字的值挤一行会在 360px 手机上换行换得难看。 */
+.coach-home-row {
+  display: grid;
+  gap: 2px;
+  align-items: baseline;
+}
+
+.coach-home-row > :last-child {
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.coach-home-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (min-width: 480px) {
+  .coach-home-row {
+    grid-template-columns: 104px 1fr;
+    gap: 8px;
+  }
+}
+
+/* 荣誉和简介都是纯一行：两边的空白归一（后端 coach_trim、界面 validateCoachProfile）
+   会把换行压成一个空格，所以这里不写 pre-line —— 写了只会让人以为换行存得住。 */
+.coach-home-honors {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.coach-home-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.coach-home-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+/* 证书要完整露出，不能像个人照片那样裁掉边缘的姓名和编号。 */
+.coach-home-certificate {
+  object-fit: contain;
+  background: var(--surface);
+}
+
+.coach-home-state {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* 资料表单。四组多选沿用偏好面板的 chips，这里只补数字、下拉和图片三样。 */
+.coach-numbers {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.coach-numbers .pref-group {
+  margin-top: 0;
+}
+
+/* select 由 src/ui/coachProfile.js 生成后塞进这个 span，flex 让下拉填满栏宽。 */
+.cp-select-box {
+  display: flex;
+  min-width: 0;
+}
+
+.coach-profile-dialog input[type='text'] {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+/* 比标签再淡一点：这几栏的提示语是"没有就空着"，看着像已填就白拦人一次。 */
+.coach-profile-dialog input[type='text']::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+.coach-profile-dialog input[type='text']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.coach-profile-dialog .pref-group.invalid input[type='text'],
+.coach-profile-dialog .pref-group.invalid select {
+  border-color: var(--danger);
+}
+
+.pref-group.invalid .field-label {
+  color: var(--danger);
+}
+
+.coach-photo-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.coach-avatar-box,
+.coach-photos {
+  width: 100%;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.coach-avatar-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coach-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+}
+
+.coach-avatar-box .coach-photo {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.coach-photo-cell {
+  position: relative;
+}
+
+.coach-photo-cell .coach-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.coach-photo-cell .coach-certificate-photo {
+  object-fit: contain;
+  background: var(--surface);
+}
+
+.coach-profile-dialog .coach-photo-group.invalid .coach-avatar-box,
+.coach-profile-dialog .coach-photo-group.invalid .coach-photos {
+  border-color: var(--danger);
+}
+
+.coach-photo-group.invalid .pref-legend-text {
+  color: var(--danger);
+}
+
+.coach-photo-remove {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 11px;
+}
+
+/* 照片格子上盖在图角，头像那一格是横排 —— 不这样写的话那颗按钮会飞出框外。 */
+.coach-photo-cell .coach-photo-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+/* 图挂了（文件被删、网络断了）：碎图标收掉，格子留着 —— 留着才按得到【移除】。 */
+.coach-avatar-box.broken .coach-photo,
+.coach-photo-cell.broken .coach-photo {
+  display: none;
+}
+
+.coach-avatar-box.broken,
+.coach-photo-cell.broken {
+  min-height: 44px;
+  border-color: var(--danger);
+}
+
+.coach-avatar-box.broken::after,
+.coach-photo-cell.broken::after {
+  content: '这张图读不出来';
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.coach-photo-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 【换头像】【添加照片】：包着原生 file input 的 label，所以点它就是选文件。
+   那个 input 只是藏起来，没挂 required，也不在任何 <form> 里 —— 三条里有一条变
+   就会被那个 1×1 的隐形控件坑到（见 memory 里"隐形控件的两个静默失效坑"）。 */
+.coach-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.coach-file[hidden] {
+  display: none;
+}
+
+.coach-file:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.coach-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.coach-file input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* 申请框里那一行"哪天交的/哪天答的"：贴在 hint 下面，比正文低一档，
+   免得它和上面那句提醒抢同一层注意力。 */
+.coach-app-when {
+  margin: -8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* 已批准的人看的是自己那段话，不是表单。不上锁的只读框最容易被人当成
+   "打字打不进去"：底色换成面板色，让它一眼看着是给你读的。
+   这时候提交按钮已经整颗收掉了（见 src/ui/coachApp.js）。 */
+.pref-note[readonly] {
+  background: var(--surface);
+  color: var(--muted);
+  cursor: default;
+}
+
+.account-dialog {
+  text-align: left;
+}
+
+.account-dialog .dialog-title {
+  text-align: center;
+}
+
+/* Two panes that hold the same kind of thing, so the switch is two buttons
+   beside each other rather than two buttons of different weight. */
+.account-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 16px 0 4px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.account-tabs button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.account-tabs button:hover {
+  color: var(--text);
+}
+
+.account-tabs button.selected {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+
+.account-tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.account-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* The dialog's own surface is --surface, so a field has to sit below it. */
+.account-pane input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.account-pane input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.account-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* 注册的回答不总是错误或成功：邮箱已经存在时既不发信也不是失败。这句用中性色
+   留在表单里，而不是靠"弹窗自己关掉 + 一条转瞬即逝的提示"让人猜发生了什么。 */
+.account-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.account-name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.account-mail,
+.account-state {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.account-state.confirmed {
+  color: var(--accent-strong);
+}
+
+/* ------------------------------------------------------------------ */
+/* Game library                                                        */
+/* ------------------------------------------------------------------ */
+
+.library-dialog {
+  width: min(94vw, 520px);
+  text-align: left;
+}
+
+.library-dialog .dialog-title {
+  text-align: center;
+}
+
+/* 全选 and the count are one line about the list below, not two controls. */
+.library-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.library-all {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.library-picked {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Capped rather than left to grow: sixty rows would push the export button
+   below the fold on a phone, where the dialog itself scrolls. */
+.library-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+}
+
+.library-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
+}
+
+/* The whole row is the target, because picking one game out of sixty with a
+   17px checkbox on a phone is not something a player should have to do. */
+.library-row label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 2px;
+  cursor: pointer;
+}
+
+.library-row input {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.library-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* A sixty-character nickname would otherwise set the row's width and make
+     the meta line wrap one word at a time. */
+  min-width: 0;
+}
+
+.library-score {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.library-meta {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.library-empty {
+  margin: 18px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Export is the point of the panel, so it gets a row to itself; 清空 and
+   关闭 share the next one. */
+.dialog-buttons + .dialog-buttons {
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Toast                                                               */
+/* ------------------------------------------------------------------ */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 50;
+  max-width: min(92vw, 420px);
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                      */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] {
+    animation: none;
+  }
+
+  .dots span {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .promo-choices button:hover {
+    transform: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  /* The color already says the clock is low; the pulse is decoration. */
+  .clock.low.running {
+    animation: none;
+  }
+
+  .toast {
+    transition: none;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Short windows: the sidebar can outgrow its column — an online game that has
+   just ended shows the online panel, both player cards, the moves and the
+   controls at once. Tighten the vertical rhythm to postpone that, and reserve
+   the scrollbar's gutter so the fallback scroll costs no shift either. (Where
+   scrollbars are overlays, a stable gutter reserves nothing.) */
+@media (min-width: 921px) and (max-height: 800px) {
+  .topbar {
+    padding: 12px 24px 8px;
+  }
+
+  .layout {
+    padding: 8px 24px 16px;
+  }
+
+  .sidebar {
+    gap: 10px;
+    scrollbar-gutter: stable;
+  }
+}
+
+/* Stacked layout: the board and the sidebar together are taller than a phone
+   screen, so scrolling is unavoidable here. It happens inside .layout rather
+   than on the document, which keeps the scrollbar (and any shift when it
+   appears) out of the header and off the board. */
+@media (max-width: 920px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    gap: 20px;
+    padding: 8px 16px 24px;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .sidebar-left {
+    order: 2;
+  }
+
+  /* Same reason as the sidebar below: here the whole .layout scrolls, so a
+     column that scrolls itself has no content height of its own and its grid
+     row collapses to nothing, leaving the board painted under the next card. */
+  .board-column {
+    order: 1;
+    container-type: normal;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  .sidebar {
+    order: 3;
+  }
+
+  .topbar {
+    padding: 16px 16px 8px;
+  }
+
+  .board-frame {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  /* min-height must go back to auto here: with a 0 minimum the sidebar's grid
+     track collapses to the leftover space instead of its content height, and
+     the cards spill out of the scroll extent. */
+  .sidebar {
+    max-width: 560px;
+    width: 100%;
+    margin: 0 auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .moves-card {
+    flex: none;
+  }
+
+  .move-list {
+    flex: none;
+    max-height: 180px;
+  }
+}
+
+/* 921–1023px: two columns. Three here leaves the board narrower than a phone
+   gets, so the move list goes back under the board and only the classroom
+   column keeps a fixed width. Like the stacked layout above, the whole
+   .layout scrolls and no column scrolls itself — a column that did would have
+   no content height of its own and its row would collapse to nothing. */
+@media (min-width: 921px) and (max-width: 1023px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-rows: none;
+    gap: 18px 24px;
+    padding: 8px 20px 20px;
+    align-items: start;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .board-column {
+    grid-column: 1;
+    grid-row: 1;
+    container-type: normal;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  .sidebar-left {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  .sidebar:not(.sidebar-left) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .board-frame {
+    width: min(100%, calc(100dvh - 260px));
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  .moves-card {
+    flex: none;
+  }
+
+  .move-list {
+    flex: none;
+    max-height: 260px;
+  }
+}
+
+/* 复盘报告打开时，宽屏也像窄屏一样让整个 .layout 滚动：棋盘列不再按视口
+   高度限制，报告排在棋盘下按自然高度展开。之前它被棋盘列的剩余高度压成
+   一条，内层小框怎么滚都只看得到开头几行。 */
+@media (min-width: 1024px) {
+  body.review-open .layout {
+    grid-template-rows: none;
+    align-items: start;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
+
+  body.review-open .board-column {
+    container-type: normal;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  /* 棋盘列不再是尺寸容器，cqh 算不出列高，改用窗口高度定棋盘。 */
+  body.review-open .board-frame {
+    width: min(100%, calc(100dvh - 260px));
+  }
+}
+
+@media (max-width: 420px) {
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .field-row,
+  .dialog-buttons {
+    flex-direction: column;
+  }
+
+  .mode-switch button {
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 2px;
+    font-size: 11.5px;
+  }
+}
+
+/* ==========================================================================
+ * 复盘面板
+ * ======================================================================== */
+
+.review-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+/* 复盘报告放在棋盘下方：宽度跟棋盘一致，手机上全宽，宽屏上和棋盘同列。 */
+.review-progress-section,
+.review-sheet {
+  background: var(--surface);
+  border-radius: 10px;
+  margin-top: 12px;
+}
+
+.review-progress-section {
+  padding: 16px;
+  text-align: center;
+}
+
+.review-sheet {
+  max-height: 500px;
+  overflow: hidden;
+}
+
+.review-sheet .review-panel {
+  max-height: 480px;
+}
+
+/* 报告打开后 body 带 review-open（见 main.js）：它是拿来读的，不再塞进一截
+   小框里滚。按自然高度展开，由主区整体滚动带着走。 */
+body.review-open .review-sheet {
+  max-height: none;
+  overflow: visible;
+}
+
+body.review-open .review-sheet .review-panel {
+  max-height: none;
+}
+
+.review-section {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.review-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+/* 小结：一句一段，行距比数字区松，手机上也能一句句扫 */
+.review-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-summary-line {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+/* 准确率 */
+.review-accuracy {
+  display: flex;
+  gap: 16px;
+  justify-content: space-around;
+}
+
+.review-accuracy-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.review-accuracy-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.review-accuracy-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* 白方/黑方两个数字只要求读得清；总体是结论，用强调色。 */
+.review-accuracy-value.acc-plain {
+  color: var(--text);
+}
+
+.review-accuracy-value.acc-overall {
+  color: var(--accent);
+}
+
+/* 统计 */
+.review-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--surface);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.review-stat-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  /* 颜色由 `.annot-*` 给，圆点本身只跟着 currentColor 走。 */
+  background: currentColor;
+}
+
+.review-stat-label {
+  color: var(--text);
+}
+
+.review-stat-count {
+  font-weight: 600;
+}
+
+.review-stat-pct {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* 标注说明 */
+.review-threshold-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.review-threshold-mark {
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+.review-threshold-name {
+  color: var(--text);
+  min-width: 48px;
+}
+
+.review-threshold-desc {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* 评估曲线 */
+.eval-graph-container {
+  width: 100%;
+}
+
+.eval-graph {
+  position: relative;
+  width: 100%;
+}
+
+.eval-graph svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Cursor affordance lives here rather than in a style attribute: the live site
+   sends style-src 'self', which blocks setAttribute('style', ...). */
+.eval-graph .eval-dot {
+  cursor: pointer;
+}
+
+/* 曲线图的颜色只写在这一处，JS 侧只给类名。以前 fill/stroke 是写死的深色主题
+   （#1a1a2e 底框、#888 标签、#fff 描边），浅色主题下就是一块黑。 */
+.eval-bg {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.eval-zero {
+  stroke: var(--border);
+}
+
+.eval-label {
+  fill: var(--muted);
+}
+
+/* 深浅只表示哪边占优，不表示好坏。 */
+.eval-area-white {
+  fill: var(--sq-dark);
+  opacity: 0.2;
+}
+
+.eval-area-black {
+  fill: var(--sq-dark);
+  opacity: 0.45;
+}
+
+/* 曲线本身叫 eval-curve：eval-line 已经被分析区的文字行占了，同名会让 SVG 路径
+   吃到的 display:flex。 */
+.eval-curve {
+  fill: none;
+  stroke: var(--accent);
+}
+
+.eval-cursor {
+  stroke: var(--accent-strong);
+}
+
+.eval-dot {
+  fill: var(--muted);
+  stroke: var(--surface);
+}
+
+/* 分类好的点：把 `.annot-*` 给的 color 接成 fill。 */
+.eval-dot.annot-blunder,
+.eval-dot.annot-mistake,
+.eval-dot.annot-inaccuracy,
+.eval-dot.annot-good,
+.eval-dot.annot-best {
+  fill: currentColor;
+}
+
+.eval-tooltip {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: var(--shadow-card);
+}
+
+/* 关键转折 */
+.review-moments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-moment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--surface);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.review-moment-item:hover {
+  background: var(--accent-tint);
+}
+
+.review-moment-move {
+  font-weight: 500;
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.review-moment-loss {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 走法列表 */
+.review-moves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.review-moves-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.review-moves-row:hover {
+  background: var(--bg);
+}
+
+.review-moves-num {
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 24px;
+}
+
+.review-move-item {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.review-move-item:hover {
+  background: var(--accent-tint);
+}
+
+.review-move-item.current {
+  background: var(--accent-tint);
+  outline: 1px solid var(--accent);
+}
+
+/* 复盘报告里的走法：颜色由通用类名 `.annot-*` 给（和走法区、曲线点是同一套），
+   这里只补字重——错着最重，扫列表时先看到问题。符号（?? ? ?! ! !!）跟着 SAN 写在后面。 */
+.review-move-item.annot-blunder {
+  font-weight: 600;
+}
+
+.review-move-item.annot-mistake {
+  font-weight: 500;
+}
+
+.review-mark {
+  margin-left: 1px;
+  font-weight: 700;
+}
+
+/* 进度条 */
+.review-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.review-progress-bar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.review-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.review-progress-text {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 复盘按钮 */
+.review-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.review-btn:hover {
+  background: var(--accent-strong);
+}
+
+.review-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 复盘模式指示 */
+.review-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--accent-tint);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.review-mode-indicator svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ====================================================================== */
+/* 题库面板                                                                */
+/* ====================================================================== */
+
+.tactics-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tactics-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.tactics-section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* 导入区域 */
+.tactics-import {
+  border-style: dashed;
+}
+
+.tactics-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tactics-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+}
+
+.tactics-tab:hover {
+  background: var(--bg);
+}
+
+.tactics-tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.tactics-file-area {
+  margin-bottom: 12px;
+}
+
+.tactics-file-input {
+  display: none;
+}
+
+.tactics-file-label {
+  display: block;
+  padding: 24px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+  transition: all 0.15s;
+}
+
+.tactics-file-label:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.tactics-text-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tactics-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tactics-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tactics-import-result {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  display: none;
+}
+
+.tactics-import-result.success {
+  display: block;
+  background: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+.tactics-import-result.error {
+  display: block;
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+/* 题目展示区域 */
+.tactics-problem-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tactics-counter {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tactics-status {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tactics-status.status-solving {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.tactics-status.status-correct {
+  background: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+.tactics-status.status-incorrect {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.tactics-status.status-showing-solution {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f39c12;
+}
+
+.tactics-hint {
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.tactics-feedback {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  min-height: 20px;
+}
+
+.tactics-feedback.feedback-correct {
+  background: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+.tactics-feedback.feedback-incorrect {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.tactics-feedback.feedback-solution {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f39c12;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+/* 导航区域 */
+.tactics-btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tactics-btn-group .btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+.tactics-btn-group button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 题库模式按钮 */
+.tactics-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tactics-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 题库开着时按钮是蓝的，和「分析」用同一种说法。 */
+.tactics-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* 题库模式指示 */
+.tactics-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--accent-tint);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.tactics-mode-indicator svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 视图切换 */
+.tactics-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tactics-view-toggle .btn {
+  flex: 1;
+}
+
+.tactics-view-toggle .btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* 筛选区域 */
+.tactics-filter {
+  margin-bottom: 12px;
+}
+
+.tactics-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tactics-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tactics-filter-options {
+  display: flex;
+  gap: 12px;
+}
+
+.tactics-filter-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tactics-filter-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.tactics-filter-option input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.tactics-difficulty-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+/* 统计区域 */
+.tactics-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.tactics-stat {
+  text-align: center;
+  padding: 8px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* 随机练习按钮 */
+.tactics-random-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tactics-random-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 题目集管理 */
+.tactics-sets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tactics-set-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  gap: 8px;
+}
+
+.tactics-set-item span {
+  flex: 1;
+  font-size: 13px;
+}
+
+.tactics-set-item .btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: var(--danger-tint);
+}
+
+.tactics-save-set {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tactics-set-name-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tactics-set-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* 题目列表 */
+.tactics-problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tactics-problem-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tactics-problem-item:hover {
+  background: var(--accent-tint);
+}
+
+.problem-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.problem-id {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.problem-tags {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.problem-difficulty {
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.problem-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.problem-progress {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.problem-progress.solved {
+  background: rgba(46, 204, 113, 0.15);
+  color: #27ae60;
+}
+
+.problem-progress.attempted {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f39c12;
+}
+
+.fav-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.fav-btn.active {
+  color: #f1c40f;
+}
+
+.fav-btn:hover {
+  transform: scale(1.1);
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tactics-empty {
+  text-align: center;
+  padding: 14px 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ------------------------------------------------------------------ */
+/* 题库面板（单栏版：≈290px 宽，控件要能在这个宽度里排开）               */
+/* ------------------------------------------------------------------ */
+
+.tactics-panel {
+  gap: 12px;
+}
+
+.tactics-problem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tactics-problem-header {
+  margin-bottom: 8px;
+}
+
+.tactics-counter {
+  font-size: 13px;
+}
+
+.tactics-hint {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tactics-feedback {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.tactics-nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tactics-nav-grid .btn {
+  padding: 7px 8px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.tactics-nav-grid .tactics-random {
+  grid-column: 1 / -1;
+}
+
+.tactics-list-block {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.tactics-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tactics-toolbar .tactics-search {
+  margin-bottom: 0;
+}
+
+.tactics-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.tactics-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tactics-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.tactics-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tactics-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tactics-list-count {
+  font-weight: 400;
+}
+
+.tactics-problem-list {
+  max-height: 260px;
+}
+
+.tactics-problem-item {
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.tactics-problem-item .problem-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tactics-problem-item .problem-tags,
+.tactics-problem-item .problem-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.problem-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 选中的题整行变蓝：教练一眼能看出现在做的是哪一道。 */
+.tactics-problem-item.selected {
+  background: var(--accent);
+}
+
+.tactics-problem-item.selected .problem-id,
+.tactics-problem-item.selected .problem-tags,
+.tactics-problem-item.selected .problem-difficulty,
+.tactics-problem-item.selected .problem-meta {
+  color: #fff;
+}
+
+.tactics-problem-item.selected .problem-tags {
+  opacity: 0.85;
+}
+
+.tactics-problem-item.selected .fav-btn {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.tactics-problem-item.selected .fav-btn.active {
+  color: #ffd76a;
+}
+
+.tactics-problem-item:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.tactics-more {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.tactics-more-summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tactics-more[open] .tactics-more-summary {
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.tactics-more-body {
+  min-width: 0;
+}
+
+.tactics-stats-line {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.tactics-store .tactics-sets-list {
+  margin: 8px 0;
+}
+
+.tactics-store .tactics-set-item {
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.tactics-store .tactics-set-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+.tactics-store .tactics-save-set {
+  margin-top: 6px;
+}
+
+.tactics-store .tactics-set-name-input {
+  min-width: 0;
+}
+
+.tactics-import-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.tactics-import .tactics-textarea {
+  font-size: 11.5px;
+}
+
+.tactics-format {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.tactics-format summary {
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tactics-format-body {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.tactics-format-body p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.tactics-format-body ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.tactics-format-body li {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.tactics-format-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11.5px;
+}
+
+.tactics-format-sample {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.tactics-format-copy {
+  margin-top: 2px;
+}
