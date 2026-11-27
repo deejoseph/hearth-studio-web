@@ -103,6 +103,18 @@ $assert(isset($codes['too_many_inquiries']), '预约端点使用预约专属限�
 $assert(isset($codes['too_many_complaints']), '申诉端点使用申诉专属限流码');
 
 $guard = (string) file_get_contents(__DIR__ . '/../v1/chess_guard.php');
+$directoryStart = strpos($guard, 'function chess_coach_ids(');
+$directoryEnd = strpos($guard, '/**', $directoryStart);
+$directorySource = substr($guard, $directoryStart, $directoryEnd - $directoryStart);
+$assert(strpos($directorySource, 's.restored_at IS NOT NULL') !== false
+    && strpos($directorySource, "restored_at <> ''") === false,
+    '公开名录只用 IS NULL 判断恢复时间，不把 DATETIME 与空字符串比较');
+$restoreStart = strpos($guard, 'function chess_coach_standing_restore(');
+$restoreEnd = strpos($guard, '/**', $restoreStart);
+$restoreSource = substr($guard, $restoreStart, $restoreEnd - $restoreStart);
+$assert(strpos($restoreSource, "status = 'revoked' AND restored_at IS NULL") !== false
+    && strpos($restoreSource, "restored_at = ''") === false,
+    '恢复资格的条件同样只判断 DATETIME NULL');
 $appStart = strpos($guard, 'function chess_app_decide(');
 $appSource = substr($guard, $appStart, strpos($guard, 'function chess_app_counts(', $appStart) - $appStart);
 $appLock = strpos($appSource, 'chess_lock_player_standing(');

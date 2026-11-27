@@ -1995,8 +1995,7 @@ function chess_coach_standing_restore($conn, $coachId, $reason, $adminId) {
             }
             $stmt = $conn->prepare("UPDATE chess_coach_standing
                 SET restored_at = NOW(), restored_by = ?, restore_reason = ?, updated_at = NOW()
-                WHERE player_id = ? AND status = 'revoked'
-                    AND (restored_at IS NULL OR restored_at = '')");
+                WHERE player_id = ? AND status = 'revoked' AND restored_at IS NULL");
             $stmt->bind_param("isi", $adminId, $reason, $coachId);
             if (!$stmt->execute() || $stmt->affected_rows !== 1) {
                 $stmt->close();
@@ -2483,8 +2482,7 @@ function chess_coach_ids($conn, $cap = 100) {
         FROM chess_coach_apps a
         LEFT JOIN chess_coach_standing s ON s.player_id = a.player_id
         WHERE a.status = 'approved'
-          AND (s.player_id IS NULL OR s.status <> 'revoked'
-               OR (s.restored_at IS NOT NULL AND s.restored_at <> ''))
+          AND (s.player_id IS NULL OR s.status <> 'revoked' OR s.restored_at IS NOT NULL)
         ORDER BY a.decided_at DESC LIMIT {$limit}");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
