@@ -42,6 +42,7 @@ import {
   ScanSearch,
   Target,
   Megaphone,
+  MessageSquare,
   BadgeCheck,
   FlipVertical2,
 } from 'lucide';
@@ -147,6 +148,7 @@ createIcons({
     ScanSearch,
     Target,
     Megaphone,
+    MessageSquare,
     BadgeCheck,
     FlipVertical2,
   },
