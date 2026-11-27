@@ -420,11 +420,20 @@ svg.lucide {
   }
 }
 
-/* 自学教程：正文放对话框里读，窄屏一屏放不下就框内滚。 */
-.learn-dialog {
-  width: min(94vw, 560px);
+/* 教程和练习统一用弹窗；宽屏把题面与棋盘并排，避免摆棋时反复滚动。 */
+.dialog.learn-dialog {
+  width: min(96vw, 900px);
   padding: 24px;
   text-align: left;
+}
+
+.dialog.learn-dialog.quiz-open {
+  width: min(96vw, 960px);
+}
+
+.learn-dialog.quiz-open .learn-body {
+  max-height: none;
+  overflow: visible;
 }
 
 .learn-dialog .dialog-title {
@@ -440,7 +449,7 @@ svg.lucide {
 
 .learn-body {
   margin-top: 12px;
-  max-height: min(58vh, 520px);
+  max-height: min(66vh, 680px);
   overflow-y: auto;
   font-size: 14px;
   line-height: 1.7;
@@ -564,7 +573,7 @@ svg.lucide {
 .setup-quiz-board {
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
-  width: min(100%, 360px);
+  width: min(100%, 480px);
   margin: 0 auto;
   aspect-ratio: 1;
   overflow: hidden;
@@ -708,23 +717,137 @@ svg.lucide {
   width: 100%;
 }
 
-@media (min-width: 560px) {
-  .learn-dialog {
-    width: min(94vw, 620px);
+@media (min-width: 720px) {
+  .setup-quiz {
+    display: grid;
+    grid-template-columns: minmax(200px, 0.8fr) minmax(360px, 480px);
+    grid-template-rows: auto auto auto 1fr auto;
+    gap: 10px 20px;
+    align-items: start;
+    justify-content: center;
   }
 
-  .setup-quiz-piece {
-    padding: 8px 4px;
+  .setup-quiz-guide {
+    grid-column: 1 / -1;
+    margin-bottom: 0;
   }
 
-  .setup-quiz-piece img {
-    width: 36px;
-    height: 36px;
+  .setup-quiz-palette {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .setup-quiz-tools {
+    grid-column: 1;
+    grid-row: 3;
+    flex-wrap: wrap;
+    margin: 0;
+  }
+
+  .setup-quiz-board {
+    grid-column: 2;
+    grid-row: 2 / 5;
+    width: 100%;
+  }
+
+  .setup-quiz-status {
+    grid-column: 1;
+    grid-row: 4;
+    margin: 0;
+  }
+
+  .setup-quiz-actions {
+    grid-column: 1;
+    grid-row: 5;
+    margin: 0;
   }
 }
 
 .learn-dialog .dialog-buttons {
   margin-top: 18px;
+}
+
+.dialog.tactics-dialog {
+  width: min(96vw, 1120px);
+  padding: 20px;
+  text-align: left;
+}
+
+.tactics-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.tactics-dialog-head .dialog-title,
+.tactics-dialog-head .learn-step {
+  text-align: left;
+}
+
+.tactics-dialog-head .learn-step {
+  margin-bottom: 2px;
+}
+
+.tactics-dialog-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(320px, 560px);
+  gap: 20px;
+  align-items: start;
+  justify-content: center;
+}
+
+.tactics-dialog-panel {
+  max-height: min(72vh, 720px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tactics-dialog-panel .tactics-panel {
+  display: block;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.tactics-dialog-board {
+  min-width: 0;
+}
+
+.tactics-dialog-board .board-frame {
+  width: 100%;
+}
+
+.tactics-dialog.lesson-mode .tactics-list-block,
+.tactics-dialog.lesson-mode .tactics-more {
+  display: none;
+}
+
+.tactics-dialog.lesson-mode .tactics-dialog-panel {
+  max-height: none;
+  overflow: visible;
+}
+
+@media (max-width: 719px) {
+  .dialog.tactics-dialog {
+    padding: 16px;
+  }
+
+  .tactics-dialog-head {
+    align-items: flex-start;
+  }
+
+  .tactics-dialog-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .tactics-dialog-panel {
+    max-height: none;
+    overflow: visible;
+  }
 }
 
 .board-column {

@@ -113,8 +113,7 @@
 
       <main class="layout">
         <aside class="sidebar sidebar-left">
-          <!-- 左边这一栏永远先是自学教程（人人可看），题库打开时把教程和题库并成一列，
-               走法回到右边单独一列 —— 题目列表放在走法框左侧，教练一眼能挑题。 -->
+          <!-- 教程、题库和测验都在弹窗里，主页面只保留入口。 -->
           <div class="learn-panes">
             <section class="card learn-card" id="learn-card" aria-label="国象自学教程">
               <div class="card-head">
@@ -130,9 +129,6 @@
                 <button type="button" class="learn-topic" data-learn-topic="etiquette">国象礼仪</button>
                 <button type="button" class="learn-topic" data-learn-topic="ai">国际象棋与 AI</button>
               </div>
-            </section>
-            <section class="card tactics-card hidden" id="tactics-card" aria-label="题库练习">
-              <div id="tactics-panel-container"></div>
             </section>
           </div>
           <section class="card moves-card" id="moves-card">
@@ -902,6 +898,21 @@
       <div class="dialog-buttons">
         <button class="btn btn-ghost" id="coach-app-close-btn" type="button">关闭</button>
         <button class="btn btn-primary" id="coach-app-save-btn" type="button">提交申请</button>
+      </div>
+    </dialog>
+
+    <!-- 教程练习和完整题库共用一个弹窗；主棋盘临时移进来，关闭后回到原局。 -->
+    <dialog class="dialog tactics-dialog" id="tactics-dialog" aria-labelledby="tactics-dialog-title">
+      <div class="tactics-dialog-head">
+        <div>
+          <p class="learn-step" id="tactics-dialog-step">在棋盘上走出答案</p>
+          <h2 class="dialog-title" id="tactics-dialog-title">国际象棋练习</h2>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="tactics-dialog-close" type="button">关闭练习</button>
+      </div>
+      <div class="tactics-dialog-layout">
+        <div class="tactics-dialog-panel" id="tactics-panel-container"></div>
+        <div class="tactics-dialog-board" id="tactics-board-host"></div>
       </div>
     </dialog>
 

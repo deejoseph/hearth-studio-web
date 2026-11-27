@@ -72,6 +72,7 @@ export function mountLearnPanel({ onPractice } = {}) {
   }
 
   function paint() {
+    dialog.classList.remove('quiz-open');
     const topic = LEARN_TOPICS[current];
     el.prev.classList.remove('hidden');
     el.next.classList.remove('hidden');
@@ -132,10 +133,7 @@ export function mountLearnPanel({ onPractice } = {}) {
       practiceButton = document.createElement('button');
       practiceButton.type = 'button';
       practiceButton.className = `btn ${topic.quizzes?.length ? 'btn-ghost' : 'btn-primary'} learn-practice`;
-      practiceButton.addEventListener('click', () => {
-        dialog.close();
-        onPractice(topic.id);
-      });
+      practiceButton.addEventListener('click', () => onPractice(topic.id));
       el.body.appendChild(practiceButton);
     }
     updatePractice(topic);
@@ -144,6 +142,7 @@ export function mountLearnPanel({ onPractice } = {}) {
   }
 
   function openQuiz(topic, quizConfig) {
+    dialog.classList.add('quiz-open');
     el.title.textContent = `${quizConfig.label}：${topic.label}`;
     el.prev.classList.add('hidden');
     el.next.classList.add('hidden');

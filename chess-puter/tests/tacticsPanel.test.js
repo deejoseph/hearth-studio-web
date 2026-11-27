@@ -143,6 +143,22 @@ describe('公开解题与教练管理', () => {
 });
 
 describe('教程推荐选题', () => {
+  it('章节练习按推荐顺序切换，最后一题不会跳到其他章节', () => {
+    const { container, panel } = mount();
+    const ids = [
+      'basic-pieces-pawn', 'basic-pieces-knight', 'basic-pieces-bishop',
+      'basic-pieces-rook', 'basic-pieces-queen', 'basic-pieces-king',
+    ];
+    expect(panel.selectLesson(ids)).toBe(true);
+    expect(panel.getState().problems.map((problem) => problem.id)).toEqual(ids);
+    const next = findAll(container, (node) => node.name === 'button' && node.textContent === '下一题 →')[0];
+    for (const id of ids.slice(1)) {
+      next.emit('click');
+      expect(panel.getState().currentProblemId).toBe(id);
+    }
+    expect(next.disabled).toBe(true);
+  });
+
   it('推荐题清除筛选并按 ID 选中', () => {
     const { container, panel } = mount();
     const search = findAll(container, (node) => node.className === 'tactics-search')[0];

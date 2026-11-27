@@ -134,6 +134,17 @@ describe('教程练习进度', () => {
     expect(findText(body, '再练一次：特殊规则')).toBeTruthy();
   });
 
+  it('练一练打开独立练习弹窗，教程弹窗保持打开', () => {
+    const opened = [];
+    const { panel, topics, body, elements } = mount({ onPractice: (id) => opened.push(id) });
+    panel.open('pieces');
+    findText(body, '练一练：棋子怎么走').emit('click');
+    expect(opened).toEqual(['pieces']);
+    expect(elements['learn-dialog'].open).toBe(true);
+    topics[1].emit('click');
+    expect(elements['learn-dialog'].open).toBe(true);
+  });
+
   it('阅读课可以打开和翻页，但不会显示找不到题的练一练入口', () => {
     const { panel, topics, body, elements } = mount();
     panel.open('etiquette');

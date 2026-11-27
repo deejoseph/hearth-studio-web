@@ -197,8 +197,12 @@ const els = {
   pgnSheet: $('pgn-sheet'),
   pgnBody: $('pgn-body'),
   tacticsBtn: $('tactics-btn'),
-  tacticsCard: $('tactics-card'),
+  tacticsDialog: $('tactics-dialog'),
+  tacticsDialogTitle: $('tactics-dialog-title'),
+  tacticsDialogStep: $('tactics-dialog-step'),
+  tacticsDialogClose: $('tactics-dialog-close'),
   tacticsPanelContainer: $('tactics-panel-container'),
+  tacticsBoardHost: $('tactics-board-host'),
   layout: document.querySelector('.layout'),
   srStatus: $('sr-status'),
   toast: $('toast'),
@@ -1390,15 +1394,27 @@ let tacticsMode = false;
 let tacticsReturn = null;
 let tacticsViewColor = 'w';
 let learnPanel = null;
+const tacticsBoardHome = {
+  parent: document.querySelector('.board-column'),
+  next: document.querySelector('.board-frame').nextSibling,
+};
 
 function canManageTactics() {
   return coachApp?.state() === 'approved';
 }
 
 function paintTacticsColumn() {
-  els.layout.classList.toggle('tactics-open', tacticsMode);
-  els.tacticsCard.classList.toggle('hidden', !tacticsMode);
+  document.body.classList.toggle('practice-open', tacticsMode);
   els.tacticsBtn.setAttribute('aria-pressed', String(tacticsMode));
+}
+
+function attachTacticsBoard() {
+  els.tacticsBoardHost.appendChild(document.querySelector('.board-frame'));
+}
+
+function detachTacticsBoard() {
+  const frame = document.querySelector('.board-frame');
+  tacticsBoardHome.parent.insertBefore(frame, tacticsBoardHome.next);
 }
 
 /** 离开棋盘去做题前，把这一盘连钟、支线和复盘位置一起收好。 */
@@ -1490,6 +1506,10 @@ function openTactics(topicId = null) {
   clearReview();
 
   paintTacticsColumn();
+  attachTacticsBoard();
+  els.tacticsDialog.classList.remove('lesson-mode');
+  els.tacticsDialogTitle.textContent = '国际象棋练习';
+  els.tacticsDialogStep.textContent = '完整题库 · 在棋盘上走出答案';
   if (!tacticsPanel) {
     tacticsPanel = mountTacticsPanel(els.tacticsPanelContainer, {
       problems: BASIC_PROBLEMS,
@@ -1506,31 +1526,29 @@ function openTactics(topicId = null) {
     });
   } else {
     tacticsPanel.setCanManage(canManageTactics());
-    if (!topicId) {
-      const problemId = tacticsPanel.getState().currentProblemId || BASIC_PROBLEMS[0]?.id;
-      if (problemId) tacticsPanel.selectProblemById(problemId);
-    }
+    tacticsPanel.selectAll();
   }
+  if (!els.tacticsDialog.open) els.tacticsDialog.showModal();
   if (topicId) openPractice(topicId);
   if (account.player() && coachApp?.state() == null) void coachApp.refresh();
 }
 
-/** 教程的「练一练」直接落到对应章节推荐的第一道题。 */
+/** 教程练习只在本章推荐题内切换，不跳到其他章节。 */
 function openPractice(topicId) {
   const topic = learnTopic(topicId);
-  const problemId = topic?.practiceIds?.[0];
-  if (!problemId) {
+  if (!topic?.practiceIds?.length) {
     showToast('这节课的练习暂时没找到。');
     return false;
   }
-  if (!tacticsMode) {
-    openTactics(topicId);
-    return tacticsMode;
-  }
-  if (!tacticsPanel?.selectProblemById(problemId)) {
+  if (!tacticsMode) openTactics();
+  if (!tacticsPanel?.selectLesson(topic.practiceIds)) {
     showToast('这节课的练习暂时没找到。');
     return false;
   }
+  els.tacticsDialog.classList.add('lesson-mode');
+  els.tacticsDialogTitle.textContent = `练一练：${topic.label}`;
+  els.tacticsDialogStep.textContent = `本节 ${topic.practiceIds.length} 题 · 在棋盘上走出答案`;
+  if (!els.tacticsDialog.open) els.tacticsDialog.showModal();
   return true;
 }
 
@@ -1539,6 +1557,8 @@ function closeTactics() {
   if (!tacticsMode) return;
   const resumeAnalysis = tacticsReturn?.analyzing ?? false;
   tacticsMode = false;
+  if (els.tacticsDialog.open) els.tacticsDialog.close();
+  detachTacticsBoard();
   restoreTacticsReturn();
   paintTacticsColumn();
   renderAll();
@@ -1548,7 +1568,10 @@ function closeTactics() {
 
 /** 换模式或开新局时丢弃快照，不能把上一盘恢复回来。 */
 function clearTactics() {
+  const wasOpen = tacticsMode;
   tacticsMode = false;
+  if (els.tacticsDialog.open) els.tacticsDialog.close();
+  if (wasOpen) detachTacticsBoard();
   tacticsReturn = null;
   tacticsViewColor = 'w';
   paintTacticsColumn();
@@ -2403,7 +2426,8 @@ function describeEnd(status) {
 function currentEnd() {
   if (tacticsMode) {
     const status = game.status();
-    return status.over ? describeEnd(status) : null;
+    // 走法题常用王对象、王对王教走法；子力不足不能把这些题面锁死。
+    return status.over && status.reason !== 'insufficient material' ? describeEnd(status) : null;
   }
   // Online, nothing but the server's verdict counts: it does not judge the
   // three draws the engine sees (repetition, fifty moves, bare kings), so
@@ -4722,6 +4746,10 @@ els.reviewGameBtn.addEventListener('click', () => {
 els.tacticsBtn.addEventListener('click', () => {
   if (tacticsMode) closeTactics();
   else openTactics();
+});
+els.tacticsDialogClose.addEventListener('click', closeTactics);
+els.tacticsDialog.addEventListener('close', () => {
+  if (tacticsMode) closeTactics();
 });
 
 // The move list is rebuilt on every render, so the click lands on the list.

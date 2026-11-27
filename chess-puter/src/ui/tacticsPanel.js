@@ -114,6 +114,22 @@ export function mountTacticsPanel(container, {
       panel.canManage = Boolean(canManage);
       syncManagement();
     },
+    selectLesson(ids) {
+      panel.resetFilters();
+      const lesson = ids.map((id) => BASIC_PROBLEMS.find((problem) => problem.id === id)).filter(Boolean);
+      if (lesson.length === 0) return false;
+      loadProblems(panel, lesson);
+      return true;
+    },
+    selectAll() {
+      panel.resetFilters();
+      const currentId = panel.problems[panel.currentIndex]?.id;
+      const merged = [...BASIC_PROBLEMS];
+      for (const problem of panel.problems) {
+        if (!merged.some((known) => known.id === problem.id)) merged.push(problem);
+      }
+      loadProblems(panel, merged, currentId);
+    },
     selectProblemById(id) {
       panel.resetFilters();
       let index = panel.problems.findIndex((problem) => problem.id === id);

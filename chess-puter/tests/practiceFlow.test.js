@@ -92,6 +92,22 @@ describe('终局与历史回看隔离', () => {
     expect(harness.currentEnd()).toBe(manualEnd);
   });
 
+  it('王对象与王对王题面不会因子力不足锁盘', () => {
+    for (const fen of ['4k3/8/8/8/8/8/8/2B1K3 w - - 0 1', '4k3/8/8/8/8/8/8/4K3 w - - 0 1']) {
+      const game = new Chess(fen);
+      const { currentEnd } = new Function(
+        'game',
+        `let tacticsMode = true;
+         let mode = 'local';
+         let onlineEnd = null;
+         let manualEnd = null;
+         ${extract('currentEnd')}
+         return { currentEnd };`,
+      )(game);
+      expect(currentEnd()).toBe(null);
+    }
+  });
+
   it('历史回看标记不会锁住练习走法', () => {
     const { movableColorNow } = new Function(
       'game',
@@ -216,22 +232,19 @@ describe('原对局快照', () => {
 });
 
 describe('练习界面', () => {
-  it('题库打开和关闭时同步卡片、布局与按钮状态', () => {
-    const classes = new Set(['hidden']);
+  it('题库打开和关闭时同步页面与按钮状态', () => {
+    const classes = new Set();
     const pressed = [];
     const { paintTacticsColumn } = new Function(
-      'tacticsMode', 'els',
+      'tacticsMode', 'els', 'document',
       `${extract('paintTacticsColumn')}
        return { paintTacticsColumn };`,
     )(true, {
-      layout: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } },
-      tacticsCard: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } },
       tacticsBtn: { setAttribute: (name, value) => pressed.push([name, value]) },
-    });
+    }, { body: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } } });
 
     paintTacticsColumn();
-    expect(classes.has('tactics-open')).toBe(true);
-    expect(classes.has('hidden')).toBe(false);
+    expect(classes.has('practice-open')).toBe(true);
     expect(pressed).toEqual([['aria-pressed', 'true']]);
   });
 
@@ -259,7 +272,7 @@ describe('公开入口与会话隔离', () => {
     const mounted = [];
     const toasts = [];
     const harness = new Function(
-      'game', 'BASIC_PROBLEMS', 'learnTopic', 'mounted', 'toasts',
+      'game', 'BASIC_PROBLEMS', 'learnTopic', 'mounted', 'toasts', 'document',
       `let tacticsPanel = null;
        let tacticsMode = false;
        let tacticsReturn = null;
@@ -289,8 +302,25 @@ describe('公开入口与会话隔离', () => {
        const gameFinished = () => false;
        const updateTacticsHighlight = () => {};
        const boardView = { setOrientation: () => {} };
-       const chrome = { classList: { toggle() {} }, setAttribute() {} };
-       const els = { tacticsPanelContainer: {}, layout: chrome, tacticsCard: chrome, tacticsBtn: chrome };
+       const attachTacticsBoard = () => {};
+       const detachTacticsBoard = () => {};
+       const dialogClasses = new Set();
+       const dialog = {
+         open: false,
+         classList: {
+           add: (name) => dialogClasses.add(name),
+           remove: (name) => dialogClasses.delete(name),
+         },
+         showModal() { this.open = true; },
+         close() { this.open = false; },
+       };
+       const els = {
+         tacticsPanelContainer: {},
+         tacticsDialog: dialog,
+         tacticsDialogTitle: { textContent: '' },
+         tacticsDialogStep: { textContent: '' },
+         tacticsBtn: { setAttribute() {} },
+       };
        const showToast = (text) => toasts.push(text);
        const mountTacticsPanel = (container, options) => {
          mounted.push(options);
@@ -299,6 +329,8 @@ describe('公开入口与会话隔离', () => {
          options.setFen(BASIC_PROBLEMS[0].fen);
          return {
            setCanManage() {},
+           selectAll() { loads++; return true; },
+           selectLesson(ids) { selected = ids[0]; loads++; return true; },
            getState() { return { currentProblemId: selected }; },
            selectProblemById(id) { selected = id; loads++; return true; },
          };
@@ -318,8 +350,11 @@ describe('公开入口与会话隔离', () => {
          saves: () => saves,
          clearReviews: () => clearReviews,
          reviewIndex: () => reviewIndex,
+         lessonMode: () => dialogClasses.has('lesson-mode'),
+         dialogOpen: () => dialog.open,
        };`,
-    )(game, BASIC_PROBLEMS, learnTopic, mounted, toasts);
+    )(game, BASIC_PROBLEMS, learnTopic, mounted, toasts,
+      { body: { classList: { toggle() {} } } });
     return { ...harness, mounted, toasts };
   }
 
@@ -328,6 +363,8 @@ describe('公开入口与会话隔离', () => {
     expect(harness.openPractice('pieces')).toBe(true);
     expect(harness.isOpen()).toBe(true);
     expect(harness.selected()).toBe('basic-pieces-pawn');
+    expect(harness.lessonMode()).toBe(true);
+    expect(harness.dialogOpen()).toBe(true);
     expect(harness.reviewIndex()).toBe(null);
     expect(harness.clearReviews()).toBe(1);
     expect(harness.mounted[0]).toMatchObject({ canManage: false, problems: BASIC_PROBLEMS });
