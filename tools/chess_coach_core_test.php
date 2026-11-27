@@ -390,13 +390,14 @@ $full = static function (array $over = []) use ($imgD) {
         'years' => 7,
         'tagline' => '带零基础到比赛',
         'honors' => '市青少年锦标赛 优秀教练',
+        'teaching_focus' => '擅长把战术题拆成几步提问',
         'enrollment_notes' => '先发水平与目标，周末可约',
         'tuition_text' => '每小时 300 元，可单次约课',
         'schedule_text' => '周六日 14:00 后',
         'hourly_rate_cny' => 300,
         'language' => 'zh_en',
         'timezone' => 'Asia/Shanghai',
-        'levels' => ['zero', 'moves'],
+        'levels' => ['zero', 'amateur5'],
         'goals' => ['tactics', 'basics'],
         'formats' => ['one', 'group'],
         'slots' => ['wkend_am'],
@@ -412,11 +413,12 @@ $assert($p !== null, '一份完整资料该通过');
 $assert($p['title'] === 'im', 'title 原样');
 $assert($p['elo'] === 2210, 'elo 取成整数');
 $assert($p['years'] === 7, 'years 取成整数');
+$assert($p['teaching_focus'] === '擅长把战术题拆成几步提问', '教学补充说明原样收下');
 $assert($p['enrollment_notes'] === '先发水平与目标，周末可约', '招生要求原样收下');
 $assert($p['tuition_text'] === '每小时 300 元，可单次约课', '收费说明原样收下');
 $assert($p['schedule_text'] === '周六日 14:00 后', '授课时间原样收下');
 $assert($p['hourly_rate_cny'] === 300, '每小时价格取成整数');
-$assert($p['levels'] === 'zero,moves', 'levels 按白名单顺序,不按点击顺序');
+$assert($p['levels'] === 'zero,amateur5', 'levels 按白名单顺序,不按点击顺序');
 $assert($p['goals'] === 'basics,tactics', 'goals 与学员那侧同一套 key');
 $assert($p['formats'] === 'one,group', 'formats 两条');
 $assert($p['slots'] === 'wkend_am', 'slots 一条');
@@ -427,7 +429,7 @@ $assert($p['certificates'] === $imgD, 'certificates 一张');
 /* --- 每个字段都可以留空：资料不是门槛 --- */
 $assert($prof([]) !== null, '整张表单空着也要存得下 —— 判够不够格的是申请状态,不是这里');
 $blank = $prof([]);
-foreach (['title', 'tagline', 'honors', 'enrollment_notes', 'tuition_text', 'schedule_text',
+foreach (['title', 'tagline', 'honors', 'teaching_focus', 'enrollment_notes', 'tuition_text', 'schedule_text',
     'language', 'timezone', 'levels', 'goals', 'formats', 'slots', 'avatar', 'photos', 'certificates'] as $key) {
     $assert(($blank[$key] ?? '缺键') === '', "空着 {$key} 存空串");
 }
@@ -481,6 +483,15 @@ $assert($profBad($full(['honors' => str_repeat('奖', COACH_HONORS_MAX + 1)]))
 $assert($profBad($full(['honors' => "奖\xa0杯"])) === ['bad_honors', 'honors'], '荣誉坏字节 → bad_honors');
 
 /* --- 招生、收费、时间与每小时价格 --- */
+$assert(COACH_TEACHING_FOCUS_MAX === 300, '教学补充说明最多 300 字');
+$assert($prof($full(['teaching_focus' => str_repeat('马', COACH_TEACHING_FOCUS_MAX)])) !== null,
+    '教学补充说明恰好到上限');
+$assert($profBad($full(['teaching_focus' => str_repeat('马', COACH_TEACHING_FOCUS_MAX + 1)]))
+    === ['long_teaching_focus', 'teaching_focus'], '教学补充说明超一个码点 → long_teaching_focus');
+$assert($profBad($full(['teaching_focus' => ['战术']])) === ['bad_teaching_focus', 'teaching_focus'],
+    '教学补充说明不收数组');
+$assert($profBad($full(['teaching_focus' => "战术\xa0"])) === ['bad_teaching_focus', 'teaching_focus'],
+    '教学补充说明不收坏字节');
 $assert(COACH_ENROLLMENT_NOTES_MAX === 2000 && COACH_TUITION_TEXT_MAX === 1000
     && COACH_SCHEDULE_TEXT_MAX === 1000, '教练公开说明的三档字数上限保持契约值');
 foreach ([
@@ -510,10 +521,16 @@ $assert($prof($full(['hourly_rate_cny' => '']))['hourly_rate_cny'] === null,
 $assert($prof($full(['levels' => []]))['levels'] === '', 'levels 不填允许');
 $assert($prof($full(['levels' => '']))['levels'] === '',
     'levels 发空串也当"一个都没选",而不是"选了一个不存在的 key"');
+$assert($prof($full(['levels' => ['master', 'amateur1', 'amateur5', 'zero']]))['levels']
+    === 'zero,amateur5,amateur1,master', 'levels 四条选满,按白名单顺序');
 $assert($prof($full(['levels' => ['rated', 'zero', 'moves', 'play']]))['levels']
-    === 'zero,moves,play,rated', 'levels 四条选满,按白名单顺序');
+    === 'zero,amateur5,master', '旧 levels 读回或重存时换算成新档位');
+$assert($prof($full(['levels' => 'zero,moves,play,rated']))['levels']
+    === 'zero,amateur5,master', '旧 levels 逗号串也换算');
 $assert($profBad($full(['levels' => ['zero', 'nope']])) === ['bad_profile', 'levels'],
     'levels 混一项不认识 → bad_profile 并点名');
+$assert($profBad($full(['levels' => 123])) === ['bad_profile', 'levels'],
+    'levels 收数字 → bad_profile');
 $assert($prof($full(['goals' => ['basics', 'tactics', 'contest']]))['goals'] === 'basics,tactics,contest',
     'goals 三条恰好到上限');
 $assert($profBad($full(['goals' => ['basics', 'tactics', 'opening', 'endgame']]))
@@ -585,7 +602,8 @@ $assert($profBad($full(['certificates' => ['../' . $imgA]]))
 
 /* --- 库里的一行 → 回给界面 --- */
 $row = coach_profile_public($p);
-$assert($row['levels'] === ['zero', 'moves'], '回界面时多选变数组');
+$assert($row['levels'] === ['zero', 'amateur5'], '回界面时多选变数组');
+$assert($row['teaching_focus'] === '擅长把战术题拆成几步提问', '教学补充说明按公开形状带回');
 $assert($row['photos'] === [$imgB], '照片变数组,顺序还是那一列');
 $assert($row['certificates'] === [$imgD], '证书变数组,公开主页拿得到');
 $assert($row['elo'] === 2210 && $row['years'] === 7, '整数带回去');
@@ -597,6 +615,7 @@ $empty = coach_profile_public([]);
 $assert($empty['title'] === '' && $empty['levels'] === [] && $empty['photos'] === []
     && $empty['certificates'] === [] && $empty['elo'] === null && $empty['updated_at'] === null,
     '空行不会给界面 undefined');
+$assert($empty['teaching_focus'] === '', '旧资料行缺教学补充说明时保持空串');
 $assert($empty['enrollment_notes'] === '' && $empty['tuition_text'] === ''
     && $empty['schedule_text'] === '' && $empty['hourly_rate_cny'] === null,
     '旧资料行缺新字段时保持空值');
@@ -620,11 +639,12 @@ $entry = coach_directory_entry([
     'title' => 'im',
     'elo' => '2210',
     'years' => '7',
+    'teaching_focus' => '擅长把战术题拆成几步提问',
     'enrollment_notes' => '先发水平与目标，周末可约',
     'tuition_text' => '每小时 300 元，可单次约课',
     'schedule_text' => '周六日 14:00 后',
     'hourly_rate_cny' => '300',
-    'levels' => 'zero,moves',
+    'levels' => 'zero,amateur5',
     'photos' => "{$imgB},{$imgC}",
     'certificates' => $imgD,
     'avatar' => $imgA,
@@ -634,7 +654,9 @@ $entry = coach_directory_entry([
 ]);
 $assert($entry['player_id'] === 12, 'player_id 取成整数（mysqli 回来的是串）');
 $assert($entry['nickname'] === '青瓷' && $entry['rating'] === 1450, '名头和等级分带出去');
-$assert($entry['profile']['levels'] === ['zero', 'moves'], '资料那一坨按 public 的形状');
+$assert($entry['profile']['levels'] === ['zero', 'amateur5'], '资料那一坨按 public 的形状');
+$assert($entry['profile']['teaching_focus'] === '擅长把战术题拆成几步提问',
+    '名录也带得出教学补充说明');
 $assert($entry['profile']['photos'] === [$imgB, $imgC], '照片是数组,第一张当封面');
 $assert($entry['profile']['certificates'] === [$imgD], '证书按 public 的形状上主页');
 $assert($entry['profile']['hourly_rate_cny'] === 300 && $entry['profile']['tuition_text'] !== '',
@@ -659,7 +681,7 @@ $assert(coach_profile_filled(coach_profile_public(['elo' => 0])) === true,
 $assert(coach_profile_filled(coach_profile_public(['years' => 0])) === true, '0 年教龄同上');
 $assert(coach_profile_filled(coach_profile_public(['hourly_rate_cny' => 0])) === true,
     '0 元价格也算填过,不和没填混淆');
-foreach (['enrollment_notes', 'tuition_text', 'schedule_text'] as $field) {
+foreach (['teaching_focus', 'enrollment_notes', 'tuition_text', 'schedule_text'] as $field) {
     $assert(coach_profile_filled(coach_profile_public([$field => '已填写'])) === true,
         "只填 {$field} 也算填过资料");
 }
