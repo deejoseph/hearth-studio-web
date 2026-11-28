@@ -182,10 +182,25 @@ svg.lucide {
   height: 100%;
 }
 
+.brand-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .brand-name {
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+
+.brand-domain {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
 }
 
 .topbar-right {

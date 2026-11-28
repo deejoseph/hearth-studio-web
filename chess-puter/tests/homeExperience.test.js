@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const html = read('../index.html');
 const css = read('../src/style.css');
 const main = read('../src/main.js');
+const htaccess = read('../public/.htaccess');
 
 describe('首页体验契约', () => {
   it('页面标题、分享标题和品牌标题统一', () => {
@@ -13,6 +15,24 @@ describe('首页体验契约', () => {
     expect(html).toMatch(/<meta name="twitter:title" content="国际象棋免费自学平台"/);
     expect(html).toContain('"name": "国际象棋免费自学平台"');
     expect(html).toContain('<h1 class="brand-name">国际象棋免费自学平台</h1>');
+  });
+
+  it('CSP 允许按 LF 归一后的主题内联脚本', () => {
+    const scripts = html.match(/<script>([\s\S]*?)<\/script>/g) ?? [];
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const tag of scripts) {
+      const source = tag.slice('<script>'.length, -'</script>'.length).replace(/\r\n?/g, '\n');
+      const hash = createHash('sha256').update(source, 'utf8').digest('base64');
+      expect(htaccess).toContain(`sha256-${hash}`);
+    }
+  });
+
+  it('品牌标题下显示站点域名小字', () => {
+    expect(html).toContain('<div class="brand-copy">');
+    expect(html).toContain('<span class="brand-domain">ichessgeek.com</span>');
+    const domain = css.match(/^\.brand-domain \{[\s\S]*?^\}/m)?.[0];
+    expect(domain).toContain('font-size: 11px');
+    expect(domain).toContain('color: var(--muted)');
   });
 
   it('平台亮点默认选中，教程标签仍具备完整 ARIA 状态', () => {
