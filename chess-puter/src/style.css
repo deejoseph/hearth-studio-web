@@ -5096,6 +5096,10 @@ body.review-open .review-sheet .review-panel {
   margin-bottom: 0;
 }
 
+.tactics-review-btn {
+  width: 100%;
+}
+
 .tactics-filter-row {
   display: flex;
   flex-wrap: wrap;

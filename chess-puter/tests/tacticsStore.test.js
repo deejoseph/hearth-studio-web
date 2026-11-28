@@ -3,6 +3,7 @@ import {
   clearAll,
   deleteProblemSet,
   getProblemSetNames,
+  getMistakeQueue,
   getProgress,
   getUserRating,
   isFavorite,
@@ -31,6 +32,18 @@ describe('公开做题进度', () => {
     recordAttempt('basic-setup-e2-e4', true);
     recordAttempt('basic-setup-e2-e4', false);
     expect(getProgress('basic-setup-e2-e4')).toMatchObject({ attempts: 3, solved: true });
+  });
+
+  it('错题队列按答错次数降序，并排除已经解决的题', () => {
+    const problems = [{ id: 'low' }, { id: 'high' }, { id: 'done' }];
+    recordAttempt('low', false);
+    recordAttempt('high', false);
+    recordAttempt('high', false);
+    recordAttempt('done', true);
+    recordAttempt('done', false);
+
+    expect(getMistakeQueue(problems).map((problem) => problem.id)).toEqual(['high', 'low']);
+    expect(getProgress('done')).toMatchObject({ attempts: 2, solved: true });
   });
 
   it('评级按题目难度更新，并限制在有效范围', () => {

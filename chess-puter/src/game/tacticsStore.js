@@ -128,6 +128,18 @@ export function getAllProgress() {
   return { ...store.progress };
 }
 
+export function getMistakeQueue(problems) {
+  const store = loadStore();
+  return problems
+    .map((problem, index) => ({ problem, index, progress: store.progress[problem.id] }))
+    .filter(({ progress }) => progress && progress.attempts > 0 && !progress.solved)
+    .sort((a, b) =>
+      b.progress.attempts - a.progress.attempts ||
+      (b.progress.lastAttempt || 0) - (a.progress.lastAttempt || 0) ||
+      a.index - b.index)
+    .map(({ problem }) => problem);
+}
+
 export function getReadTopics() {
   return [...loadStore().readTopics];
 }

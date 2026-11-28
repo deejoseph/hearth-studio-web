@@ -81,6 +81,10 @@ function enableMistakesFilter(container) {
   return mistakes;
 }
 
+function reviewButton(container) {
+  return findAll(container, (node) => node.className === 'btn btn-primary btn-sm tactics-review-btn')[0];
+}
+
 function mount({ canManage = false, problems = BASIC_PROBLEMS, onProgress = () => {} } = {}) {
   const container = fakeNode('div');
   const positions = [];
@@ -206,6 +210,86 @@ describe('错题本', () => {
     expect(getProgress(wrong.id)).toMatchObject({ attempts: 2, solved: true });
     expect(findAll(container, (node) =>
       node.textContent === '错题本是空的——答错且还没解决的题会出现在这里。')).toHaveLength(1);
+  });
+
+  it('错题本按答错次数降序，并显示每题错了几次', () => {
+    const low = BASIC_PROBLEMS[0];
+    const high = BASIC_PROBLEMS[1];
+    recordAttempt(low.id, false);
+    recordAttempt(high.id, false);
+    recordAttempt(high.id, false);
+    const { container } = mount();
+
+    enableMistakesFilter(container);
+
+    expect(visibleProblemIds(container)).toEqual([high.id, low.id]);
+    const meta = findAll(container, (node) => node.className === 'problem-meta');
+    expect(meta.some((node) => node.textContent.includes('错 2 次'))).toBe(true);
+    expect(meta.some((node) => node.textContent.includes('错 1 次'))).toBe(true);
+  });
+
+  it('复习队列按错次进入，答对后移出并显示完成状态', () => {
+    const problems = [
+      { id: 'review-low', title: '低错次', fen: START_FEN, solution: ['e2e4'], difficulty: 1000 },
+      { id: 'review-high', title: '高错次', fen: START_FEN, solution: ['d2d4'], difficulty: 1000 },
+      { id: 'review-done', title: '已解决', fen: START_FEN, solution: ['g1f3'], difficulty: 1000 },
+    ];
+    recordAttempt('review-low', false);
+    recordAttempt('review-high', false);
+    recordAttempt('review-high', false);
+    recordAttempt('review-done', true);
+    const { container, panel } = mount({ problems });
+    const start = reviewButton(container);
+
+    expect(start.textContent).toBe('复习错题 (2)');
+    start.emit('click');
+
+    expect(panel.getState()).toMatchObject({
+      reviewMode: true,
+      currentProblemId: 'review-high',
+      problems: [problems[1], problems[0]],
+    });
+    expect(findAll(container, (node) => node.className === 'tactics-counter')[0].textContent)
+      .toContain('复习 1 / 2 · 剩 2 题');
+    expect(panel.checkMove('d2d4')).toBe(true);
+    expect(visibleProblemIds(container)).toEqual(['review-low']);
+
+    const next = findAll(container, (node) => node.name === 'button' && node.textContent === '下一题 →')[0];
+    next.emit('click');
+    expect(panel.checkMove('e2e4')).toBe(true);
+    expect(visibleProblemIds(container)).toEqual([]);
+    expect(findAll(container, (node) => node.textContent === '复习完成，错题本已清空。')).toHaveLength(1);
+    expect(start.textContent).toBe('退出复习');
+
+    start.emit('click');
+    expect(panel.getState().reviewMode).toBe(false);
+    expect(panel.getState().currentProblemId).toBe('review-low');
+  });
+
+  it('复习中再次答错会按最新错次重新排序', () => {
+    localStorage.setItem('chess-tactics-store', JSON.stringify({
+      favorites: [],
+      progress: {
+        low: { attempts: 1, solved: false, lastAttempt: 1 },
+        high: { attempts: 2, solved: false, lastAttempt: 2 },
+      },
+      problemSets: {},
+      userRating: 1000,
+      readTopics: [],
+    }));
+    const problems = [
+      { id: 'low', fen: START_FEN, solution: ['e2e4'], difficulty: 1000 },
+      { id: 'high', fen: START_FEN, solution: ['d2d4'], difficulty: 1000 },
+    ];
+    const { container, panel } = mount({ problems });
+    reviewButton(container).emit('click');
+    const next = findAll(container, (node) => node.name === 'button' && node.textContent === '下一题 →')[0];
+    next.emit('click');
+
+    expect(panel.checkMove('d2d4')).toBe(false);
+
+    expect(panel.getState().problems.map((problem) => problem.id)).toEqual(['low', 'high']);
+    expect(panel.getState().currentProblemId).toBe('low');
   });
 
   it('教程推荐选题会清除错题本筛选', () => {

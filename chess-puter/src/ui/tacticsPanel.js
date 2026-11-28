@@ -21,6 +21,7 @@ import {
   getUserRating,
   updateRating,
   getRecommendedDifficultyRange,
+  getMistakeQueue,
 } from '../game/tacticsStore.js';
 
 const DIFFICULTY_MODES = [
@@ -77,6 +78,7 @@ export function mountTacticsPanel(container, {
       searchText: '',
       difficultyMode: 'all',
     },
+    reviewMode: false,
     setFen,
     getFen,
     onProgress,
@@ -122,27 +124,13 @@ export function mountTacticsPanel(container, {
       return true;
     },
     selectAll() {
-      panel.resetFilters();
-      const currentId = panel.problems[panel.currentIndex]?.id;
-      const merged = [...BASIC_PROBLEMS];
-      for (const problem of panel.problems) {
-        if (!merged.some((known) => known.id === problem.id)) merged.push(problem);
-      }
-      loadProblems(panel, merged, currentId);
+      selectAllProblems(panel);
     },
     selectProblemById(id) {
       panel.resetFilters();
-      let index = panel.problems.findIndex((problem) => problem.id === id);
-      if (index < 0 && BASIC_PROBLEMS.some((problem) => problem.id === id)) {
-        const merged = [...BASIC_PROBLEMS];
-        for (const problem of panel.problems) {
-          if (!merged.some((known) => known.id === problem.id)) merged.push(problem);
-        }
-        loadProblems(panel, merged, id);
-        index = panel.problems.findIndex((problem) => problem.id === id);
-      }
-      if (index < 0) return false;
-      selectProblem(panel, index);
+      const available = allAvailableProblems(panel);
+      if (!available.some((problem) => problem.id === id)) return false;
+      loadProblems(panel, available, id);
       return true;
     },
     update(problems) {
@@ -162,6 +150,7 @@ export function mountTacticsPanel(container, {
         currentMoveIndex: panel.currentMoveIndex,
         status: panel.status,
         canManage: panel.canManage,
+        reviewMode: panel.reviewMode,
       };
     },
     checkMove(uci) {
@@ -238,7 +227,11 @@ function buildProblemSection(panel) {
       return;
     }
 
-    counter.textContent = `第 ${panel.currentIndex + 1} / ${panel.problems.length} 题`;
+    counter.textContent = panel.reviewMode
+      ? getMistakeQueue(panel.problems).length === 0
+        ? `复习完成 · 共 ${panel.problems.length} 题`
+        : `复习 ${panel.currentIndex + 1} / ${panel.problems.length} · 剩 ${getMistakeQueue(panel.problems).length} 题`
+      : `第 ${panel.currentIndex + 1} / ${panel.problems.length} 题`;
     statusBadge.textContent = STATUS_TEXT[panel.status] || '';
     statusBadge.className = `tactics-status status-${panel.status}`;
 
@@ -316,7 +309,8 @@ function buildListSection(panel) {
   });
   const mistakesFilter = filterCheckbox('错题本', panel.filter.mistakesOnly, (checked) => {
     panel.filter.mistakesOnly = checked;
-    panel.refreshList();
+    if (panel.reviewMode && !checked) selectAllProblems(panel);
+    else panel.refreshList();
   });
   filterRow.append(favoritesFilter, unsolvedFilter, mistakesFilter);
 
@@ -340,7 +334,20 @@ function buildListSection(panel) {
   });
   selectRow.append(selectLabel, select);
 
-  toolbar.append(search, filterRow, selectRow);
+  const reviewBtn = navButton('复习错题 (0)', 'btn btn-primary btn-sm tactics-review-btn', () => {
+    if (panel.reviewMode) {
+      selectAllProblems(panel);
+      return;
+    }
+    const queue = getMistakeQueue(allAvailableProblems(panel));
+    if (queue.length === 0) return;
+    panel.resetFilters();
+    panel.filter.mistakesOnly = true;
+    mistakesFilter.firstChild.checked = true;
+    loadProblems(panel, queue, null, true);
+  });
+
+  toolbar.append(search, filterRow, selectRow, reviewBtn);
 
   const listHead = document.createElement('div');
   listHead.className = 'tactics-list-head';
@@ -363,6 +370,7 @@ function buildListSection(panel) {
     panel.filter.mistakesOnly = false;
     panel.filter.searchText = '';
     panel.filter.difficultyMode = 'all';
+    panel.reviewMode = false;
     search.value = '';
     favoritesFilter.firstChild.checked = false;
     unsolvedFilter.firstChild.checked = false;
@@ -373,8 +381,17 @@ function buildListSection(panel) {
   panel.refreshList = () => {
     list.innerHTML = '';
     const filtered = filteredProblems(panel);
-    listCount.textContent =
-      panel.problems.length === 0 ? '' : `${filtered.length} / ${panel.problems.length} 道`;
+    const mistakeTotal = getMistakeQueue(allAvailableProblems(panel)).length;
+    listTitle.textContent = panel.reviewMode
+      ? '错题复习队列'
+      : panel.filter.mistakesOnly ? '错题（按答错次数）' : '题目列表';
+    listCount.textContent = panel.problems.length === 0
+      ? ''
+      : panel.reviewMode
+        ? `剩 ${filtered.length} / ${panel.problems.length} 道`
+        : `${filtered.length} / ${panel.problems.length} 道`;
+    reviewBtn.textContent = panel.reviewMode ? '退出复习' : `复习错题 (${mistakeTotal})`;
+    reviewBtn.disabled = !panel.reviewMode && mistakeTotal === 0;
 
     if (panel.problems.length === 0) {
       list.appendChild(emptyNote(panel.canManage
@@ -383,9 +400,11 @@ function buildListSection(panel) {
       return;
     }
     if (filtered.length === 0) {
-      list.appendChild(emptyNote(panel.filter.mistakesOnly
-        ? '错题本是空的——答错且还没解决的题会出现在这里。'
-        : '没有符合筛选的题目。'));
+      list.appendChild(emptyNote(panel.reviewMode
+        ? '复习完成，错题本已清空。'
+        : panel.filter.mistakesOnly
+          ? '错题本是空的——答错且还没解决的题会出现在这里。'
+          : '没有符合筛选的题目。'));
       return;
     }
     for (const item of filtered) {
@@ -445,7 +464,9 @@ function problemRow(panel, problem, index) {
   if (problem.difficulty) meta.push(`难度 ${problem.difficulty}`);
   const progress = getProgress(problem.id);
   if (progress) {
-    meta.push(progress.solved ? `✓ 已解决（${progress.attempts} 次）` : `试过 ${progress.attempts} 次`);
+    meta.push(progress.solved
+      ? `✓ 已解决（${progress.attempts} 次）`
+      : progress.attempts > 0 ? `错 ${progress.attempts} 次` : '');
   }
   if (meta.length > 0) {
     const metaSpan = document.createElement('span');
@@ -490,7 +511,7 @@ function filteredProblems(panel) {
   const range = getRecommendedDifficultyRange(userRating);
   const search = panel.filter.searchText.trim().toLowerCase();
 
-  return panel.problems
+  const filtered = panel.problems
     .map((problem, index) => ({ problem, index }))
     .filter(({ problem }) => {
       if (panel.filter.favoritesOnly && !isFavorite(problem.id)) return false;
@@ -524,6 +545,12 @@ function filteredProblems(panel) {
 
       return true;
     });
+
+  if (panel.filter.mistakesOnly) {
+    const order = new Map(getMistakeQueue(panel.problems).map((problem, index) => [problem.id, index]));
+    filtered.sort((a, b) => order.get(a.problem.id) - order.get(b.problem.id));
+  }
+  return filtered;
 }
 
 /* ------------------------------------------------------------------ */
@@ -859,8 +886,23 @@ function buildFormatGuide() {
 /* 共用的状态操作                                                      */
 /* ------------------------------------------------------------------ */
 
-function loadProblems(panel, problems, selectedId = null) {
+function allAvailableProblems(panel) {
+  const merged = [...BASIC_PROBLEMS];
+  for (const problem of panel.problems) {
+    if (!merged.some((known) => known.id === problem.id)) merged.push(problem);
+  }
+  return merged;
+}
+
+function selectAllProblems(panel) {
+  const currentId = panel.problems[panel.currentIndex]?.id;
+  panel.resetFilters();
+  loadProblems(panel, allAvailableProblems(panel), currentId);
+}
+
+function loadProblems(panel, problems, selectedId = null, reviewMode = false) {
   panel.problems = problems;
+  panel.reviewMode = reviewMode;
   const selectedIndex = selectedId
     ? problems.findIndex((problem) => problem.id === selectedId)
     : 0;
@@ -884,6 +926,14 @@ function selectProblem(panel, index) {
   if (panel.setFen) panel.setFen(problem.fen);
   panel.refreshProblem();
   panel.refreshList();
+}
+
+function reorderReviewQueue(panel, selectedId) {
+  panel.problems = getMistakeQueue(panel.problems);
+  panel.currentIndex = Math.max(0, panel.problems.findIndex((problem) => problem.id === selectedId));
+  panel.refreshProblem();
+  panel.refreshList();
+  panel.refreshStore();
 }
 
 function handlePlayerMove(panel, uci) {
@@ -919,9 +969,13 @@ function handlePlayerMove(panel, uci) {
   if (panel.currentMoveIndex === 0) {
     updateRating(problem.difficulty || 1000, false);
   }
-  panel.refreshProblem();
-  panel.refreshList();
-  panel.refreshStore();
+  if (panel.reviewMode) {
+    reorderReviewQueue(panel, problem.id);
+  } else {
+    panel.refreshProblem();
+    panel.refreshList();
+    panel.refreshStore();
+  }
   panel.onProgress();
   return false;
 }
