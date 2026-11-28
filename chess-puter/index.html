@@ -203,7 +203,12 @@
             </div>
             <ol class="move-list" id="move-list"></ol>
             <p class="moves-empty" id="moves-empty">还没有走法 —— 白方先走。</p>
-            <section class="analysis hidden" id="analysis-panel" aria-label="引擎评估">
+            <section class="analysis hidden" id="analysis-panel" aria-label="引擎分析与开局">
+              <div class="opening-row" id="opening-row">
+                <span class="opening-label">开局</span>
+                <span class="opening-code" id="opening-code">—</span>
+                <span class="opening-name" id="opening-name">标准开局</span>
+              </div>
               <div class="eval-row">
                 <div class="eval-bar" aria-hidden="true"><span class="eval-fill" id="eval-fill"></span></div>
                 <span class="eval-score" id="eval-score"></span>
@@ -251,8 +256,9 @@
               <span>棋子</span>
               <select id="piece-style-select" aria-label="棋子样式">
                 <option value="classic">经典</option>
-                <option value="forest">森林</option>
-                <option value="ocean">海蓝</option>
+                <option value="forest">森林木雕</option>
+                <option value="ocean">海蓝琉璃</option>
+                <option value="night">暗夜金属</option>
               </select>
             </label>
             <button type="button" id="sound-btn" class="sound-toggle" aria-pressed="true" title="关闭音效" aria-label="关闭音效">

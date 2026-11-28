@@ -61,11 +61,11 @@ describe('首页体验契约', () => {
     expect(main).toContain('mountCommunityPresence();');
   });
 
-  it('画笔栏提供三套棋盘、三套棋子和音效开关', () => {
+  it('画笔栏提供三套棋盘、四套棋子和音效开关', () => {
     const boardSelect = html.match(/<select id="board-style-select"[\s\S]*?<\/select>/)?.[0];
     const pieceSelect = html.match(/<select id="piece-style-select"[\s\S]*?<\/select>/)?.[0];
     expect(boardSelect?.match(/<option /g)).toHaveLength(3);
-    expect(pieceSelect?.match(/<option /g)).toHaveLength(3);
+    expect(pieceSelect?.match(/<option /g)).toHaveLength(4);
     expect(html).toContain('id="sound-btn"');
     expect(html).toContain('aria-pressed="true"');
   });
@@ -82,8 +82,19 @@ describe('首页体验契约', () => {
 
   it('同一局面重复渲染不重复播音，导入棋谱不误播最后一手', () => {
     expect(main).toContain('if (plies === announcedPlies) return;');
-    expect(main).toContain('playMoveSound(moveSoundKind(lastMove, end || status));');
+    expect(main).toContain('playMoveSound(moveSoundKind(lastMove, end ? { ...status, over: true } : status));');
     expect(main).toContain('announcedPlies = 0;');
     expect(main).toContain('announcedPlies = game.history().length;');
+  });
+
+  it('分析区显示完整主线自动识别出的开局', () => {
+    const panel = html.match(/<section class="analysis hidden" id="analysis-panel"[\s\S]*?<\/section>/)?.[0];
+    expect(panel).toContain('id="opening-row"');
+    expect(panel).toContain('id="opening-code"');
+    expect(panel).toContain('id="opening-name"');
+    expect(main).toContain("import { identifyOpening } from './game/opening.js';");
+    expect(main).toContain('renderOpening();');
+    expect(main).toContain('identifyOpening(gameOrigin, game.history())');
+    expect(css).toContain('.opening-row {');
   });
 });

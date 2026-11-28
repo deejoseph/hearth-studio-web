@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { squareToIndex } from '../src/engine/chess.js';
 
 vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
@@ -20,12 +20,13 @@ afterAll(() => {
 });
 
 describe('棋盘与棋子外观', () => {
-  it('提供三套棋盘和三套棋子样式，未知存档值回退到经典样式', () => {
+  it('提供三套棋盘和四套不同造型的棋子，未知存档值回退到经典样式', () => {
     expect(BOARD_STYLES.map((style) => style.id)).toEqual(['classic', 'walnut', 'green']);
-    expect(PIECE_STYLES.map((style) => style.id)).toEqual(['classic', 'forest', 'ocean']);
+    expect(PIECE_STYLES.map((style) => style.id)).toEqual(['classic', 'forest', 'ocean', 'night']);
     expect(normalizeBoardStyle('walnut')).toBe('walnut');
     expect(normalizeBoardStyle('missing')).toBe('classic');
     expect(normalizePieceStyle('ocean')).toBe('ocean');
+    expect(normalizePieceStyle('night')).toBe('night');
     expect(normalizePieceStyle('missing')).toBe('classic');
   });
 
@@ -44,6 +45,18 @@ describe('棋盘与棋子外观', () => {
           expect(pieceUrl(symbol, style.id)).toContain(`pieces/${folder}${color}${piece}.svg`);
         }
       }
+    }
+  });
+
+  it('每套棋子的轮廓几何不同，不只是填色或描边', () => {
+    for (const piece of ['K', 'Q', 'R', 'B', 'N', 'P']) {
+      const silhouettes = PIECE_STYLES.map((style) => {
+        const folder = style.id === 'classic' ? '' : `${style.id}/`;
+        const asset = new URL(`../public/pieces/${folder}w${piece}.svg`, import.meta.url);
+        const svg = readFileSync(asset, 'utf8');
+        return [...svg.matchAll(/\bd="([^"]+)"/g)].map((match) => match[1]).join('|');
+      });
+      expect(new Set(silhouettes).size, piece).toBe(PIECE_STYLES.length);
     }
   });
 
@@ -76,5 +89,11 @@ describe('棋盘与棋子外观', () => {
     expect(currentPieceStyle()).toBe('forest');
     expect(image.src).toMatch(/pieces\/forest\/wP\.svg$/);
     expect(image.dataset.pieceStyle).toBe('forest');
+
+    setPieceStyle('night');
+    BoardView.prototype.render.call(view, state);
+    expect(currentPieceStyle()).toBe('night');
+    expect(image.src).toMatch(/pieces\/night\/wP\.svg$/);
+    expect(image.dataset.pieceStyle).toBe('night');
   });
 });

@@ -1,13 +1,15 @@
 let context = null;
 let enabled = true;
+let resumeTarget = null;
+let resuming = null;
 
 const SOUNDS = {
-  move: [[240, 150, 0.075, 'triangle', 0.09, 0]],
-  capture: [[160, 70, 0.13, 'triangle', 0.13, 0], [320, 120, 0.06, 'sine', 0.07, 0.015]],
-  check: [[660, 660, 0.08, 'sine', 0.08, 0], [880, 880, 0.12, 'sine', 0.08, 0.09]],
-  castle: [[220, 180, 0.06, 'triangle', 0.08, 0], [180, 140, 0.08, 'triangle', 0.08, 0.09]],
-  promote: [[523, 523, 0.09, 'sine', 0.07, 0], [659, 659, 0.09, 'sine', 0.07, 0.07], [784, 784, 0.14, 'sine', 0.07, 0.14]],
-  end: [[392, 392, 0.12, 'sine', 0.07, 0], [294, 196, 0.22, 'triangle', 0.09, 0.12]],
+  move: [[240, 150, 0.09, 'triangle', 0.16, 0]],
+  capture: [[160, 70, 0.15, 'triangle', 0.2, 0], [320, 120, 0.07, 'sine', 0.11, 0.015]],
+  check: [[660, 660, 0.09, 'sine', 0.13, 0], [880, 880, 0.14, 'sine', 0.13, 0.09]],
+  castle: [[220, 180, 0.07, 'triangle', 0.13, 0], [180, 140, 0.09, 'triangle', 0.13, 0.09]],
+  promote: [[523, 523, 0.1, 'sine', 0.11, 0], [659, 659, 0.1, 'sine', 0.11, 0.07], [784, 784, 0.16, 'sine', 0.11, 0.14]],
+  end: [[392, 392, 0.14, 'sine', 0.12, 0], [294, 196, 0.24, 'triangle', 0.14, 0.12]],
 };
 
 export function setMoveSoundEnabled(value) {
@@ -23,16 +25,48 @@ export function moveSoundKind(move, status = {}) {
   return 'move';
 }
 
-function getContext() {
+function createContext() {
   const AudioContext = globalThis.AudioContext ?? globalThis.webkitAudioContext;
   if (!AudioContext) return null;
-  context ??= new AudioContext();
-  if (context.state === 'suspended') context.resume().catch(() => {});
+  try {
+    return new AudioContext({ latencyHint: 'interactive' });
+  } catch {
+    try {
+      return new AudioContext();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function getContext() {
+  if (!context || context.state === 'closed') context = createContext();
   return context;
 }
 
+function resumeAudio(audio) {
+  if (!audio) return Promise.resolve(false);
+  if (audio.state === 'running') return Promise.resolve(true);
+  if (typeof audio.resume !== 'function') return Promise.resolve(false);
+  if (resumeTarget !== audio || !resuming) {
+    resumeTarget = audio;
+    resuming = Promise.resolve()
+      .then(() => audio.resume())
+      .then(() => audio.state === 'running')
+      .catch(() => false)
+      .finally(() => {
+        if (resumeTarget === audio) {
+          resumeTarget = null;
+          resuming = null;
+        }
+      });
+  }
+  return resuming;
+}
+
 export function unlockMoveAudio() {
-  if (enabled) getContext();
+  if (!enabled) return Promise.resolve(false);
+  return resumeAudio(getContext());
 }
 
 function tone(audio, start, [from, to, duration, type, volume, delay]) {
@@ -51,11 +85,20 @@ function tone(audio, start, [from, to, duration, type, volume, delay]) {
   oscillator.stop(at + duration + 0.02);
 }
 
-export function playMoveSound(kind) {
-  if (!enabled) return;
+export async function playMoveSound(kind) {
+  if (!enabled) return false;
   const audio = getContext();
+  if (!audio) return false;
+  if (audio.state !== 'running') {
+    const ready = await resumeAudio(audio);
+    if (!ready || !enabled || context !== audio || audio.state !== 'running') return false;
+  }
   const notes = SOUNDS[kind] ?? SOUNDS.move;
-  if (!audio) return;
   const start = audio.currentTime + 0.005;
-  for (const note of notes) tone(audio, start, note);
+  try {
+    for (const note of notes) tone(audio, start, note);
+    return true;
+  } catch {
+    return false;
+  }
 }

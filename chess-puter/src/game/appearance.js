@@ -6,8 +6,9 @@ export const BOARD_STYLES = [
 
 export const PIECE_STYLES = [
   { id: 'classic', label: '经典' },
-  { id: 'forest', label: '森林' },
-  { id: 'ocean', label: '海蓝' },
+  { id: 'forest', label: '森林木雕' },
+  { id: 'ocean', label: '海蓝琉璃' },
+  { id: 'night', label: '暗夜金属' },
 ];
 
 let activePieceStyle = 'classic';

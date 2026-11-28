@@ -96,6 +96,7 @@ import { mountLearnPanel } from './ui/learnPanel.js';
 import { mountCommunityPresence } from './ui/communityPresence.js';
 import { normalizeBoardStyle, normalizePieceStyle, setPieceStyle } from './game/appearance.js';
 import { moveSoundKind, playMoveSound, setMoveSoundEnabled, unlockMoveAudio } from './game/moveAudio.js';
+import { identifyOpening } from './game/opening.js';
 import { BASIC_PROBLEMS } from './game/basicProblems.js';
 import { learnTopic } from './game/learnContent.js';
 import { track } from './analytics.js';
@@ -200,6 +201,9 @@ const els = {
   reviewNote: $('review-note'),
   analysisBtn: $('analysis-btn'),
   analysisPanel: $('analysis-panel'),
+  openingRow: $('opening-row'),
+  openingCode: $('opening-code'),
+  openingName: $('opening-name'),
   evalFill: $('eval-fill'),
   evalScore: $('eval-score'),
   evalLines: $('eval-lines'),
@@ -1151,6 +1155,14 @@ function clearAnalysis() {
   els.evalNote.textContent = '';
 }
 
+function renderOpening() {
+  const opening = identifyOpening(gameOrigin, game.history());
+  els.openingCode.textContent = opening?.eco || '—';
+  els.openingName.textContent = opening?.name || '尚未识别';
+  els.openingName.title = opening?.officialName || '';
+  els.openingRow.classList.toggle('unrecognized', !opening?.eco);
+}
+
 /** Called from renderAll, so the engine follows whatever the board shows. */
 function renderAnalysis(plies, position) {
   if (!analyzing || !analysisAllowed()) return;
@@ -1950,6 +1962,7 @@ function paint() {
   renderNotation(plies);
   scrollNotationIntoView();
   renderReviewBar(plies);
+  renderOpening();
   renderAnalysis(plies, shown);
   updateReviewButton();
   updateReviewHighlight(plies);
@@ -1984,7 +1997,7 @@ function announceState(status, lastMove) {
     // are the server's. revealEnd() says it again when the end arrives without
     // a move attached to it.
     const end = currentEnd();
-    playMoveSound(moveSoundKind(lastMove, end || status));
+    playMoveSound(moveSoundKind(lastMove, end ? { ...status, over: true } : status));
     if (end) text += `${end.title}。${end.sub}`;
     else if (status.check) text += '将军。';
   }
