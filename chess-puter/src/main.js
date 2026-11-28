@@ -270,6 +270,7 @@ const els = {
   classJoinInput: $('class-join-input'),
   classJoinBtn: $('class-join-btn'),
   classCodeDisplay: $('class-code-display'),
+  classModeNote: $('class-mode-note'),
   classStudents: $('class-students'),
   classLeaveBtn: $('class-leave-btn'),
   classStudentStatus: $('class-student-status'),
@@ -411,6 +412,8 @@ let classUiState = 'idle'; // 'idle'|'creating'|'joining'|'teaching'|'spectating
 let classTimer = 0;
 let classAppliedSeq = 0; // last classroom event drawn on the board
 let classSentSan = null; // our move, on its way to the server
+let classSentBranch = null; // branch event already drawn while its request is in flight
+let classEndShown = false;
 let classSentAt = 0; // when it went, so a lost request cannot lock the board
 let classYourHand = 'none'; // what this seat was told last, to notice a change
 let classRequestOut = false; // one classroom call at a time
@@ -434,19 +437,18 @@ const resultFor = (winner) => (winner === 'w' ? '1-0' : '0-1');
 /** The color shown at the bottom of the board. */
 function bottomColor() {
   if (tacticsMode) return tacticsViewColor;
-  // A classroom board belongs to the position, not to the person holding it:
-  // both colours are played by whoever the server has authorised, so there is no
-  // "my side" to turn the board around for.
-  if (mode === 'class') return 'w';
+  // Classroom and explanation boards are shared teaching surfaces. Either side
+  // can be put at the bottom without changing whose turn it is.
+  if (mode === 'class') return viewColor;
   // 讲解时两个颜色都坐在这台设备前，棋盘朝谁翻开由讲解的人说了算：默认白方
   // 在下，点右边那张对局卡或画笔旁的翻转按钮都能把视角换过去。
   if (mode === 'local') return viewColor;
   return myColor;
 }
 
-/** 讲解模式下换视角：把某一方放到棋盘下面，棋盘和对局卡一起翻。 */
+/** 讲解和课堂可以独立换棋盘视角，不改变当前该走的一方。 */
 function setViewColor(color) {
-  if (mode !== 'local' || color === viewColor) return;
+  if (!['local', 'class'].includes(mode) || !['w', 'b'].includes(color) || color === viewColor) return;
   viewColor = color;
   boardView.setOrientation(bottomColor());
   renderAll();
@@ -917,9 +919,10 @@ function clampReview() {
   const view = getActiveBranch();
   if (view) {
     const root = getNode(view.path.slice(0, 1));
-    reviewIndex = root ? Math.max(0, Math.min(root.branchIndex, total - 1)) : null;
+    reviewIndex = root ? Math.max(0, Math.min(root.branchIndex, total)) : null;
+  } else if (reviewIndex !== null && reviewIndex >= total) {
+    reviewIndex = null;
   }
-  if (reviewIndex !== null && reviewIndex >= total) reviewIndex = null;
 }
 
 /**
@@ -1030,7 +1033,7 @@ function enterBranch(path, ply) {
  * line; otherwise they walk the main line (and drop out of any branch).
  */
 function reviewNavigate(action) {
-  if (analyzing && isViewingBranch()) {
+  if (branchingEnabled() && isViewingBranch()) {
     navigateActiveBranch(action);
     renderAll();
     announceReview();
@@ -1046,7 +1049,7 @@ function reviewNavigate(action) {
 
 function announceReview() {
   const plies = viewPlies();
-  const view = analyzing ? getActiveBranch() : null;
+  const view = branchingEnabled() ? getActiveBranch() : null;
   if (!reviewing()) {
     els.srStatus.textContent = '已回到最新局面。';
   } else if (view) {
@@ -1111,6 +1114,12 @@ function analysisAllowed() {
   return !tacticsMode && canAnalyze({ mode, onlineUiState });
 }
 
+/** 讲解和课堂默认是打谱界面；其他模式仍沿用分析开关。 */
+function branchingEnabled() {
+  if (tacticsMode) return analyzing;
+  return mode === 'local' || mode === 'class' || analyzing;
+}
+
 function setAnalysis(on) {
   if (analyzing === on) return;
   analyzing = on;
@@ -1120,15 +1129,13 @@ function setAnalysis(on) {
   els.analysisPanel.classList.toggle('hidden', !on);
   if (!on) {
     closeEngine();
-    // 支线只在分析模式下能走，所以关掉分析就退出支线的 view。那些变化本身留着，
-    // 下次开分析还在。退出支线时把棋盘送回最新的一手：关掉分析之后旧局面只是
-    // 一张图片，留人站在那里没棋可走。
-    if (isViewingBranch()) {
+    // 讲解和课堂的支线不依赖引擎；其他模式关掉分析时才离开支线。
+    if (!branchingEnabled() && isViewingBranch()) {
       setActiveBranch(null);
       reviewIndex = null;
     }
   }
-  // 棋盘下面那份棋谱两边都要重画：开分析才点得动支线，关分析要看得见它变成只能看。
+  // 棋盘下面那份棋谱两边都要重画：支线是否可点由 branchingEnabled 决定。
   renderAll();
   // 回到下棋：分析期间欠着电脑的那一手补上（见 afterMove 里让路的那句）。
   if (!on && !tacticsMode && mode === 'computer' && !thinking && !gameFinished() && game.turn() !== myColor) {
@@ -1931,8 +1938,8 @@ function paint() {
     board: shown.board(),
     // In analysis mode while reviewing, allow piece selection for creating
     // variations (see #107).
-    selected: (live || (analyzing && reviewing())) ? selected : null,
-    targets: (live || (analyzing && reviewing())) ? targets : NO_TARGETS,
+    selected: (live || (branchingEnabled() && reviewing())) ? selected : null,
+    targets: (live || (branchingEnabled() && reviewing())) ? targets : NO_TARGETS,
     lastMove: shownLast ? { from: shownLast.from, to: shownLast.to } : null,
     checkSquare: shownStatus.check ? shown.kingSquare(shownStatus.turn) : null,
   });
@@ -1961,6 +1968,10 @@ function paint() {
 /** Undo takes back from the live position, so it is off while reviewing. */
 function canUndo() {
   if (tacticsMode || mode === 'online' || reviewing()) return false;
+  if (mode === 'class') {
+    return classUiState === 'teaching' && classSession.isTeacher
+      && !classRequestOut && classSentSan === null && game.history().length > 0;
+  }
   if (mode === 'computer') {
     return !thinking && game.history().some((m) => m.color === myColor);
   }
@@ -2027,9 +2038,8 @@ function renderPlayers() {
   els.topIconCpu?.classList.toggle('hidden', !topIsCpu);
   els.topIconUser?.classList.toggle('hidden', topIsCpu);
 
-  // 讲解模式下两张对局卡可以点：点哪一方，棋盘就把哪一方翻到下面。它说的是
-  // "视角"，和 .active（轮到谁走）不是一回事，所以只标可点状态和当前那只。
-  const pickable = mode === 'local';
+  // 讲解和课堂的两张对局卡都可以点：点哪一方，棋盘就把哪一方翻到下面。
+  const pickable = mode === 'local' || mode === 'class';
   for (const [card, color] of [
     [els.cardTop, top],
     [els.cardBottom, bottom],
@@ -2186,7 +2196,7 @@ function renderMoves(plies) {
  * 只在分析开着时出现：支线是分析里记下的变化，关了分析就是下棋，棋盘下面留走法。
  */
 function renderNotation(plies) {
-  const branches = analyzing ? getBranches() : [];
+  const branches = branchingEnabled() ? getBranches() : [];
   els.pgnSheet.classList.toggle('hidden', branches.length === 0);
   if (branches.length === 0) {
     els.pgnBody.replaceChildren();
@@ -2360,7 +2370,7 @@ function renderReviewBar(plies) {
   const total = game.history().length;
   // Inside an open branch the arrows walk that line, so their end stops are
   // the ends of the branch, not of the game.
-  const view = analyzing ? getActiveBranch() : null;
+  const view = branchingEnabled() ? getActiveBranch() : null;
   const branchLen = view ? (getNode(view.path)?.moves.length ?? 0) : 0;
   const atStart = view ? view.ply === 0 : plies === 0;
   const atEnd = view ? view.ply >= branchLen : plies >= total;
@@ -2424,7 +2434,7 @@ function keepReviewFocus(focused) {
 function describeEnd(status) {
   if (status.reason === 'checkmate') {
     const base = { reason: 'checkmate', result: status.result, termination: 'normal' };
-    if (mode === 'local') {
+    if (mode === 'local' || mode === 'class') {
       const winner = status.result === '1-0' ? 'w' : 'b';
       return {
         ...base,
@@ -2557,7 +2567,12 @@ function updateModeUi() {
   els.classCreateBtn.disabled = classBusy || teacherBlocked();
   els.classJoinBtn.disabled = classBusy;
   els.classJoinInput.disabled = classBusy;
-  if (teaching) els.classCodeDisplay.textContent = classSession.code || '';
+  if (teaching) {
+    els.classCodeDisplay.textContent = classSession.code || '';
+    els.classModeNote.textContent = classSession.members.length > 1
+      ? '多人课堂：学生举手，老师批准后走一步。'
+      : '单人课堂：无需举手，白黑双方都可以直接走。';
+  }
   if (spectating) {
     els.classStudentStatus.textContent = CLASS_HAND_NOTE[classSession.handStatus] ?? '等待老师走子……';
     const raised = classSession.handStatus === 'raised';
@@ -2584,7 +2599,7 @@ function updateModeUi() {
   // belong to games this device owns, and there is no second game to offer a
   // friend from here (they need a new code; see the note in the online card).
   const playing = online && onlineUiState === 'playing';
-  const showButtons = !online && !inClass || playing;
+  const showButtons = playing || (!online && (!inClass || teaching));
   const showField = showLevel || showColor || showTime;
   const finished = gameFinished();
   els.levelField.classList.toggle('hidden', !showLevel);
@@ -2596,10 +2611,12 @@ function updateModeUi() {
   // game, so it comes and goes with them. Only the host of an online game
   // picks a side and a clock — a guest is dealt both, which is worth saying
   // next to controls that sit above the Join box.
-  const showHint = showColor || showTime;
+  const showHint = showColor || showTime || inClass;
   if (online) {
     els.controlsHint.textContent =
       '只有开局的一方选颜色和时限，而且在线对弈的钟没有每步加时。';
+  } else if (inClass) {
+    els.controlsHint.textContent = '单人课堂无需举手；学生加入后，学生举手并由老师批准。悔棋会生成支线。';
   } else if (showColor) {
     els.controlsHint.textContent = '颜色和时限在开始新的一局时生效。';
   } else {
@@ -2607,8 +2624,8 @@ function updateModeUi() {
   }
   els.controlsHint.classList.toggle('hidden', !showHint);
 
-  els.newGameBtn.classList.toggle('hidden', online || inClass || tacticsMode);
-  els.undoBtn.classList.toggle('hidden', online || inClass || tacticsMode);
+  els.newGameBtn.classList.toggle('hidden', online || tacticsMode || (inClass && !teaching));
+  els.undoBtn.classList.toggle('hidden', online || tacticsMode || (inClass && !teaching));
   // 和棋/认输：在线要坐下之后才有对面，电脑和讲解一开局就能用。
   // 题库里的棋盘是题面，不归这两个按钮管。
   const canEndNow = !finished && !tacticsMode && (playing || (!online && !inClass));
@@ -2628,12 +2645,11 @@ function updateModeUi() {
   // the next poll.
   els.annotationToolbar.classList.toggle('hidden', inClass && !teaching);
   // 翻转棋盘只在讲解里有意义：电脑和在线模式的"你"固定在下面，翻过来名字就对不上了。
-  els.flipBoardBtn.classList.toggle('hidden', mode !== 'local');
+  els.flipBoardBtn.classList.toggle('hidden', mode !== 'local' && !teaching);
   importBtn.classList.toggle('hidden', inClass);
 
-  // The game-over dialog's other button starts a new game, which online means
-  // a new room and a new friend: the panel above has that.
-  els.gameoverNew.classList.toggle('hidden', online || inClass);
+  els.gameoverNew.classList.toggle('hidden', tacticsMode);
+  els.gameoverNew.textContent = online ? '返回在线开局' : inClass ? '全班新的一局' : '新的一局';
 }
 
 function setOnlineError(message) {
@@ -2656,7 +2672,7 @@ function targetsFor(square) {
   const map = new Map();
   // In analysis mode while reviewing, use the historical position's moves,
   // not the current game's moves (see #107).
-  const pos = analyzing && reviewing() ? shownPosition(viewPlies()) : game;
+  const pos = branchingEnabled() && reviewing() ? shownPosition(viewPlies()) : game;
   for (const move of pos.moves({ square })) {
     map.set(move.to, !!move.captured);
   }
@@ -2671,11 +2687,11 @@ function movableColorNow() {
   // Exception: in analysis mode, the player may try moves from any position
   // to create variations (see #107). Allow both colors when reviewing in
   // analysis mode, since we're exploring variations, not playing a real game.
-  if (reviewing() && !analyzing) return null;
-  if (gameFinished() && !analyzing) return null;
-  // In analysis mode while reviewing, allow moves for the color whose turn it
-  // is at the historical position being viewed (not the current game's turn).
-  if (analyzing && reviewing()) {
+  if (reviewing() && !branchingEnabled()) return null;
+  if (gameFinished() && !branchingEnabled()) return null;
+  // 回看时试走当前显示局面的行棋方；课堂里只有老师可以改全班的变化。
+  if (branchingEnabled() && reviewing()) {
+    if (mode === 'class' && !classSession.isTeacher) return null;
     const pos = shownPosition(viewPlies());
     return pos.turn();
   }
@@ -2713,11 +2729,11 @@ function onSquarePress(square, event) {
   }
   // When reviewing in analysis mode, get the piece from the historical
   // position we're viewing, not the current game state (see #107).
-  const pos = analyzing && reviewing() ? shownPosition(viewPlies()) : game;
+  const pos = branchingEnabled() && reviewing() ? shownPosition(viewPlies()) : game;
   const piece = pos.get(square);
   // When reviewing in analysis mode, use the turn of the position we're
   // viewing, not the current game's turn (see #107).
-  const currentTurn = analyzing && reviewing() ? pos.turn() : game.turn();
+  const currentTurn = branchingEnabled() && reviewing() ? pos.turn() : game.turn();
   if (piece && colorOf(piece) === movable && currentTurn === movable) {
     pendingToggleOff = selected === square;
     selected = square;
@@ -2751,11 +2767,11 @@ function onSquareActivate(square) {
   }
   // When reviewing in analysis mode, get the piece from the historical
   // position we're viewing, not the current game state (see #107).
-  const pos = analyzing && reviewing() ? shownPosition(viewPlies()) : game;
+  const pos = branchingEnabled() && reviewing() ? shownPosition(viewPlies()) : game;
   const piece = pos.get(square);
   // When reviewing in analysis mode, use the turn of the position we're
   // viewing, not the current game's turn (see #107).
-  const currentTurn = analyzing && reviewing() ? pos.turn() : game.turn();
+  const currentTurn = branchingEnabled() && reviewing() ? pos.turn() : game.turn();
   if (piece && colorOf(piece) === movable && currentTurn === movable) {
     selected = square;
     targets = targetsFor(square);
@@ -2800,12 +2816,12 @@ function recordBranchMove(san) {
     const ply = viewPlies();
     if (main[ply] === san) {
       reviewIndex = ply + 1; // 走到最新一手的下一格，clampReview 会把视角放回 live
-      return;
+      return false;
     }
     const known = findBranch([], ply, san);
     if (known) {
       enterBranch(known, 1);
-      return;
+      return false;
     }
     const path = branchAt([], ply, san);
     if (path) {
@@ -2815,20 +2831,21 @@ function recordBranchMove(san) {
           ? `已记下支线（${san}）—— 主线是裁判记的那一份`
           : `已记下支线（${san}）—— 主线照旧`,
       );
+      return true;
     }
-    return;
+    return false;
   }
 
   const node = getNode(view.path);
   if (!node) {
     setActiveBranch(null);
-    return;
+    return false;
   }
   const replaced = existingMoveAt(view.path, view.ply, main);
   if (replaced === null) {
     appendToBranch(view.path, san);
     setActiveBranch(view.path, view.ply + 1);
-    return;
+    return true;
   }
   if (replaced === san) {
     // 这一手就是上面那条线本来走的：跳到那条线的下一格。
@@ -2842,15 +2859,19 @@ function recordBranchMove(san) {
       const outer = getNode(parent);
       setActiveBranch(parent, outer ? node.branchIndex + 1 : 1);
     }
-    return;
+    return false;
   }
   const known = findBranch(view.path, view.ply, san);
   if (known) {
     setActiveBranch(known, 1);
-    return;
+    return false;
   }
   const path = branchAt(view.path, view.ply, san);
-  if (path) setActiveBranch(path, 1);
+  if (path) {
+    setActiveBranch(path, 1);
+    return true;
+  }
+  return false;
 }
 
 /** 错着在落盘前撤销；解法没走完时，两边回合都由做题者继续。 */
@@ -2865,14 +2886,21 @@ function attemptMove(from, to, { animate }) {
   // 分析模式里回头看旧局面时，这一手是记进棋谱的变化而不是在下这盘棋（见 #107）。
   // 要赶在拿 live game 校验之前处理：显示的那个局面和棋盘现在的 turn 可能已经不
   // 是一回事。
-  if (analyzing && reviewing()) {
+  if (branchingEnabled() && reviewing()) {
+    if (mode === 'class' && (
+      !classSession.isTeacher || classRequestOut || classSentBranch || classSentSan
+    )) return;
     const played = shownPosition(viewPlies()).move({ from, to });
     if (!played) {
       clearSelection();
       renderAll();
       return;
     }
-    recordBranchMove(played.san);
+    const view = getActiveBranch();
+    const path = view?.path ?? [];
+    const ply = view?.ply ?? viewPlies();
+    const changed = recordBranchMove(played.san);
+    if (mode === 'class' && changed) sendClassBranch({ path, ply, san: played.san });
     clearSelection();
     renderAll();
     announceReview();
@@ -2937,12 +2965,7 @@ function attemptMove(from, to, { animate }) {
 }
 
 function afterMove() {
-  // Online, this board does not call games finished: the referee's verdict
-  // arrives with the snapshot of the move that ends the game, and it is the
-  // only one that can be exported or shown. An optimistic checkmate here would
-  // be a result the server has not agreed to yet.
-  // A classroom game has no verdict to hand out — the teacher keeps the board
-  // after the mate to talk about it — so the same silence applies.
+  // 在线对弈和课堂都等服务端确认后再宣布终局。
   if (mode === 'online' || mode === 'class') return;
   const status = game.status();
   if (status.over) {
@@ -3062,7 +3085,14 @@ function closeDialogs() {
 /* ------------------------------------------------------------------ */
 
 function newGame() {
-  if (mode === 'online' || mode === 'class') return; // a class starts with a code, not here
+  if (mode === 'class') {
+    requestClassNewGame();
+    return;
+  }
+  if (mode === 'online') {
+    enterOnlineIdle();
+    return;
+  }
   aiToken++;
   thinking = false;
   myColor =
@@ -3116,6 +3146,10 @@ function requestNewGame() {
 
 function undoTurn() {
   if (!canUndo()) return;
+  if (mode === 'class') {
+    sendClassUndo();
+    return;
+  }
   aiToken++;
   thinking = false;
   // Taking a move back also takes back an end the app declared for itself —
@@ -3168,6 +3202,8 @@ function teardownForModeChange() {
   classUiState = 'idle';
   classAppliedSeq = 0;
   classSentSan = null;
+  classSentBranch = null;
+  classEndShown = false;
   classSentAt = 0;
   classYourHand = 'none';
   classRequestOut = false;
@@ -4096,6 +4132,7 @@ async function classCall(what) {
     // Snapshots repaint the panel while the request is still in flight, so the
     // button disabled above must be undone here rather than at the next poll.
     updateModeUi();
+    els.undoBtn.disabled = !canUndo();
   }
 }
 
@@ -4108,6 +4145,8 @@ function enterClassIdle() {
   classUiState = 'idle';
   classAppliedSeq = 0;
   classSentSan = null;
+  classSentBranch = null;
+  classEndShown = false;
   classSentAt = 0;
   classYourHand = 'none';
   manualEnd = null;
@@ -4121,7 +4160,8 @@ function enterClassIdle() {
   clearSelection();
   clearTimeout(gameOverTimer);
   closeDialogs();
-  boardView.setOrientation('w');
+  viewColor = 'w';
+  boardView.setOrientation(bottomColor());
   announcedPlies = 0;
   setClassError('');
   els.classJoinInput.value = '';
@@ -4211,6 +4251,10 @@ function handleClassSnapshot(cls, fresh) {
   updateClassRoster();
   updateModeUi();
   renderAll();
+  if (classSession.isTeacher && game.status().over && !classEndShown) {
+    classEndShown = true;
+    showEnd(describeEnd(game.status()));
+  }
 }
 
 /** A seat has appeared in a class: take it and get the board under it. */
@@ -4221,6 +4265,8 @@ function sitInClass(cls) {
   reviewIndex = null;
   classAppliedSeq = 0;
   classSentSan = null;
+  classSentBranch = null;
+  classEndShown = false;
   classSentAt = 0;
   classYourHand = cls.you?.hand ?? 'none';
   finishPromotion(null);
@@ -4229,7 +4275,8 @@ function sitInClass(cls) {
   clearTimeout(gameOverTimer);
   resetClock(null);
   resetTracking();
-  boardView.setOrientation('w');
+  viewColor = 'w';
+  boardView.setOrientation(bottomColor());
   announcedPlies = 0;
   resetBoard();
   classUiState = cls.you?.role === 'teacher' ? 'teaching' : 'spectating';
@@ -4247,6 +4294,51 @@ function sitInClass(cls) {
   els.srStatus.textContent = text;
   showToast(text);
   track('Class Joined', { role: cls.you?.role });
+}
+
+function branchKey(data) {
+  return JSON.stringify([data?.path ?? [], data?.ply ?? 0, data?.san ?? '']);
+}
+
+function applyClassBranch(data) {
+  const path = Array.isArray(data?.path) ? data.path : [];
+  const ply = Number(data?.ply);
+  const san = String(data?.san ?? '');
+  if (!san || !Number.isInteger(ply) || ply < 0) return false;
+  if (path.length === 0) {
+    if (ply > game.history().length) return false;
+    reviewIndex = ply;
+  } else if (!enterBranch(path, ply)) {
+    return false;
+  }
+  recordBranchMove(san);
+  return true;
+}
+
+function applyClassUndo(data) {
+  const last = game.history().at(-1);
+  if (!last || last.san !== data?.san) return false;
+  undoPly();
+  classEndShown = false;
+  clearTimeout(gameOverTimer);
+  closeDialogs();
+  const ply = game.history().length;
+  const path = findBranch([], ply, data.san) || branchAt([], ply, data.san);
+  if (path) enterBranch(path, 1);
+  return true;
+}
+
+function applyClassReset() {
+  manualEnd = null;
+  classEndShown = false;
+  reviewIndex = null;
+  resetBoard();
+  resetTracking();
+  clearSelection();
+  clearTimeout(gameOverTimer);
+  closeDialogs();
+  announcedPlies = 0;
+  return true;
 }
 
 /**
@@ -4267,6 +4359,16 @@ function applyClassEvents(events) {
       }
       if (!game.move(data.san)) return false;
       trackGameStart();
+    } else if (event.type === 'branch') {
+      if (classSentBranch === branchKey(data)) {
+        classSentBranch = null;
+        continue;
+      }
+      if (!applyClassBranch(data)) return false;
+    } else if (event.type === 'undo') {
+      if (!applyClassUndo(data)) return false;
+    } else if (event.type === 'reset') {
+      if (!applyClassReset()) return false;
     } else if (event.type === 'annotation') {
       annotationOverlay.applyRemote(game.fen(), data.annotations);
     }
@@ -4300,6 +4402,12 @@ function rebuildClass(cls) {
     if (event.type === 'move') {
       const san = event.data?.san;
       if (!san || !game.move(san)) break;
+    } else if (event.type === 'branch') {
+      if (!applyClassBranch(event.data)) break;
+    } else if (event.type === 'undo') {
+      if (!applyClassUndo(event.data)) break;
+    } else if (event.type === 'reset') {
+      applyClassReset();
     } else if (event.type === 'annotation') {
       annotationOverlay.applyRemote(game.fen(), event.data?.annotations);
     }
@@ -4310,6 +4418,7 @@ function rebuildClass(cls) {
   if (fenCore(game.fen()) !== fenCore(cls.fen)) loadBoard(cls.fen);
   classAppliedSeq = classSession.seqSeen();
   classSentSan = null;
+  classSentBranch = null;
   clampReview();
 }
 
@@ -4425,6 +4534,53 @@ async function sendClassMove(san) {
   classSentSan = san;
   classSentAt = Date.now();
   await classCall(() => classSession.move(san));
+}
+
+async function sendClassBranch(data) {
+  if (!classSession.isTeacher || !classSession.code || classRequestOut || classSentBranch) return;
+  classSentBranch = branchKey(data);
+  let reply;
+  try {
+    reply = await classCall(() => classSession.control('branch', data));
+  } catch {
+    reply = null;
+  }
+  if (!reply?.ok) {
+    classSentBranch = null;
+    if (classSession.cls) rebuildClass(classSession.cls);
+    renderAll();
+  }
+}
+
+async function sendClassUndo() {
+  if (!classSession.isTeacher || !classSession.code || classRequestOut) return;
+  const reply = await classCall(() => classSession.control('undo'));
+  if (!reply?.ok && classSession.cls) rebuildClass(classSession.cls);
+}
+
+function requestClassNewGame() {
+  if (!classSession.isTeacher || !classSession.code) return;
+  closeDialogs();
+  const start = () => sendClassNewGame();
+  if (game.history().length === 0 && getBranches().length === 0) {
+    start();
+    return;
+  }
+  askConfirm(
+    {
+      title: '全班开始新的一局？',
+      sub: '当前主线和支线都会清空，棋盘回到开局。',
+      confirmLabel: '全班新的一局',
+      danger: false,
+    },
+    start,
+  );
+}
+
+async function sendClassNewGame() {
+  if (!classSession.isTeacher || !classSession.code || classRequestOut) return;
+  const reply = await classCall(() => classSession.control('reset'));
+  if (!reply?.ok && classSession.cls) rebuildClass(classSession.cls);
 }
 
 /**
@@ -4895,7 +5051,7 @@ els.moveList.addEventListener('click', (e) => {
 // 普通的跳步。只有分析开着时这些 token 才是按钮（见 pgnPly）。
 els.pgnBody.addEventListener('click', (e) => {
   const token = e.target.closest('.pgn-ply');
-  if (!token || !analyzing) return;
+  if (!token || !branchingEnabled()) return;
   const path = (token.dataset.path ?? '').split(',').filter(Boolean).map(Number);
   const ply = Number(token.dataset.ply);
   if (!path.length) {

@@ -6,7 +6,7 @@
  * hands to request a one-move turn. All state syncs via short polling,
  * same transport as the 1v1 room system.
  *
- * Events are typed: 'move', 'annotation', 'hand', 'approve'.
+ * Events are typed: 'move', 'annotation', 'hand', 'approve', 'branch', 'undo', 'reset'.
  * The poll payload carries the full class state + new events since cursor.
  */
 
@@ -31,6 +31,10 @@ export function makeClassApi({ fetchImpl } = {}) {
       call('chess_class_hand.php', { body: { code, action }, fetchImpl }),
     approve: (code, playerId, approve) =>
       call('chess_class_approve.php', { body: { code, player_id: playerId, approve }, fetchImpl }),
+    control: (code, action, data = {}) =>
+      call('chess_class_control.php', {
+        body: { code, action, data }, fetchImpl, timeoutMs: 15000,
+      }),
     poll: (code, since) =>
       call(
         `chess_class_poll.php?code=${encodeURIComponent(code)}&since=${encodeURIComponent(since)}`,
@@ -124,6 +128,10 @@ export class ClassSession {
 
   async approveMove(playerId, approve) {
     return this._ask(() => this.api.approve(this.code, playerId, approve));
+  }
+
+  async control(action, data = {}) {
+    return this._ask(() => this.api.control(this.code, action, data));
   }
 
   async poll(since = this.seqSeen()) {

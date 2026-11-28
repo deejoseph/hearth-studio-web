@@ -354,6 +354,98 @@ $refused = chess_class_move($class, 'e5', 2, true);
 $assert($refused['err'] === 'class_closed', 'lifecycle: closed class refuses moves');
 
 /* ==========================================================================
+ * 10. 课堂控制：支线、悔棋、新局
+ * ======================================================================== */
+$class = chess_class_new(1)['class'];
+$events = [];
+$played = chess_class_move($class, 'e4', 1, true);
+$class = $played['class'];
+$events[] = $played['event'];
+$played = chess_class_move($class, 'e5', 1, true);
+$class = $played['class'];
+$events[] = $played['event'];
+$played = chess_class_move($class, 'Nf3', 1, true);
+$class = $played['class'];
+$events[] = $played['event'];
+
+$branched = chess_class_control($class, CHESS_EVT_BRANCH,
+    ['path' => [], 'ply' => 2, 'san' => 'Nc3'], $events, 1, true);
+$assert($branched['err'] === null, 'teacher can record an alternative branch');
+$assert($branched['class']['fen'] === $class['fen'], 'a branch does not change the main position');
+$assert($branched['class']['seq'] === 4, 'branch advances seq');
+$assert($branched['event']['type'] === CHESS_EVT_BRANCH, 'branch event type');
+$events[] = $branched['event'];
+
+$nested = chess_class_control($branched['class'], CHESS_EVT_BRANCH,
+    ['path' => [0], 'ply' => 1, 'san' => 'Nc6'], $events, 1, true);
+$assert($nested['err'] === null, 'a branch can fork inside an existing branch');
+$events[] = $nested['event'];
+$sameNested = chess_class_control($nested['class'], CHESS_EVT_BRANCH,
+    ['path' => [0], 'ply' => 0, 'san' => 'Nc3'], $events, 1, true);
+$assert($sameNested['err'] === null, 'replaying an existing branch move is accepted');
+$events[] = $sameNested['event'];
+$sameRoot = chess_class_replay_controls($events);
+$assert(count($sameRoot['root']['children']) === 1, 'replaying a branch move does not duplicate its node');
+$continued = chess_class_control($sameNested['class'], CHESS_EVT_BRANCH,
+    ['path' => [0], 'ply' => 2, 'san' => 'Nf3'], $events, 1, true);
+$assert($continued['err'] === null, 'a branch can continue at its end');
+$events[] = $continued['event'];
+$sameContinuation = chess_class_control($continued['class'], CHESS_EVT_BRANCH,
+    ['path' => [0], 'ply' => 2, 'san' => 'Nf3'], $events, 1, true);
+$assert($sameContinuation['err'] === null, 'replaying an existing continuation is accepted');
+$events[] = $sameContinuation['event'];
+$withoutDuplicate = chess_class_replay_controls($events);
+$assert($withoutDuplicate['root']['children'][0]['moves'] === ['Nc3', 'Nc6', 'Nf3'],
+    'replaying a continuation does not append it twice');
+
+foreach ([
+    [['path' => [], 'ply' => 99, 'san' => 'e4'], 'branch beyond the main line'],
+    [['path' => [], 'ply' => 3, 'san' => 'Nc3'], 'branch at the live mainline end'],
+    [['path' => [9], 'ply' => 0, 'san' => 'e4'], 'unknown branch path'],
+    [['path' => '0', 'ply' => 0, 'san' => 'e4'], 'non-array branch path'],
+    [['path' => [], 'ply' => 0, 'san' => 'e5'], 'illegal branch move'],
+    [['path' => [], 'ply' => '0', 'san' => 'e4'], 'non-integer branch ply'],
+] as [$badData, $label]) {
+    $refused = chess_class_control($continued['class'], CHESS_EVT_BRANCH, $badData, $events, 1, true);
+    $assert($refused['err'] === 'bad_branch', $label);
+}
+
+$denied = chess_class_control($class, CHESS_EVT_UNDO, [], $events, 2, false);
+$assert($denied['err'] === 'no_permission', 'students cannot control the class board');
+$undone = chess_class_control($continued['class'], CHESS_EVT_UNDO, [], $events, 1, true);
+$assert($undone['err'] === null, 'teacher can undo the last mainline move');
+$assert($undone['event']['data']['san'] === 'Nf3', 'undo names the removed move');
+$assert($undone['class']['fen'] === 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2',
+    'undo restores the position before that move');
+$events[] = $undone['event'];
+$undoBranch = chess_class_control($undone['class'], CHESS_EVT_BRANCH,
+    ['path' => [1], 'ply' => 1, 'san' => 'Nf6'], $events, 1, true);
+$assert($undoBranch['err'] === null, 'the undone mainline move remains a continuable branch');
+$events[] = $undoBranch['event'];
+$undoneAgain = chess_class_control($undoBranch['class'], CHESS_EVT_UNDO, [], $events, 1, true);
+$assert($undoneAgain['event']['data']['san'] === 'e5', 'undo keeps walking back the main line');
+$events[] = $undoneAgain['event'];
+$afterSecondUndo = chess_class_replay_controls($events);
+$assert(count($afterSecondUndo['root']['children']) === 1
+    && $afterSecondUndo['root']['children'][0]['moves'] === ['e5'],
+    'undo prunes branch roots beyond the shortened main line');
+$empty = chess_class_control($undoneAgain['class'], CHESS_EVT_UNDO, [], $events, 1, true);
+$events[] = $empty['event'];
+$refused = chess_class_control($empty['class'], CHESS_EVT_UNDO, [], $events, 1, true);
+$assert($refused['err'] === 'nothing_to_undo', 'an empty main line has nothing to undo');
+
+$reset = chess_class_control($empty['class'], CHESS_EVT_RESET, [], $events, 1, true);
+$assert($reset['err'] === null, 'teacher can start a new class game');
+$assert($reset['class']['fen'] === CHESS_ENGINE_START_FEN, 'new game restores the initial position');
+$assert($reset['event']['type'] === CHESS_EVT_RESET, 'new game emits reset');
+$events[] = $reset['event'];
+$fresh = chess_class_move($reset['class'], 'd4', 1, true);
+$assert($fresh['err'] === null, 'moves work after a class reset');
+$events[] = $fresh['event'];
+$afterResetUndo = chess_class_control($fresh['class'], CHESS_EVT_UNDO, [], $events, 1, true);
+$assert($afterResetUndo['event']['data']['san'] === 'd4', 'control replay starts from the latest reset');
+
+/* ==========================================================================
  * 汇总
  * ======================================================================== */
 printf("checks           %d\n", $checks);

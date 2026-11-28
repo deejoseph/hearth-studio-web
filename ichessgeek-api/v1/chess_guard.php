@@ -107,6 +107,8 @@ const CHESS_ERRORS = [
     'stale_class_move' => ['课堂局面已经变了，这一步没记下，请等棋盘同步后再试', 409],
     'bad_approve' => ['批准状态必须是 true 或 false', 400],
     'teacher_unavailable' => ['老师当前不能继续授课', 409],
+    'nothing_to_undo' => ['主线已经没有可以撤回的走法了', 409],
+    'bad_branch' => ['这条支线的起点或走法不对', 400],
 
     // 教练偏好（P3）。界面按 code + field 出句子，中文只当兜底。
     'bad_pref' => ['这些选项里有一项不对，请再检查一遍', 400],
@@ -1270,8 +1272,18 @@ function chess_class_insert_event($conn, $classId, array $event) {
 }
 
 function chess_class_events($conn, $classId, $since, $cap = 200) {
+    $fullHistory = $since <= 0;
+    if ($fullHistory) {
+        $reset = $conn->prepare("SELECT COALESCE(MAX(seq), 1) FROM chess_class_events
+            WHERE class_id = ? AND type = 'reset'");
+        $reset->bind_param("i", $classId);
+        $reset->execute();
+        $since = (int) $reset->get_result()->fetch_row()[0] - 1;
+        $reset->close();
+    }
+    $limit = $fullHistory ? '' : ' LIMIT ' . (int) $cap;
     $stmt = $conn->prepare("SELECT seq, type, data, actor_id, created_at
-        FROM chess_class_events WHERE class_id = ? AND seq > ? ORDER BY seq ASC LIMIT " . (int) $cap);
+        FROM chess_class_events WHERE class_id = ? AND seq > ? ORDER BY seq ASC" . $limit);
     $stmt->bind_param("ii", $classId, $since);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -1285,6 +1297,30 @@ function chess_class_events($conn, $classId, $since, $cap = 200) {
             'data' => json_decode((string) $row['data'], true) ?? [],
             'actor_id' => (int) $row['actor_id'],
             'created_at' => $row['created_at'],
+        ];
+    }
+    $stmt->close();
+    return $rows;
+}
+
+function chess_class_events_since_reset($conn, $classId) {
+    $stmt = $conn->prepare("SELECT COALESCE(MAX(seq), 0) FROM chess_class_events
+        WHERE class_id = ? AND type = 'reset'");
+    $stmt->bind_param("i", $classId);
+    $stmt->execute();
+    $since = (int) $stmt->get_result()->fetch_row()[0];
+    $stmt->close();
+    $stmt = $conn->prepare("SELECT seq, type, data, actor_id, created_at
+        FROM chess_class_events WHERE class_id = ? AND seq > ? ORDER BY seq ASC");
+    $stmt->bind_param("ii", $classId, $since);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = [];
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = [
+            'seq' => (int) $row['seq'], 'type' => $row['type'],
+            'data' => json_decode((string) $row['data'], true) ?? [],
+            'actor_id' => (int) $row['actor_id'], 'created_at' => $row['created_at'],
         ];
     }
     $stmt->close();
