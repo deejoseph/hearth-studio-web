@@ -1,4 +1,5 @@
 import { Chess, START_FEN, indexToSquare, squareToIndex } from '../engine/chess.js';
+import { pieceUrl } from '../game/appearance.js';
 
 export const SETUP_QUIZ_ID = 'learn-setup-board';
 
@@ -23,11 +24,6 @@ export function setupBoardErrors(board) {
 
 export function isStandardSetup(board) {
   return setupBoardErrors(board).length === 0;
-}
-
-function pieceUrl(piece) {
-  const color = piece.charCodeAt(0) < 97 ? 'w' : 'b';
-  return `${import.meta.env.BASE_URL}pieces/${color}${piece.toUpperCase()}.svg`;
 }
 
 export function mountSetupQuiz({ onComplete = () => {} } = {}) {

@@ -8,7 +8,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="国际象棋" />
     <meta property="og:url" content="https://www.ichessgeek.com/chess/" />
-    <meta property="og:title" content="国际象棋自学 —— 浏览器里练棋、复盘、导棋谱" />
+    <meta property="og:title" content="国际象棋免费自学平台" />
     <meta property="og:description" content="免费、不用装东西。和电脑练，或者报房间码和朋友在线下；走完一手一手回看，棋谱一键复制或存成 PGN。" />
     <!-- 1200x630 (1.91:1) is the ratio Facebook, LinkedIn, Slack, and X's
          large card all render. Built from tools/og-image.html.
@@ -21,7 +21,7 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="国际象棋自学 —— 浏览器里免费。一张走出将死的棋盘。" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="国际象棋自学 —— 浏览器里练棋、复盘、导棋谱" />
+    <meta name="twitter:title" content="国际象棋免费自学平台" />
     <meta name="twitter:description" content="免费、不用装东西。和电脑练，或者报房间码和朋友在线下；走完一手一手回看，棋谱一键复制或存成 PGN。" />
     <meta name="twitter:image" content="https://www.ichessgeek.com/chess/og-image-v2.png" />
     <meta name="twitter:image:alt" content="国际象棋自学 —— 浏览器里免费。一张走出将死的棋盘。" />
@@ -32,12 +32,12 @@
     <link rel="manifest" href="site.webmanifest" />
     <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#13151b" media="(prefers-color-scheme: dark)" />
-    <title>国际象棋自学 —— 浏览器里练棋、复盘、导棋谱</title>
+    <title>国际象棋免费自学平台</title>
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": ["WebApplication", "VideoGame"],
-        "name": "国际象棋自学 —— 浏览器里练棋、复盘、导棋谱",
+        "name": "国际象棋免费自学平台",
         "url": "https://www.ichessgeek.com/chess/",
         "description": "给自学者的一副国际象棋棋盘，浏览器里直接下，免费、无广告、不用装东西。和电脑练（三档难度），两个人用一台设备讲解，或报房间码和朋友在线下，走完一手一手回看，棋谱能复制或存成 PGN 文件。",
         "applicationCategory": "EducationalApplication",
@@ -85,10 +85,10 @@
     </noscript>
     <div id="app">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="国际象棋 —— 返回 ichessgeek.com 首页">
+        <a class="brand" href="/" aria-label="国际象棋免费自学平台 —— 返回 ichessgeek.com 首页">
           <span class="brand-back" aria-hidden="true">←</span>
           <span class="brand-mark"><img src="icon-128.png" alt="" width="128" height="128" /></span>
-          <h1 class="brand-name">国际象棋<span class="visually-hidden"> —— 浏览器里免费练棋、复盘、导棋谱</span></h1>
+          <h1 class="brand-name">国际象棋免费自学平台</h1>
         </a>
         <div class="topbar-right">
           <a class="btn btn-ghost btn-sm feedback-link" href="mailto:admin@ichessgeek.com?subject=%E5%9B%BD%E8%B1%A1%E5%B9%B3%E5%8F%B0%E5%BB%BA%E8%AE%AE"
@@ -118,12 +118,12 @@
           <!-- 教程和平台介绍共用一张卡，走法区始终保留自己的高度。 -->
           <div class="card learn-panes">
             <div class="learn-tabs" role="tablist" aria-label="学习与平台">
-              <button type="button" class="learn-tab is-active" id="learn-tab" role="tab"
-                      aria-selected="true" aria-controls="learn-panel" tabindex="0">自学教程</button>
-              <button type="button" class="learn-tab" id="promo-tab" role="tab"
-                      aria-selected="false" aria-controls="platform-promo-panel" tabindex="-1">平台亮点</button>
+              <button type="button" class="learn-tab" id="learn-tab" role="tab"
+                      aria-selected="false" aria-controls="learn-panel" tabindex="-1">自学教程</button>
+              <button type="button" class="learn-tab is-active" id="promo-tab" role="tab"
+                      aria-selected="true" aria-controls="platform-promo-panel" tabindex="0">平台亮点</button>
             </div>
-            <div class="learn-tab-panel" id="learn-panel" role="tabpanel" aria-labelledby="learn-tab">
+            <div class="learn-tab-panel" id="learn-panel" role="tabpanel" aria-labelledby="learn-tab" hidden>
               <section class="learn-card" id="learn-card" aria-label="国象自学教程">
                 <div class="card-head">
                   <h2 class="card-title">国象自学教程</h2>
@@ -140,7 +140,7 @@
                 </div>
               </section>
             </div>
-            <div class="learn-tab-panel" id="platform-promo-panel" role="tabpanel" aria-labelledby="promo-tab" hidden>
+            <div class="learn-tab-panel" id="platform-promo-panel" role="tabpanel" aria-labelledby="promo-tab">
               <section class="platform-promo" aria-labelledby="platform-promo-title">
                 <div class="card-head">
                   <h2 class="card-title" id="platform-promo-title">在这里，学棋可以很简单</h2>
@@ -235,6 +235,27 @@
             <button type="button" class="color-swatch" data-color="green" aria-pressed="false" aria-label="绿色" title="绿色"></button>
             <button type="button" class="color-swatch" data-color="red" aria-pressed="false" aria-label="红色" title="红色"></button>
             <button type="button" class="color-swatch" data-color="blue" aria-pressed="false" aria-label="蓝色" title="蓝色"></button>
+            <span class="separator"></span>
+            <label class="toolbar-select">
+              <span>棋盘</span>
+              <select id="board-style-select" aria-label="棋盘样式">
+                <option value="classic">经典蓝</option>
+                <option value="walnut">胡桃木</option>
+                <option value="green">竞技绿</option>
+              </select>
+            </label>
+            <label class="toolbar-select">
+              <span>棋子</span>
+              <select id="piece-style-select" aria-label="棋子样式">
+                <option value="classic">经典</option>
+                <option value="forest">森林</option>
+                <option value="ocean">海蓝</option>
+              </select>
+            </label>
+            <button type="button" id="sound-btn" class="sound-toggle" aria-pressed="true" title="关闭音效" aria-label="关闭音效">
+              <i data-lucide="volume-2" class="sound-on-icon"></i>
+              <i data-lucide="volume-x" class="sound-off-icon"></i>
+            </button>
             <span class="separator"></span>
             <button type="button" id="annotation-clear" title="清空当前局面所有标注">
               <i data-lucide="trash-2"></i>
@@ -483,10 +504,10 @@
           </section>
 
           <!-- 偏好说明永远在折叠区外面：先说明平台做什么、隐私怎么用，再给入口。 -->
-          <section class="card coach-presence" aria-label="社区在线人数（初期展示数据）">
-            <div><strong>128</strong><span>在线学员</span></div>
-            <div><strong>12</strong><span>在线教练</span></div>
-            <p>初期展示数据</p>
+          <section class="card coach-presence" aria-label="社区人数（展示数据）">
+            <div><strong id="presence-students">128</strong><span>学员</span></div>
+            <div><strong id="presence-coaches">12</strong><span>教练</span></div>
+            <p>展示数据 · 自动更新</p>
           </section>
 
           <button class="btn btn-ghost btn-sm coach-admin-btn" id="coach-admin-btn" type="button" hidden>

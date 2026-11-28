@@ -1,4 +1,5 @@
 import { indexToSquare, squareToIndex } from '../engine/chess.js';
+import { pieceUrl } from '../game/appearance.js';
 
 export const PIECE_RANGE_QUIZ_ID = 'learn-piece-ranges';
 
@@ -38,10 +39,6 @@ export function pieceRangeSquares(piece, square) {
     }
   }
   return squares;
-}
-
-function pieceUrl(piece) {
-  return `${import.meta.env.BASE_URL}pieces/w${piece}.svg`;
 }
 
 export function mountPieceRangeQuiz({ onComplete = () => {} } = {}) {

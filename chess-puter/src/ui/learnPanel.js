@@ -65,7 +65,7 @@ export function mountLearnPanel({ onPractice } = {}) {
       next.focus();
     });
   }
-  selectTab(tabs[0]);
+  selectTab(tabs[1]);
 
   function paintCard() {
     const progress = getAllProgress();

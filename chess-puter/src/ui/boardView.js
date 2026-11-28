@@ -5,15 +5,12 @@
  */
 
 import { squareToIndex, indexToSquare } from '../engine/chess.js';
+import { currentPieceStyle, pieceUrl } from '../game/appearance.js';
 
-const PIECE_BASE = `${import.meta.env.BASE_URL}pieces/`;
 const TYPE_NAMES = { p: '兵', n: '马', b: '象', r: '车', q: '后', k: '王' };
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-export function pieceUrl(piece) {
-  const color = piece.charCodeAt(0) < 97 ? 'w' : 'b';
-  return `${PIECE_BASE}${color}${piece.toUpperCase()}.svg`;
-}
+export { pieceUrl };
 
 /** What a piece is called out loud: 白兵, 黑马. */
 export function pieceLabel(piece) {
@@ -147,6 +144,7 @@ export class BoardView {
    *           checkSquare: string|null }} state
    */
   render(state) {
+    const pieceStyle = currentPieceStyle();
     for (const [square, squareEl] of this.squareEls) {
       const piece = state.board[squareToIndex(square)];
       let img = squareEl.querySelector('.piece');
@@ -157,10 +155,11 @@ export class BoardView {
           img.draggable = false;
           squareEl.appendChild(img);
         }
-        if (img.dataset.piece !== piece) {
-          img.src = pieceUrl(piece);
+        if (img.dataset.piece !== piece || img.dataset.pieceStyle !== pieceStyle) {
+          img.src = pieceUrl(piece, pieceStyle);
           img.alt = pieceLabel(piece);
           img.dataset.piece = piece;
+          img.dataset.pieceStyle = pieceStyle;
         }
         // A render can land mid-drag (the computer's reply finishing its
         // slide, a remote move, Escape clearing the selection). The piece

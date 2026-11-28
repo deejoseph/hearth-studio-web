@@ -45,6 +45,8 @@ import {
   MessageSquare,
   BadgeCheck,
   FlipVertical2,
+  Volume2,
+  VolumeX,
 } from 'lucide';
 
 import { Chess, colorOf, START_FEN } from './engine/chess.js';
@@ -91,6 +93,9 @@ import { analyzeGame, CLASSIFY_ANNOT, CLASSIFY_LABEL, markFor } from './game/rev
 import { mountReviewPanel, mountReviewProgress } from './ui/reviewPanel.js';
 import { mountTacticsPanel } from './ui/tacticsPanel.js';
 import { mountLearnPanel } from './ui/learnPanel.js';
+import { mountCommunityPresence } from './ui/communityPresence.js';
+import { normalizeBoardStyle, normalizePieceStyle, setPieceStyle } from './game/appearance.js';
+import { moveSoundKind, playMoveSound, setMoveSoundEnabled, unlockMoveAudio } from './game/moveAudio.js';
 import { BASIC_PROBLEMS } from './game/basicProblems.js';
 import { learnTopic } from './game/learnContent.js';
 import { track } from './analytics.js';
@@ -151,6 +156,8 @@ createIcons({
     MessageSquare,
     BadgeCheck,
     FlipVertical2,
+    Volume2,
+    VolumeX,
   },
 });
 
@@ -161,6 +168,9 @@ const els = {
   boardFrame: document.querySelector('.board-frame'),
   annotationToolbar: $('annotation-toolbar'),
   flipBoardBtn: $('flip-board-btn'),
+  boardStyleSelect: $('board-style-select'),
+  pieceStyleSelect: $('piece-style-select'),
+  soundBtn: $('sound-btn'),
   resultBanner: $('result-banner'),
   topbarNote: $('topbar-note'),
   modeButtons: document.querySelectorAll('.mode-switch [data-mode]'),
@@ -337,6 +347,9 @@ let level = 'medium';
 let colorSetting = 'w';
 let timeSetting = DEFAULT_TIME_ID; // time control for the next game we start
 let themeSetting = 'system';
+let boardStyle = 'classic';
+let pieceStyle = 'classic';
+let soundEnabled = true;
 let thinking = false;
 let thinkingLevel = null; // level the in-flight search actually uses
 let aiToken = 0;
@@ -574,12 +587,19 @@ function loadSettings() {
       themeSetting = stored.theme;
     }
     if (stored && MODES.includes(stored.mode)) mode = stored.mode;
+    if (stored) {
+      boardStyle = normalizeBoardStyle(stored.boardStyle);
+      pieceStyle = normalizePieceStyle(stored.pieceStyle);
+      if (typeof stored.sound === 'boolean') soundEnabled = stored.sound;
+    }
   } catch {
     // Corrupt or missing settings: keep defaults.
   }
   els.levelSelect.value = level;
   els.colorSelect.value = colorSetting;
   els.timeSelect.value = timeSetting;
+  applyAppearance();
+  updateSoundButton();
 }
 
 function saveSettings() {
@@ -592,12 +612,30 @@ function saveSettings() {
         time: timeSetting,
         theme: themeSetting,
         mode,
+        boardStyle,
+        pieceStyle,
+        sound: soundEnabled,
       }),
     );
   } catch {
     // Storage unavailable (private browsing, denied permission): settings
     // still apply for this session, they just won't persist.
   }
+}
+
+function applyAppearance() {
+  document.documentElement.dataset.boardStyle = boardStyle;
+  setPieceStyle(pieceStyle);
+  els.boardStyleSelect.value = boardStyle;
+  els.pieceStyleSelect.value = pieceStyle;
+}
+
+function updateSoundButton() {
+  setMoveSoundEnabled(soundEnabled);
+  const label = soundEnabled ? '关闭音效' : '开启音效';
+  els.soundBtn.setAttribute('aria-pressed', String(soundEnabled));
+  els.soundBtn.setAttribute('aria-label', label);
+  els.soundBtn.title = label;
 }
 
 /**
@@ -1806,6 +1844,7 @@ importConfirm.addEventListener('click', () => {
     reviewIndex = null;
     selected = null;
     targets = NO_TARGETS;
+    announcedPlies = 0;
     importDialog.close();
     renderAll();
   } else if (format === 'pgn') {
@@ -1849,6 +1888,7 @@ importConfirm.addEventListener('click', () => {
     reviewIndex = null;
     selected = null;
     targets = NO_TARGETS;
+    announcedPlies = game.history().length;
     importDialog.close();
     renderAll();
   } else {
@@ -1944,6 +1984,7 @@ function announceState(status, lastMove) {
     // are the server's. revealEnd() says it again when the end arrives without
     // a move attached to it.
     const end = currentEnd();
+    playMoveSound(moveSoundKind(lastMove, end || status));
     if (end) text += `${end.title}。${end.sub}`;
     else if (status.check) text += '将军。';
   }
@@ -4714,6 +4755,7 @@ function teacherBlocked() {
 
 /** 国象自学教程：左边常驻的一张小卡，人人可看，不经过任何资格门。 */
 learnPanel = mountLearnPanel({ onPractice: openPractice });
+mountCommunityPresence();
 
 /* ------------------------------------------------------------------ */
 /* Wiring                                                              */
@@ -4780,6 +4822,32 @@ els.timeSelect.addEventListener('change', () => {
   }
   renderAll();
 });
+
+els.boardStyleSelect.addEventListener('change', () => {
+  boardStyle = normalizeBoardStyle(els.boardStyleSelect.value);
+  applyAppearance();
+  saveSettings();
+});
+
+els.pieceStyleSelect.addEventListener('change', () => {
+  pieceStyle = normalizePieceStyle(els.pieceStyleSelect.value);
+  applyAppearance();
+  saveSettings();
+  renderAll();
+});
+
+els.soundBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  updateSoundButton();
+  saveSettings();
+  if (soundEnabled) {
+    unlockMoveAudio();
+    playMoveSound('move');
+  }
+});
+
+window.addEventListener('pointerdown', unlockMoveAudio, { capture: true, passive: true });
+window.addEventListener('keydown', unlockMoveAudio, { capture: true, passive: true });
 
 els.reviewFirstBtn.addEventListener('click', () => reviewNavigate('first'));
 els.reviewPrevBtn.addEventListener('click', () => reviewNavigate('prev'));

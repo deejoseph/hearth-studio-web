@@ -96,23 +96,23 @@ function findText(node, value) {
 beforeEach(() => vi.unstubAllGlobals());
 
 describe('教程与平台标签', () => {
-  it('默认显示教程，点击后只切换对应面板', () => {
+  it('默认显示平台亮点，点击后只切换对应面板', () => {
     const { elements } = mount();
     const { 'learn-tab': learn, 'promo-tab': promo } = elements;
     const learnPanel = elements['learn-panel'];
     const promoPanel = elements['platform-promo-panel'];
-    expect(learn.getAttribute('aria-selected')).toBe('true');
-    expect(promo.getAttribute('aria-selected')).toBe('false');
-    expect(learnPanel.hidden).toBe(false);
-    expect(promoPanel.hidden).toBe(true);
-
-    promo.emit('click');
     expect(learn.getAttribute('aria-selected')).toBe('false');
     expect(promo.getAttribute('aria-selected')).toBe('true');
     expect(learnPanel.hidden).toBe(true);
     expect(promoPanel.hidden).toBe(false);
-    expect(learn.tabIndex).toBe(-1);
-    expect(promo.tabIndex).toBe(0);
+
+    learn.emit('click');
+    expect(learn.getAttribute('aria-selected')).toBe('true');
+    expect(promo.getAttribute('aria-selected')).toBe('false');
+    expect(learnPanel.hidden).toBe(false);
+    expect(promoPanel.hidden).toBe(true);
+    expect(learn.tabIndex).toBe(0);
+    expect(promo.tabIndex).toBe(-1);
   });
 
   it('左右方向键循环切换标签并移动焦点', () => {
@@ -120,20 +120,20 @@ describe('教程与平台标签', () => {
     const learn = elements['learn-tab'];
     const promo = elements['promo-tab'];
     let prevented = false;
-    learn.emit('keydown', {
-      key: 'ArrowRight',
+    promo.emit('keydown', {
+      key: 'ArrowLeft',
       preventDefault() { prevented = true; },
     });
     expect(prevented).toBe(true);
-    expect(promo.focused).toBe(true);
-    expect(elements['platform-promo-panel'].hidden).toBe(false);
-
-    promo.emit('keydown', {
-      key: 'ArrowRight',
-      preventDefault() {},
-    });
     expect(learn.focused).toBe(true);
     expect(elements['learn-panel'].hidden).toBe(false);
+
+    learn.emit('keydown', {
+      key: 'ArrowLeft',
+      preventDefault() {},
+    });
+    expect(promo.focused).toBe(true);
+    expect(elements['platform-promo-panel'].hidden).toBe(false);
   });
 });
 
