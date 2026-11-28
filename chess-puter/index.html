@@ -115,35 +115,45 @@
 
       <main class="layout">
         <aside class="sidebar sidebar-left">
-          <!-- 教程、题库和测验都在弹窗里，主页面只保留入口。 -->
-          <div class="learn-panes">
-            <section class="card platform-promo" aria-labelledby="platform-promo-title">
-              <div class="card-head">
-                <h2 class="card-title" id="platform-promo-title">在这里，学棋可以很简单</h2>
-                <span class="learn-tag">免费</span>
-              </div>
-              <ul class="platform-promo-list">
-                <li><strong>复制棋局，就能复盘。</strong>无需安装任何软件，随时将你的棋局复制过来，获取 AI 复盘分析结果。</li>
-                <li><strong>自学不收费。</strong>无需任何费用，你就可以在这里自学国际象棋。</li>
-                <li><strong>开班也不收平台费。</strong>无需任何费用，你就可以在这里开班教棋；平台只是希望你能给学生更好的性价比。</li>
-                <li><strong>专业棋手有专属方向。</strong>如果你是专业棋手，平台可以为你设计度身定制的提升计划。</li>
-              </ul>
-            </section>
-            <section class="card learn-card" id="learn-card" aria-label="国象自学教程">
-              <div class="card-head">
-                <h2 class="card-title">国象自学教程</h2>
-                <span class="learn-tag">从零开始</span>
-              </div>
-              <div class="learn-topics">
-                <button type="button" class="learn-topic" data-learn-topic="setup">摆好棋盘</button>
-                <button type="button" class="learn-topic" data-learn-topic="pieces">棋子怎么走</button>
-                <button type="button" class="learn-topic" data-learn-topic="rules">特殊规则</button>
-                <button type="button" class="learn-topic" data-learn-topic="opening">开局三原则</button>
-                <button type="button" class="learn-topic" data-learn-topic="tactics">常见战术</button>
-                <button type="button" class="learn-topic" data-learn-topic="etiquette">国象礼仪</button>
-                <button type="button" class="learn-topic" data-learn-topic="ai">国际象棋与 AI</button>
-              </div>
-            </section>
+          <!-- 教程和平台介绍共用一张卡，走法区始终保留自己的高度。 -->
+          <div class="card learn-panes">
+            <div class="learn-tabs" role="tablist" aria-label="学习与平台">
+              <button type="button" class="learn-tab is-active" id="learn-tab" role="tab"
+                      aria-selected="true" aria-controls="learn-panel" tabindex="0">自学教程</button>
+              <button type="button" class="learn-tab" id="promo-tab" role="tab"
+                      aria-selected="false" aria-controls="platform-promo-panel" tabindex="-1">平台亮点</button>
+            </div>
+            <div class="learn-tab-panel" id="learn-panel" role="tabpanel" aria-labelledby="learn-tab">
+              <section class="learn-card" id="learn-card" aria-label="国象自学教程">
+                <div class="card-head">
+                  <h2 class="card-title">国象自学教程</h2>
+                  <span class="learn-tag">从零开始</span>
+                </div>
+                <div class="learn-topics">
+                  <button type="button" class="learn-topic" data-learn-topic="setup">摆好棋盘</button>
+                  <button type="button" class="learn-topic" data-learn-topic="pieces">棋子怎么走</button>
+                  <button type="button" class="learn-topic" data-learn-topic="rules">特殊规则</button>
+                  <button type="button" class="learn-topic" data-learn-topic="opening">开局三原则</button>
+                  <button type="button" class="learn-topic" data-learn-topic="tactics">常见战术</button>
+                  <button type="button" class="learn-topic" data-learn-topic="etiquette">国象礼仪</button>
+                  <button type="button" class="learn-topic" data-learn-topic="ai">国际象棋与 AI</button>
+                </div>
+              </section>
+            </div>
+            <div class="learn-tab-panel" id="platform-promo-panel" role="tabpanel" aria-labelledby="promo-tab" hidden>
+              <section class="platform-promo" aria-labelledby="platform-promo-title">
+                <div class="card-head">
+                  <h2 class="card-title" id="platform-promo-title">在这里，学棋可以很简单</h2>
+                  <span class="learn-tag">免费</span>
+                </div>
+                <ul class="platform-promo-list">
+                  <li><strong>复制棋局，就能复盘。</strong>无需安装任何软件，随时将你的棋局复制过来，获取 AI 复盘分析结果。</li>
+                  <li><strong>自学不收费。</strong>无需任何费用，你就可以在这里自学国际象棋。</li>
+                  <li><strong>开班也不收平台费。</strong>无需任何费用，你就可以在这里开班教棋；平台只是希望你能给学生更好的性价比。</li>
+                  <li><strong>专业棋手有专属方向。</strong>如果你是专业棋手，平台可以为你设计度身定制的提升计划。</li>
+                </ul>
+              </section>
+            </div>
           </div>
           <section class="card moves-card" id="moves-card">
             <div class="card-head">

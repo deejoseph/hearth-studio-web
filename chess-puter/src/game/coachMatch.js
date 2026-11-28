@@ -148,8 +148,7 @@ function fallbackRank(coach) {
   return [
     coach?.has_profile ? 1 : 0,
     TITLE_RANK[profile.title] ?? 0,
-    // 和 coachBadges 同一个口径：先他自己登记的 elo，没有才退回站内算出来的 rating。
-    Number(profile.elo ?? coach?.rating ?? 0) || 0,
+    Number(profile.elo ?? 0) || 0,
     Number(profile.years ?? 0) || 0,
   ];
 }

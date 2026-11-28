@@ -293,14 +293,13 @@ export function validateCoachProfile(form) {
  * 抬头那几枚小徽章：称号、等级分、教龄。没填的不出现（不印"暂无"），
  * 一屏要看七八张卡，空话比空白更挡眼。
  *
- * 等级分先看教练自己登记的 elo，没有才退回账号那个 rating：前者是他报的
- * "我是多少分"，后者是站内下的棋算出来的，两个不是一回事，但名录上只显示一个。
+ * 等级分只显示教练自己登记的 elo；没填就不显示，不拿站内对局 rating 代替。
  */
 export function coachBadges(coach) {
   const profile = coach?.profile ?? {};
   const bits = [];
   if (profile.title) bits.push(coachTitleLabel(profile.title));
-  const elo = profile.elo ?? coach?.rating;
+  const elo = profile.elo;
   if (elo) bits.push(`等级分 ${elo}`);
   if (profile.years !== null && profile.years !== undefined && profile.years !== '') {
     bits.push(`教龄 ${profile.years} 年`);

@@ -156,12 +156,12 @@ describe('整页顺序', () => {
     expect(list.map((item) => item.coach.player_id)).toEqual([3, 4, 2, 1]);
   });
 
-  it('教练没登记 elo 时用账号那个 rating 比较', () => {
+  it('教练没登记 elo 时不拿账号 rating 比较，保持服务端原序', () => {
     const list = rankCoaches([
       coachRow({}, { player_id: 1, rating: 1800, has_profile: true }),
       coachRow({}, { player_id: 2, rating: 2300, has_profile: true }),
     ], null);
-    expect(list.map((item) => item.coach.player_id)).toEqual([2, 1]);
+    expect(list.map((item) => item.coach.player_id)).toEqual([1, 2]);
   });
 
   it('一个都不占时保持服务端给的原序：同一份数据刷两次不能看到卡片自己换位', () => {

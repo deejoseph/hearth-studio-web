@@ -344,14 +344,55 @@ svg.lucide {
 
 .learn-panes {
   display: flex;
+  flex: none;
   flex-direction: column;
-  gap: 12px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.learn-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.learn-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.learn-tab:hover {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.learn-tab.is-active {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+}
+
+.learn-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.learn-tab-panel {
+  padding: 12px 14px;
 }
 
 .learn-card {
-  flex: none;
-  padding: 12px 14px;
+  padding: 0;
 }
 
 .learn-card .card-head {
@@ -2668,8 +2709,6 @@ select:focus-visible {
   min-width: 0;
 }
 
-/* 一张卡 = 一个按钮（点哪儿都进主页）。卡片里不再嵌别的控件，
-   否则右栏那么窄，两个可点区域挨着一定按错。 */
 .coach-item {
   display: flex;
   align-items: flex-start;
@@ -2681,7 +2720,6 @@ select:focus-visible {
   color: inherit;
   font: inherit;
   text-align: left;
-  cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -2711,6 +2749,20 @@ select:focus-visible {
   gap: 10px;
   width: 100%;
   min-width: 0;
+}
+
+.coach-item-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.coach-item-actions .btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  padding-inline: 8px;
 }
 
 /* 头像：有图裁成方，没图用昵称第一个字。尺寸固定，别让一个字把圈顶扁。 */
@@ -3012,7 +3064,7 @@ select:focus-visible {
 }
 
 .platform-promo {
-  padding: 16px;
+  padding: 2px 0 4px;
 }
 
 .platform-promo .card-head {

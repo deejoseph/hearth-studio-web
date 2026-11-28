@@ -322,14 +322,15 @@ describe('名录卡片与主页上那几句话', () => {
     expect(coachBadges(coach({ title: 'gm', elo: 2412, years: 9 }))).toEqual([
       '国际特级大师 GM', '等级分 2412', '教龄 9 年',
     ]);
-    expect(coachBadges(coach({}))).toEqual(['等级分 2210']);
-    expect(coachBadges(coach({ years: 0 }))).toEqual(['等级分 2210', '教龄 0 年']);
+    expect(coachBadges(coach({}))).toEqual([]);
+    expect(coachBadges(coach({ years: 0 }))).toEqual(['教龄 0 年']);
     expect(coachBadges(null)).toEqual([]);
   });
 
-  it('教练自己登记的等级分优先，没有才用站内那个 rating', () => {
+  it('等级分只认教练自己填的 Elo，未填时不显示账号 rating', () => {
     expect(coachBadges(coach({ elo: 1500 }, { rating: 2210 }))).toContain('等级分 1500');
-    expect(coachBadges(coach({}, { rating: null }))).toEqual([]);
+    expect(coachBadges(coach({ elo: null }, { rating: 400 }))).toEqual([]);
+    expect(coachBadges(coach({ elo: '' }, { rating: 400 }))).toEqual([]);
   });
 
   it('卡片上的接收档位与方向标签最多两样，多了读不完', () => {
@@ -494,6 +495,19 @@ describe('界面与后端的契约', () => {
     expect(opening).not.toMatch(/\bopen\b/);
     expect(MARKUP).toMatch(/<summary\b[^>]*\bid="coach-title"/);
     expect(MARKUP.indexOf('id="coach-card"')).toBeGreaterThan(MARKUP.indexOf('id="controls"'));
+  });
+
+  it('看主页与约课是等宽按钮，保留间距和独立点击区域', () => {
+    expect(DIRECTORY_UI).toContain("text('article', 'coach-item')");
+    expect(DIRECTORY_UI).toContain("button('看主页', 'btn btn-ghost btn-sm'");
+    expect(DIRECTORY_UI).toContain("button('约课', 'btn btn-primary btn-sm'");
+    expect(DIRECTORY_UI).toContain('actions.append(home, enroll)');
+    const rule = STYLE.match(/\.coach-item-actions\s*\{([^}]+)\}/)?.[1] ?? '';
+    expect(rule).toMatch(/display:\s*flex/);
+    expect(rule).toMatch(/gap:\s*8px/);
+    const buttonRule = STYLE.match(/\.coach-item-actions \.btn\s*\{([^}]+)\}/)?.[1] ?? '';
+    expect(buttonRule).toMatch(/flex:\s*1 1 0/);
+    expect(buttonRule).toMatch(/min-width:\s*0/);
   });
 
   it('头像图片绝对铺满圆框，避免被 flex 收缩成小图', () => {

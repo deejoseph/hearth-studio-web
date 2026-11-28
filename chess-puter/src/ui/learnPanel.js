@@ -41,6 +41,32 @@ export function mountLearnPanel({ onPractice } = {}) {
   let practiceButton = null;
   let quizButtons = new Map();
 
+  const tabs = [$('learn-tab'), $('promo-tab')];
+  const panels = [$('learn-panel'), $('platform-promo-panel')];
+
+  function selectTab(active) {
+    for (let index = 0; index < tabs.length; index += 1) {
+      const selected = tabs[index] === active;
+      tabs[index].classList.toggle('is-active', selected);
+      tabs[index].setAttribute('aria-selected', String(selected));
+      tabs[index].tabIndex = selected ? 0 : -1;
+      panels[index].hidden = !selected;
+    }
+  }
+
+  for (let index = 0; index < tabs.length; index += 1) {
+    tabs[index].addEventListener('click', () => selectTab(tabs[index]));
+    tabs[index].addEventListener('keydown', (event) => {
+      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      selectTab(next);
+      next.focus();
+    });
+  }
+  selectTab(tabs[0]);
+
   function paintCard() {
     const progress = getAllProgress();
     const readTopics = getReadTopics();
