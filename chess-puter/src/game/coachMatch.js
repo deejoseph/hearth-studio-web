@@ -116,7 +116,7 @@ export function matchCoach(pref, coach) {
   const formats = overlap(profile.formats, pref.formats);
   if (formats.length) {
     score += WEIGHT.format;
-    reasons.push(formats.map((one) => coachLabel('formats', one)).join('或'));
+    reasons.push(formats.map((one) => coachLabel('formats', one)).join('、'));
   }
 
   const slots = overlap(profile.slots, pref.slots);

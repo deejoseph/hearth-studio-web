@@ -13,6 +13,7 @@
 
 import { makeAccountApi, verifyNews } from '../net/auth.js';
 import { syncFromServer } from '../game/library.js';
+import { setUserText, userText } from '../i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -95,12 +96,16 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
   }
 
   function paint() {
-    el.chipLabel.textContent = player ? player.nickname : '登录';
+    if (player) setUserText(el.chipLabel, player.nickname);
+    else {
+      el.chipLabel.removeAttribute('data-i18n-skip');
+      el.chipLabel.textContent = '登录';
+    }
     el.flag.hidden = !player || player.verified;
     el.verifyCard.classList.toggle('hidden', !player || player.verified);
-    if (player) el.verifyEmail.textContent = player.email;
-    el.name.textContent = player ? player.nickname : '';
-    el.mail.textContent = player?.email ?? '';
+    if (player) setUserText(el.verifyEmail, player.email);
+    setUserText(el.name, player ? player.nickname : '');
+    setUserText(el.mail, player?.email ?? '');
     el.stateLine.textContent = player
       ? player.verified
         ? '邮箱已确认。'
@@ -195,7 +200,13 @@ export function mountAccount({ showToast, onSignOut = () => {}, onIdentity = () 
     admin = reply.admin === true;
     paint();
     el.signinPassword.value = '';
-    showToast(`已登录为 ${player?.nickname ?? '你'}。`);
+    const signedIn = document.createDocumentFragment();
+    signedIn.append(
+      document.createTextNode('已登录为 '),
+      player?.nickname ? userText(player.nickname) : document.createTextNode('你'),
+      document.createTextNode('。'),
+    );
+    showToast(signedIn);
     // A reply can land after the player gave up waiting and moved on — they
     // switched to the other form and are already typing there. The session is
     // real, but the window must not disappear from under them; showing who

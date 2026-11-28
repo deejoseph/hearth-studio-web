@@ -197,6 +197,11 @@ describe('卡片上那句"为什么排在这儿"', () => {
     expect(reasons[0]).toBe('可接收「业余五级以下」');
   });
 
+  it('多个授课形式用列表分隔，英文翻译后不会粘连', () => {
+    const match = matchCoach(pref({ formats: ['one', 'review'] }), coachRow({ formats: ['one', 'review'] }));
+    expect(match.reasons).toContain('一对一、只批改棋谱');
+  });
+
   it('没理由就是空数组，界面据此换说教练自己标的那两样', () => {
     expect(matchReasons(matchCoach(pref(), coachRow({})))).toEqual([]);
     expect(matchReasons(null)).toEqual([]);

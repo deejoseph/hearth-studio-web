@@ -8,11 +8,13 @@ const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 function fakeNode(name = '', text = '') {
   const classes = new Set();
   const listeners = new Map();
+  const attributes = new Map();
   const node = {
     name,
     children: [],
     className: '',
     dataset: {},
+    attributes,
     hidden: false,
     open: false,
     disabled: false,
@@ -24,7 +26,7 @@ function fakeNode(name = '', text = '') {
       toggle: (value, on) => (on ? classes.add(value) : classes.delete(value)),
       contains: (value) => classes.has(value),
     },
-    setAttribute() {},
+    setAttribute: (name, value) => attributes.set(name, String(value)),
     addEventListener(type, fn) {
       listeners.set(type, fn);
     },
@@ -173,6 +175,37 @@ describe('公开解题与教练管理', () => {
     const load = findAll(container, (node) => node.name === 'button' && node.textContent === '加载')[0];
     load.emit('click');
     expect(panel.getState().currentProblemId).toBe(BASIC_PROBLEMS[0].id);
+  });
+
+  it('内置题目参与翻译，用户导入题目保留原文', () => {
+    const contentSelectors = ['tactics-hint', 'problem-id', 'problem-tags'];
+    const contentChildren = (container) => contentSelectors.flatMap((className) =>
+      findAll(container, (node) => node.className === className).flatMap((node) => node.children));
+
+    const builtin = contentChildren(mount({ problems: [BASIC_PROBLEMS[0]] }).container);
+    expect(builtin).toHaveLength(5);
+    for (const child of builtin) {
+      expect(child.name).toBe('#text');
+      expect(child.attributes.has('data-i18n-skip')).toBe(false);
+    }
+
+    const imported = {
+      id: 'imported',
+      source: 'manual',
+      title: '我的题目',
+      prompt: '请找到最佳走法。',
+      tags: ['我的标签'],
+      fen: START_FEN,
+      solution: ['e2e4'],
+    };
+    const custom = contentChildren(mount({ problems: [imported] }).container)
+      .filter((child) => child.name === 'span');
+    expect(custom).toHaveLength(4);
+    for (const child of custom) {
+      expect(child.attributes.get('data-i18n-skip')).toBe('');
+    }
+    expect(new Set(custom.map((child) => child.textContent)))
+      .toEqual(new Set(['我的题目', '请找到最佳走法。', '我的标签']));
   });
 });
 

@@ -100,6 +100,7 @@ import { identifyOpening } from './game/opening.js';
 import { BASIC_PROBLEMS } from './game/basicProblems.js';
 import { learnTopic } from './game/learnContent.js';
 import { track } from './analytics.js';
+import { fillText, initI18n, setUserText, userText } from './i18n.js';
 import {
   appendToBranch,
   branchAt,
@@ -115,6 +116,8 @@ import {
   restoreBranches,
   setActiveBranch,
 } from './game/variations.js';
+
+initI18n();
 
 createIcons({
   icons: {
@@ -795,7 +798,12 @@ function announceLowTime() {
   // follows announces itself.
   if (ms <= 0 || ms >= LOW_TIME_MS) return;
   lowAnnounced[running] = true;
-  els.srStatus.textContent = `${sideName(running)}的时间快用完了 —— 还剩${speakClock(ms)}。`;
+  els.srStatus.replaceChildren(
+    document.createTextNode(sideName(running)),
+    document.createTextNode('的时间快用完了 —— 还剩'),
+    document.createTextNode(speakClock(ms)),
+    document.createTextNode('。'),
+  );
 }
 
 function handleFlagFall(loser) {
@@ -829,7 +837,9 @@ function revealEnd(end) {
   // A confirm dialog opened before the game ended — our own pending resign,
   // say — is stale now, and acting on it could overwrite this result.
   closeDialogs();
-  els.srStatus.textContent = `${end.title} —— ${end.sub}`;
+  const announcement = document.createDocumentFragment();
+  announcement.append(document.createTextNode(`${end.title} —— `), endSubNode(end));
+  fillText(els.srStatus, announcement);
   renderAll();
   showEnd(end);
 }
@@ -843,15 +853,21 @@ function describeTimeout(loser) {
   const winner = otherColor(loser);
   const base = { reason: 'timeout', termination: 'time forfeit' };
   if (!game.hasMatingMaterial(winner)) {
+    const subParts = [
+      { text: sideName(loser) }, { text: '的钟走完了，可' },
+      { text: sideName(winner) }, { text: '没法将死。' },
+    ];
     return {
       ...base,
       kind: 'draw',
       result: '1/2-1/2',
       title: '和棋',
-      sub: `${sideName(loser)}的钟走完了，可${sideName(winner)}没法将死。`,
+      sub: subParts.map((part) => part.user ?? part.text).join(''),
+      subParts,
     };
   }
   const sub = `${sideName(loser)}的钟走完了。`;
+  const subParts = [{ text: sideName(loser) }, { text: '的钟走完了。' }];
   if (mode === 'local') {
     return {
       ...base,
@@ -859,6 +875,7 @@ function describeTimeout(loser) {
       result: resultFor(winner),
       title: `${colorName(winner)}获胜`,
       sub,
+      subParts,
     };
   }
   return {
@@ -867,6 +884,7 @@ function describeTimeout(loser) {
     result: resultFor(winner),
     title: loser === myColor ? '你输了' : '你赢了',
     sub,
+    subParts,
   };
 }
 
@@ -1982,22 +2000,36 @@ function canUndo() {
 function announceState(status, lastMove) {
   const plies = game.history().length;
   if (plies === announcedPlies) return;
-  let text;
+  let announcement;
   if (plies < announcedPlies) {
-    text = '已悔棋。';
+    announcement = document.createTextNode('已悔棋。');
   } else {
-    text = `${sideName(lastMove.color)}走了 ${lastMove.san}。`;
+    announcement = document.createDocumentFragment();
+    announcement.append(
+      document.createTextNode(sideName(lastMove.color)),
+      document.createTextNode('走了 '),
+      document.createTextNode(lastMove.san),
+      document.createTextNode('。'),
+    );
     // The verdict the app is standing behind, not the engine's opinion: an
     // online game has not ended until the referee says it has, and its words
     // are the server's. revealEnd() says it again when the end arrives without
     // a move attached to it.
     const end = currentEnd();
     playMoveSound(moveSoundKind(lastMove, end ? { ...status, over: true } : status));
-    if (end) text += `${end.title}。${end.sub}`;
-    else if (status.check) text += '将军。';
+    if (end) announcement.append(document.createTextNode(`${end.title}。`), endSubNode(end));
+    else if (status.check) announcement.append(document.createTextNode('将军。'));
   }
   announcedPlies = plies;
-  els.srStatus.textContent = text;
+  fillText(els.srStatus, announcement);
+}
+
+function setPlayerName(element, name, fallback) {
+  if (name) setUserText(element, name);
+  else {
+    element.removeAttribute('data-i18n-skip');
+    element.textContent = fallback;
+  }
 }
 
 function renderPlayers() {
@@ -2005,6 +2037,8 @@ function renderPlayers() {
   const top = otherColor(bottom);
   const finished = gameFinished();
   const turn = turnNow();
+  els.topName.removeAttribute('data-i18n-skip');
+  els.bottomName.removeAttribute('data-i18n-skip');
 
   let topIsCpu = false;
   if (tacticsMode) {
@@ -2030,9 +2064,9 @@ function renderPlayers() {
   } else {
     // The nicknames are the room's own row, so a player sees the name they
     // chose rather than "Opponent" — and the empty seat still has a name.
-    els.topName.textContent = seatName(top) || opponentLabel();
+    setPlayerName(els.topName, seatName(top), opponentLabel());
     els.topCaption.textContent = `执${side(top)}`;
-    els.bottomName.textContent = seatName(bottom) || '你';
+    setPlayerName(els.bottomName, seatName(bottom), '你');
     els.bottomCaption.textContent = `执${side(bottom)}`;
   }
   els.topIconCpu?.classList.toggle('hidden', !topIsCpu);
@@ -2491,20 +2525,33 @@ function currentEnd() {
   return status.over ? describeEnd(status) : null;
 }
 
+function endSubNode(end) {
+  const fragment = document.createDocumentFragment();
+  for (const part of end?.subParts ?? [{ text: end?.sub ?? '' }]) {
+    fragment.append(part.user !== undefined ? userText(part.user) : document.createTextNode(part.text));
+  }
+  return fragment;
+}
+
 // Fills in the result text and color; whether it is on screen at all is
 // updateModeUi's call, so the banner comes and goes with the player cards and
 // the move list it belongs to.
 function renderBanner() {
   const end = currentEnd();
   els.resultBanner.className = end ? `result-banner ${end.kind}` : 'result-banner';
-  els.resultBanner.textContent = end ? `${end.title} · ${end.sub}` : '';
+  if (!end) els.resultBanner.textContent = '';
+  else {
+    const banner = document.createDocumentFragment();
+    banner.append(document.createTextNode(`${end.title} · `), endSubNode(end));
+    fillText(els.resultBanner, banner);
+  }
 }
 
 function showEnd(end) {
   trackGameEnd(end);
   archiveFinishedGame(end);
   els.gameoverTitle.textContent = end.title;
-  els.gameoverSub.textContent = end.sub;
+  fillText(els.gameoverSub, endSubNode(end));
   for (const [kind, el] of Object.entries(els.gameoverIcons)) {
     el.classList.toggle('shown', kind === end.kind);
   }
@@ -2519,7 +2566,7 @@ function showToast(text, { onlyIfIdle = false } = {}) {
   // player is waiting on — the email-confirmation reply arrives on the same
   // load as the restored-game note, and losing it means reloading to check.
   if (onlyIfIdle && els.toast.classList.contains('show')) return;
-  els.toast.textContent = text;
+  fillText(els.toast, text);
   els.toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => els.toast.classList.remove('show'), 4000);
@@ -3062,7 +3109,7 @@ function finishPromotion(choice) {
 function askConfirm({ title, sub, confirmLabel, danger = true }, onConfirm) {
   confirmAction = onConfirm;
   els.confirmTitle.textContent = title;
-  els.confirmSub.textContent = sub;
+  fillText(els.confirmSub, sub);
   els.confirmYes.textContent = confirmLabel;
   els.confirmYes.classList.toggle('btn-danger-solid', danger);
   els.confirmYes.classList.toggle('btn-primary', !danger);
@@ -3525,11 +3572,20 @@ function sitDown(snap, fresh) {
   }
   // The clock starts here rather than at the first move: the referee sets it
   // running the moment the second seat fills, whether or not anybody answers.
-  const text = `你执${side(myColor)}，对面是 ${opponentLabel()}${
-    clock.enabled ? `，每方 ${speakClock(snap.time_ms)}` : ''
-  }。`;
-  els.srStatus.textContent = text;
-  showToast(text);
+  const text = document.createDocumentFragment();
+  text.append(
+    document.createTextNode('你执'),
+    document.createTextNode(side(myColor)),
+    document.createTextNode('，对面是 '),
+    userText(opponentLabel()),
+  );
+  if (clock.enabled) {
+    text.append(document.createTextNode('，每方 '), document.createTextNode(speakClock(snap.time_ms)));
+  }
+  text.append(document.createTextNode('。'));
+  const announcement = text.cloneNode(true);
+  fillText(els.srStatus, text);
+  showToast(announcement);
   renderAll();
 }
 
@@ -3682,6 +3738,7 @@ function roomEnd(snap) {
     termination: ROOM_TERMINATION[snap.result] || 'abandoned',
     title: kind === 'draw' ? '和棋' : kind === 'win' ? '你赢了' : '你输了',
     sub: roomEndText(snap),
+    subParts: roomEndParts(snap),
   };
 }
 
@@ -3690,16 +3747,22 @@ function roomEnd(snap) {
  * phrase too, but it is written for somebody reading a list of rooms: it names
  * colours, where a player wants to know about themselves.
  */
-function roomEndText(snap) {
+function roomEndParts(snap) {
   if (snap.result === 'checkmate') {
-    return snap.winner === myColor ? '你把对方将死了。' : `${opponentLabel()}把你将死了。`;
+    return snap.winner === myColor
+      ? [{ text: '你把对方将死了。' }]
+      : [{ user: opponentLabel() }, { text: '把你将死了。' }];
   }
-  if (snap.result === 'stalemate') return '逼和 —— 两边都没有合法走法。';
-  if (snap.result === 'agreement') return '双方同意和棋。';
+  if (snap.result === 'stalemate') return [{ text: '逼和 —— 两边都没有合法走法。' }];
+  if (snap.result === 'agreement') return [{ text: '双方同意和棋。' }];
   const side = ROOM_SIDE[snap.result];
-  if (!side) return snap.result_text || '这局结束了。';
-  const who = side === myColor ? '你' : opponentLabel();
-  return snap.result.startsWith('resign') ? `${who}认输了。` : `${who}的钟走完了。`;
+  if (!side) return [{ text: snap.result_text || '这局结束了。' }];
+  const who = side === myColor ? { text: '你' } : { user: opponentLabel() };
+  return [who, { text: snap.result.startsWith('resign') ? '认输了。' : '的钟走完了。' }];
+}
+
+function roomEndText(snap) {
+  return roomEndParts(snap).map((part) => part.user ?? part.text).join('');
 }
 
 /** Take the referee's verdict onto the board, once. */
@@ -3811,7 +3874,11 @@ function requestResign() {
     askConfirm(
       {
         title: '要认输吗？',
-        sub: `认输就把这一局送给了 ${opponentLabel()}。`,
+        sub: (() => {
+          const line = document.createDocumentFragment();
+          line.append(document.createTextNode('认输就把这一局送给了 '), userText(opponentLabel()), document.createTextNode('。'));
+          return line;
+        })(),
         confirmLabel: '认输',
       },
       () => {
@@ -4466,7 +4533,7 @@ function updateClassRoster() {
       row.className = 'class-student';
       const name = document.createElement('span');
       name.className = 'class-student-name';
-      name.textContent = member.nickname || `学生 ${member.id}`;
+      setPlayerName(name, member.nickname, `学生 ${member.id}`);
       const badge = document.createElement('span');
       badge.className = `class-hand-badge hand-${member.hand}`;
       badge.textContent = CLASS_HAND_LABEL[member.hand] || '旁听';

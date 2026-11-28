@@ -1,6 +1,7 @@
 /** 学员投诉表单，以及学员/教练各自私有的投诉记录。 */
 
 import { call } from '../net/auth.js';
+import { setUserText, userText } from '../i18n.js';
 import {
   COACH_COMPLAINT_MAX,
   COACH_COMPLAINT_MIN,
@@ -96,7 +97,11 @@ export function mountCoachComplaint({ showToast, player, openAccount, wasTeacher
     submitRequest += 1;
     idleSubmit();
     selected = coach;
-    el.name.textContent = coach.nickname || '教练';
+    if (coach.nickname) setUserText(el.name, coach.nickname);
+    else {
+      el.name.removeAttribute('data-i18n-skip');
+      el.name.textContent = '教练';
+    }
     el.text.value = '';
     paintCounter();
     showError('', null);
@@ -138,14 +143,19 @@ export function mountCoachComplaint({ showToast, player, openAccount, wasTeacher
       item.className = 'coach-complaint-item';
       const head = document.createElement('h3');
       const submitted = one.relation === 'submitted';
-      head.textContent = submitted
-        ? `我提交的${one.coach_nickname ? ` · 关于 ${one.coach_nickname}` : ''}`
-        : '我收到的匿名申诉';
+      if (submitted) {
+        head.append(document.createTextNode('我提交的'));
+        if (one.coach_nickname) {
+          head.append(document.createTextNode(' · 关于 '), userText(one.coach_nickname));
+        }
+      } else {
+        head.append(document.createTextNode('我收到的匿名申诉'));
+      }
       head.append(document.createTextNode(` · ${complaintStatusLabel(one.status)}`));
       const at = typeof one.created_at === 'string' ? one.created_at.slice(0, 10) : '';
       if (at) head.append(document.createTextNode(` · ${at}`));
       const body = document.createElement('p');
-      body.textContent = typeof one.text === 'string' ? one.text : '';
+      setUserText(body, typeof one.text === 'string' ? one.text : '');
       const severity = document.createElement('p');
       severity.className = 'coach-complaint-severity';
       severity.textContent = `平台记录：${complaintSeverityLabel(one.severity)}`;
@@ -156,7 +166,7 @@ export function mountCoachComplaint({ showToast, player, openAccount, wasTeacher
       if (one.status === 'upheld' && decision) {
         const published = document.createElement('p');
         published.className = 'coach-complaint-public-text';
-        published.textContent = `平台公开说明：${decision}`;
+        published.append(document.createTextNode('平台公开说明：'), userText(decision));
         item.append(published);
       }
       return item;

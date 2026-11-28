@@ -10,6 +10,7 @@
  */
 
 import { call } from '../net/auth.js';
+import { translateUserText } from '../i18n.js';
 import {
   COACH_GROUPS,
   COACH_GROUP_TITLES,
@@ -219,7 +220,12 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
   }
 
   function paintCard() {
-    el.state.textContent = coachPrefSummary(current);
+    const scheduleNote = typeof current?.schedule_note === 'string' ? current.schedule_note.trim() : '';
+    const noteToken = '\uE100';
+    const summary = coachPrefSummary(scheduleNote ? { ...current, schedule_note: noteToken } : current);
+    el.state.textContent = translateUserText(summary, scheduleNote ? [noteToken] : [])
+      .split(noteToken).join(scheduleNote);
+    el.state.setAttribute('data-i18n-skip', '');
     el.state.classList.toggle('hidden', !current);
     el.trigger.querySelector('.coach-pref-btn-label').textContent = current
       ? '改我想找的教练'
@@ -328,6 +334,7 @@ export function mountCoachPref({ showToast, player, openAccount, onPrefChange })
   el.note.addEventListener('input', () => {
     if (!el.error.hidden) clearError();
   });
+  globalThis.window?.addEventListener('chess-language-change', paintCard);
 
   function refresh() {
     const whoId = player()?.id;

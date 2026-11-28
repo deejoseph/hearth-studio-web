@@ -7,6 +7,7 @@
  */
 
 import { Chess } from '../engine/chess.js';
+import { setUserText, translateText, userText } from '../i18n.js';
 import { BASIC_PROBLEMS } from '../game/basicProblems.js';
 import { importAuto, importFenSolutionFormat } from '../game/tactics.js';
 import {
@@ -239,11 +240,12 @@ function buildProblemSection(panel) {
     statusBadge.className = `tactics-status status-${panel.status}`;
 
     const turn = problem.fen.split(' ')[1] === 'w' ? '白方' : '黑方';
-    let hintText = problem.prompt || `${turn}走棋，找到最佳走法`;
+    hint.replaceChildren();
+    if (problem.prompt) hint.append(problemText(problem, problem.prompt));
+    else hint.textContent = `${turn}走棋，找到最佳走法`;
     if (problem.tags && problem.tags.length > 0) {
-      hintText += ` · ${problem.tags.join('、')}`;
+      hint.append(document.createTextNode(' · '), problemText(problem, problem.tags.join('、')));
     }
-    hint.textContent = hintText;
 
     if (panel.status === 'correct') {
       feedback.textContent = '正确！';
@@ -276,6 +278,12 @@ function navButton(label, className, onClick) {
   button.textContent = label;
   button.addEventListener('click', onClick);
   return button;
+}
+
+function problemText(problem, value) {
+  return problem.source === 'basic'
+    ? document.createTextNode(value)
+    : userText(value);
 }
 
 /* ------------------------------------------------------------------ */
@@ -451,14 +459,15 @@ function problemRow(panel, problem, index) {
 
   const idSpan = document.createElement('span');
   idSpan.className = 'problem-id';
-  idSpan.textContent = problem.title || `第 ${index + 1} 题`;
+  if (problem.title) idSpan.append(problemText(problem, problem.title));
+  else idSpan.textContent = `第 ${index + 1} 题`;
   info.appendChild(idSpan);
 
   if (problem.tags && problem.tags.length > 0) {
     const tags = problem.tags.join('、');
     const tagsSpan = document.createElement('span');
     tagsSpan.className = 'problem-tags';
-    tagsSpan.textContent = tags;
+    tagsSpan.append(problemText(problem, tags));
     tagsSpan.title = tags;
     info.appendChild(tagsSpan);
   }
@@ -642,7 +651,7 @@ function setItem(panel, name) {
   row.className = 'tactics-set-item';
 
   const label = document.createElement('span');
-  label.textContent = name;
+  setUserText(label, name);
   label.title = name;
 
   const loadBtn = document.createElement('button');
@@ -661,7 +670,7 @@ function setItem(panel, name) {
   deleteBtn.textContent = '删除';
   deleteBtn.addEventListener('click', () => {
     if (!panel.canManage) return;
-    if (confirm(`确定删除题目集「${name}」？`)) {
+    if (confirm(translateText(`确定删除题目集「${name}」？`))) {
       deleteProblemSet(name);
       panel.refreshStore();
     }

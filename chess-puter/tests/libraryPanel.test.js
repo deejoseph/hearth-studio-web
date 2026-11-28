@@ -54,6 +54,7 @@ function fakeStore() {
 function fakeNode(name = '') {
   const classes = new Set();
   const listeners = new Map();
+  const attributes = new Map();
   const node = {
     name,
     children: [],
@@ -68,6 +69,7 @@ function fakeNode(name = '') {
       toggle: (className, on) => (on ? classes.add(className) : classes.delete(className)),
       contains: (className) => classes.has(className),
     },
+    setAttribute: (key, value) => attributes.set(key, String(value)),
     addEventListener: (type, fn) => {
       listeners.set(type, fn);
     },
@@ -96,7 +98,7 @@ function fakeNode(name = '') {
 
 /** Every string in a subtree, in order — enough to read a row back. */
 function textOf(node) {
-  return [node.textContent, ...node.children.map(textOf)].filter(Boolean).join(' ');
+  return [node.textContent, ...node.children.map(textOf)].filter(Boolean).join('');
 }
 
 /** The first created element of this tag in a subtree. */
@@ -125,6 +127,7 @@ function mount() {
   vi.stubGlobal('document', {
     getElementById: get,
     createElement: (name) => fakeNode(name),
+    createTextNode: (text) => ({ ...fakeNode(), textContent: text }),
   });
 
   toasts = [];

@@ -38,6 +38,7 @@ function fakeNode(id = '') {
     },
     setAttribute: (name, value) => attributes.set(name, String(value)),
     getAttribute: (name) => attributes.get(name) ?? null,
+    removeAttribute: (name) => attributes.delete(name),
     addEventListener: (type, fn) => {
       listeners.set(type, fn);
     },
@@ -88,6 +89,14 @@ function mount({ search = '' } = {}) {
     hidden: false,
     getElementById: get,
     addEventListener: vi.fn(),
+    createElement: () => fakeNode(),
+    createTextNode: (text) => ({ textContent: text }),
+    createDocumentFragment: () => ({
+      textContent: '',
+      append(...children) {
+        this.textContent += children.map((child) => child.textContent ?? '').join('');
+      },
+    }),
   });
   vi.stubGlobal('window', { location: { search, pathname: '/chess/' } });
   replaceState = vi.fn();
@@ -242,7 +251,7 @@ describe('signing in', () => {
     expect(nodes.get('signin-password').value).toBe('');
     expect(nodes.get('account-dialog').open).toBe(false);
     expect(nodes.get('account-chip-label').textContent).toBe('Joe');
-    expect(toasts).toEqual(['已登录为 Joe。']);
+    expect(toasts.map((toast) => toast.textContent ?? toast)).toEqual(['已登录为 Joe。']);
   });
 
   it('locks the buttons while the request is out, and says what it is doing', async () => {
@@ -338,7 +347,7 @@ describe('signing in', () => {
     expect(nodes.get('account-pane').classList.contains('hidden')).toBe(false);
     expect(nodes.get('signup-pane').classList.contains('hidden')).toBe(true);
     expect(nodes.get('account-name').textContent).toBe('Joe');
-    expect(toasts).toEqual(['已登录为 Joe。']);
+    expect(toasts.map((toast) => toast.textContent ?? toast)).toEqual(['已登录为 Joe。']);
   });
 });
 

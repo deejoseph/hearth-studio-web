@@ -17,6 +17,7 @@
  */
 
 import { call, upload } from '../net/auth.js';
+import { setUserText } from '../i18n.js';
 import { prepareCoachImage } from '../net/coachImage.js';
 import { coachImageTrigger } from './coachLightbox.js';
 import { COACH_OPTIONS, normalizeCoachText } from '../game/coachPref.js';
@@ -365,12 +366,12 @@ export function mountCoachProfile({ showToast, player, openAccount, canTeach, on
     for (const slot of customSlots) {
       const row = document.createElement('li');
       const label = document.createElement('span');
-      label.textContent = slot;
+      setUserText(label, slot);
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'btn btn-ghost btn-sm';
       remove.textContent = '删除';
-      remove.setAttribute('aria-label', `删除时段：${slot}`);
+      remove.setAttribute('aria-label', '删除时段');
       remove.addEventListener('click', () => {
         customSlots = customSlots.filter((one) => one !== slot);
         paintCustomSlots();

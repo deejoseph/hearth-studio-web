@@ -13,6 +13,7 @@
 import { LEVELS } from '../engine/ai.js';
 import { clearLibrary, loadLibrary, deleteFromServer } from '../game/library.js';
 import { bundleFilename, bundlePgn } from '../game/pgn.js';
+import { userText } from '../i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -55,8 +56,14 @@ function opponentText(entry) {
   return '讲解两人'; // 同屏那一盘：两个颜色共用一台设备，没有名字可说
 }
 
-function scoreLine(entry) {
-  return `${RESULT[entry.result] ?? entry.result} · ${opponentText(entry)}`;
+function fillScore(score, entry) {
+  score.append(document.createTextNode(RESULT[entry.result] ?? entry.result));
+  score.append(document.createTextNode(' · '));
+  if (entry.mode === 'online' || entry.mode === 'class') {
+    score.append(userText(entry.white), document.createTextNode(' 对 '), userText(entry.black));
+    return;
+  }
+  score.append(document.createTextNode(opponentText(entry)));
 }
 
 function metaLine(entry) {
@@ -117,7 +124,7 @@ export function mountLibrary({ showToast, askConfirm, download }) {
     text.className = 'library-row-text';
     const score = document.createElement('span');
     score.className = 'library-score';
-    score.textContent = scoreLine(entry);
+    fillScore(score, entry);
     const meta = document.createElement('span');
     meta.className = 'library-meta';
     meta.textContent = metaLine(entry);

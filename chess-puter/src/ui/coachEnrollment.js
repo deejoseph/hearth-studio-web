@@ -1,6 +1,7 @@
 /** 某一位教练的招生说明与邮件预约；只经 net/auth.js 的 call() 发请求。 */
 
 import { call } from '../net/auth.js';
+import { setUserText } from '../i18n.js';
 import { coachEnrollmentRows } from '../game/coachProfile.js';
 import {
   COACH_INQUIRY_MAX,
@@ -50,14 +51,19 @@ export function mountCoachEnrollment({ showToast, player, openAccount }) {
   }
 
   function fill(coach) {
-    el.name.textContent = coach.nickname || '教练';
+    if (coach.nickname) setUserText(el.name, coach.nickname);
+    else {
+      el.name.removeAttribute('data-i18n-skip');
+      el.name.textContent = '教练';
+    }
     el.rows.replaceChildren(...coachEnrollmentRows(coach).map((row) => {
       const section = document.createElement('section');
       section.className = 'coach-enrollment-row';
       const title = document.createElement('h3');
       title.textContent = row.label;
       const body = document.createElement('p');
-      body.textContent = row.text || '暂未填写，可在预约邮件中询问。';
+      if (row.text && row.key !== 'hourly_rate_cny') setUserText(body, row.text);
+      else body.textContent = row.text || '暂未填写，可在预约邮件中询问。';
       section.append(title, body);
       return section;
     }));

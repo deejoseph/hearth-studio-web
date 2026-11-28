@@ -215,6 +215,12 @@ svg.lucide {
   color: var(--muted);
 }
 
+.language-toggle {
+  min-width: 48px;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+
 .account-chip {
   display: inline-flex;
   align-items: center;
@@ -3266,6 +3272,27 @@ select:focus-visible {
   }
 }
 
+@media (max-width: 380px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-inline: 16px;
+  }
+
+  .brand {
+    flex: 1 0 100%;
+  }
+
+  .brand-back {
+    display: none;
+  }
+
+  .topbar-right {
+    flex: 1;
+    justify-content: flex-end;
+  }
+}
+
 .pref-note-head {
   display: flex;
   align-items: baseline;
@@ -3592,6 +3619,11 @@ select:focus-visible {
   content: '这张图读不出来';
   font-size: 11px;
   color: var(--danger);
+}
+
+html[lang="en"] .coach-avatar-box.broken::after,
+html[lang="en"] .coach-photo-cell.broken::after {
+  content: 'Image could not be loaded';
 }
 
 .coach-photo-empty {

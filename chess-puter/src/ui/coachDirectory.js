@@ -20,6 +20,7 @@ import {
 import { matchReasons, recommendedCoaches } from '../game/coachMatch.js';
 import { complaintSeverityLabel, publicComplaints } from '../game/coachMarketplace.js';
 import { coachImageTrigger } from './coachLightbox.js';
+import { setUserText, userText } from '../i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -49,19 +50,22 @@ function avatarOf(coach, openImage, host = null, big = false) {
   const fallback = () => {
     if (host) {
       host.className = className;
-      host.textContent = initial;
+      setUserText(host, initial);
       return host;
     }
-    return text('span', className, initial);
+    return setUserText(text('span', className, initial), initial);
   };
   // 主页的头像容器只负责定位；有图时样式落在按钮本身，避免两层头像样式嵌套。
-  if (host) host.className = '';
+  if (host) {
+    host.className = '';
+    host.removeAttribute('data-i18n-skip');
+  }
   if (!pic) return fallback();
 
   const trigger = coachImageTrigger({
     src: coachPhotoUrl(coach.player_id, pic, big ? 320 : 96),
     fullSrc: coachPhotoUrl(coach.player_id, pic),
-    alt: `${name} 的头像`,
+    alt: '教练头像',
     openImage,
     className,
     imageClassName: 'coach-avatar-image',
@@ -165,7 +169,8 @@ export function mountCoachDirectory({
     const head = text('div', 'coach-main');
     head.append(avatarOf(coach, openImage));
     const body = text('div', 'coach-body');
-    const name = text('h3', 'coach-name', coach.nickname || '教练');
+    const name = text('h3', 'coach-name', coach.nickname ? '' : '教练');
+    if (coach.nickname) name.append(userText(coach.nickname));
     name.id = nameId;
     if (player()?.id === coach.player_id) name.append(text('span', 'coach-self', '这是我'));
     body.append(name);
@@ -173,7 +178,7 @@ export function mountCoachDirectory({
     const badges = coachBadges(coach);
     if (badges.length) body.append(text('p', 'coach-line', badges.join(' · ')));
     const tagline = String(coach?.profile?.tagline ?? '').trim();
-    if (tagline) body.append(text('p', 'coach-tagline', tagline));
+    if (tagline) body.append(setUserText(text('p', 'coach-tagline'), tagline));
     const why = whyOf(item);
     if (why) body.append(why);
     for (const warning of item.match?.warnings ?? []) {
@@ -238,6 +243,7 @@ export function mountCoachDirectory({
   function resetHome() {
     homeCoach = null;
     avatarOf(null, openImage, el.homeAvatar, true);
+    el.homeName.removeAttribute('data-i18n-skip');
     el.homeName.textContent = '教练主页';
     for (const node of [
       el.homeBadges, el.homeTagline, el.homeRows, el.homeEnrollment, el.homeHonors,
@@ -304,7 +310,7 @@ export function mountCoachDirectory({
     return coachImageTrigger({
       src: coachPhotoUrl(coach.player_id, name, certificate ? 960 : 640),
       fullSrc: coachPhotoUrl(coach.player_id, name),
-      alt: `${coach.nickname || '教练'} 的${certificate ? '证书图片' : '照片'} ${at + 1}`,
+      alt: certificate ? '教练证书图片' : '教练照片',
       openImage,
       className: 'coach-home-photo-trigger',
       imageClassName: imageClass,
@@ -319,7 +325,7 @@ export function mountCoachDirectory({
       head.append(document.createTextNode(`平台已核实 · ${complaintSeverityLabel(one.severity)}`));
       const at = typeof one.published_at === 'string' ? one.published_at.slice(0, 10) : '';
       if (at) head.append(document.createTextNode(` · ${at}`));
-      item.append(head, text('p', 'coach-public-complaint-text', one.public_text));
+      item.append(head, setUserText(text('p', 'coach-public-complaint-text'), one.public_text));
       return item;
     }));
     const empty = list.length === 0;
@@ -332,18 +338,22 @@ export function mountCoachDirectory({
   function paintHome(coach) {
     homeCoach = coach;
     avatarOf(coach, openImage, el.homeAvatar, true);
-    el.homeName.textContent = coach.nickname || '教练';
+    if (coach.nickname) setUserText(el.homeName, coach.nickname);
+    else {
+      el.homeName.removeAttribute('data-i18n-skip');
+      el.homeName.textContent = '教练';
+    }
     const badges = coachBadges(coach);
     el.homeBadges.textContent = badges.join(' · ');
     el.homeBadges.hidden = badges.length === 0;
 
     const tagline = String(coach.profile?.tagline ?? '').trim();
-    el.homeTagline.textContent = tagline;
+    setUserText(el.homeTagline, tagline);
     el.homeTagline.hidden = !tagline;
 
     const honors = String(coach.profile?.honors ?? '').trim();
     el.homeHonorsLabel.textContent = COACH_PROFILE_TITLES.honors;
-    el.homeHonors.textContent = honors;
+    setUserText(el.homeHonors, honors);
     el.homeHonorsLabel.hidden = !honors;
     el.homeHonors.hidden = !honors;
 
@@ -353,19 +363,25 @@ export function mountCoachDirectory({
     el.homeCertificates.hidden = certificates.length === 0;
 
     const rowsHome = coachProfileRows(coach);
+    const userRowLabels = new Set([
+      COACH_PROFILE_TITLES.goals_note,
+      COACH_PROFILE_TITLES.custom_slots,
+      COACH_PROFILE_TITLES.teaching_focus,
+    ]);
     el.homeRows.replaceChildren(...rowsHome.map((row) => {
       const line = text('p', 'coach-home-row');
-      line.append(text('span', 'coach-home-label', row.label), text('span', null, row.text));
+      const value = text('span', null, row.text);
+      if (userRowLabels.has(row.label)) setUserText(value, row.text);
+      line.append(text('span', 'coach-home-label', row.label), value);
       return line;
     }));
     el.homeRows.hidden = rowsHome.length === 0;
 
     el.homeEnrollment.replaceChildren(...coachEnrollmentRows(coach).map((row) => {
       const section = text('section', 'coach-enrollment-row');
-      section.append(
-        text('h3', 'coach-enrollment-title', row.label),
-        text('p', 'coach-enrollment-text', row.text || '暂未填写，可在预约邮件中询问。'),
-      );
+      const value = text('p', 'coach-enrollment-text', row.text || '暂未填写，可在预约邮件中询问。');
+      if (row.text && row.key !== 'hourly_rate_cny') setUserText(value, row.text);
+      section.append(text('h3', 'coach-enrollment-title', row.label), value);
       return section;
     }));
 
