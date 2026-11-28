@@ -263,6 +263,32 @@ describe('练习界面', () => {
   });
 });
 
+describe('题库面板生命周期', () => {
+  it('新局只重置题库，不销毁常驻面板和教练导入区', () => {
+    let destroyed = 0;
+    let resets = 0;
+    const tacticsPanel = {
+      destroy: () => { destroyed++; },
+      selectAll: () => { resets++; },
+    };
+    const harness = new Function(
+      'tacticsPanel', 'els',
+      `let tacticsMode = false;
+       let tacticsReturn = null;
+       let tacticsViewColor = 'w';
+       const detachTacticsBoard = () => {};
+       const paintTacticsColumn = () => {};
+       ${extract('clearTactics')}
+       return { clearTactics, panel: () => tacticsPanel };`,
+    )(tacticsPanel, { tacticsDialog: { open: false, close() {} } });
+
+    harness.clearTactics();
+    expect(destroyed).toBe(0);
+    expect(resets).toBe(1);
+    expect(harness.panel()).toBe(tacticsPanel);
+  });
+});
+
 describe('公开入口与会话隔离', () => {
   function makeHarness({
     state = 'none', roomCode = null, classCode = null,
@@ -324,17 +350,28 @@ describe('公开入口与会话隔离', () => {
        const showToast = (text) => toasts.push(text);
        const mountTacticsPanel = (container, options) => {
          mounted.push(options);
-         selected = BASIC_PROBLEMS[0].id;
-         loads++;
-         options.setFen(BASIC_PROBLEMS[0].fen);
          return {
            setCanManage() {},
-           selectAll() { loads++; return true; },
+           selectAll() {
+             selected ??= BASIC_PROBLEMS[0].id;
+             loads++;
+             options.setFen(BASIC_PROBLEMS[0].fen);
+             return true;
+           },
            selectLesson(ids) { selected = ids[0]; loads++; return true; },
            getState() { return { currentProblemId: selected }; },
            selectProblemById(id) { selected = id; loads++; return true; },
          };
        };
+       tacticsPanel = mountTacticsPanel(els.tacticsPanelContainer, {
+         problems: [],
+         canManage: coachApp.state() === 'approved',
+         setFen: (fen) => {
+           if (!tacticsMode) return;
+           loadBoard(fen);
+         },
+         getFen: () => game.fen(),
+       });
        ${extract('canManageTactics')}
        ${extract('paintTacticsColumn')}
        ${extract('openTactics')}
@@ -345,6 +382,7 @@ describe('公开入口与会话隔离', () => {
          openPractice,
          closeTactics,
          isOpen: () => tacticsMode,
+         fen: () => game.fen(),
          selected: () => selected,
          loads: () => loads,
          saves: () => saves,
@@ -367,7 +405,19 @@ describe('公开入口与会话隔离', () => {
     expect(harness.dialogOpen()).toBe(true);
     expect(harness.reviewIndex()).toBe(null);
     expect(harness.clearReviews()).toBe(1);
-    expect(harness.mounted[0]).toMatchObject({ canManage: false, problems: BASIC_PROBLEMS });
+    expect(harness.mounted[0]).toMatchObject({ canManage: false, problems: [] });
+  });
+
+  it('课件里导入题目不覆盖主棋盘，进入练习后才摆题', () => {
+    const harness = makeHarness();
+    const originalFen = harness.fen();
+    harness.mounted[0].setFen('rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1');
+    expect(harness.fen()).toBe(originalFen);
+    expect(harness.loads()).toBe(0);
+
+    harness.openTactics();
+    expect(harness.loads()).toBe(1);
+    expect(harness.fen()).toBe(BASIC_PROBLEMS[0].fen);
   });
 
   it('在线对弈或课堂进行中先提示离开，不覆盖题面', () => {
@@ -383,7 +433,7 @@ describe('公开入口与会话隔离', () => {
       const harness = makeHarness(options);
       harness.openPractice('setup');
       expect(harness.isOpen()).toBe(false);
-      expect(harness.mounted).toHaveLength(0);
+      expect(harness.loads()).toBe(0);
       expect(harness.saves()).toBe(0);
       expect(harness.toasts[0]).toContain('先离开');
     }
@@ -405,7 +455,7 @@ describe('公开入口与会话隔离', () => {
     const harness = makeHarness({ reviewAnalyzing: true });
     harness.openPractice('setup');
     expect(harness.isOpen()).toBe(false);
-    expect(harness.mounted).toHaveLength(0);
+    expect(harness.loads()).toBe(0);
     expect(harness.saves()).toBe(0);
     expect(harness.toasts[0]).toContain('复盘还在计算');
   });

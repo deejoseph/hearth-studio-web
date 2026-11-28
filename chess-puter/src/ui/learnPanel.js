@@ -24,7 +24,7 @@ function progressLabel(progress) {
   return `练习 ${progress.solved}/${progress.total}`;
 }
 
-export function mountLearnPanel({ onPractice } = {}) {
+export function mountLearnPanel({ onPractice, canAccessCoach = () => false } = {}) {
   const card = $('learn-card');
   const dialog = $('learn-dialog');
   const el = {
@@ -41,10 +41,13 @@ export function mountLearnPanel({ onPractice } = {}) {
   let practiceButton = null;
   let quizButtons = new Map();
 
-  const tabs = [$('learn-tab'), $('promo-tab')];
-  const panels = [$('learn-panel'), $('platform-promo-panel')];
+  const tabs = [$('learn-tab'), $('promo-tab'), $('coach-course-tab')];
+  const panels = [$('learn-panel'), $('platform-promo-panel'), $('coach-course-panel')];
+  let activeTab = tabs[1];
 
   function selectTab(active) {
+    if (!active || active.hidden) return false;
+    activeTab = active;
     for (let index = 0; index < tabs.length; index += 1) {
       const selected = tabs[index] === active;
       tabs[index].classList.toggle('is-active', selected);
@@ -52,20 +55,39 @@ export function mountLearnPanel({ onPractice } = {}) {
       tabs[index].tabIndex = selected ? 0 : -1;
       panels[index].hidden = !selected;
     }
+    return true;
+  }
+
+  function syncCoachAccess(allowed) {
+    const canAccess = Boolean(allowed);
+    tabs[2].hidden = !canAccess;
+    if (!canAccess && activeTab === tabs[2]) selectTab(tabs[1]);
+    panels[2].hidden = !canAccess || activeTab !== tabs[2];
+    return canAccess;
   }
 
   for (let index = 0; index < tabs.length; index += 1) {
-    tabs[index].addEventListener('click', () => selectTab(tabs[index]));
+    tabs[index].addEventListener('click', () => {
+      if (tabs[index] === tabs[2] && !canAccessCoach()) {
+        syncCoachAccess(false);
+        return;
+      }
+      selectTab(tabs[index]);
+    });
     tabs[index].addEventListener('keydown', (event) => {
       const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
       if (!delta) return;
       event.preventDefault();
-      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      const visible = tabs.filter((tab) => !tab.hidden);
+      const current = visible.indexOf(tabs[index]);
+      if (current < 0) return;
+      const next = visible[(current + delta + visible.length) % visible.length];
       selectTab(next);
       next.focus();
     });
   }
   selectTab(tabs[1]);
+  syncCoachAccess(canAccessCoach());
 
   function paintCard() {
     const progress = getAllProgress();
@@ -229,6 +251,7 @@ export function mountLearnPanel({ onPractice } = {}) {
 
   return {
     open,
+    syncCoachAccess,
     refresh() {
       paintCard();
       if (dialog.open) updatePractice(LEARN_TOPICS[current]);

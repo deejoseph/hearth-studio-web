@@ -35,17 +35,24 @@ describe('首页体验契约', () => {
     expect(domain).toContain('color: var(--muted)');
   });
 
-  it('平台亮点默认选中，教程标签仍具备完整 ARIA 状态', () => {
+  it('平台亮点默认选中，教练课件默认隐藏且具备完整 ARIA 状态', () => {
     const learnTab = html.match(/<button[^>]*id="learn-tab"[^>]*>/)?.[0];
     const promoTab = html.match(/<button[^>]*id="promo-tab"[^>]*>/)?.[0];
+    const coachTab = html.match(/<button[^>]*id="coach-course-tab"[^>]*>/)?.[0];
     const learnPanel = html.match(/<div[^>]*id="learn-panel"[^>]*>/)?.[0];
     const promoPanel = html.match(/<div[^>]*id="platform-promo-panel"[^>]*>/)?.[0];
+    const coachPanel = html.match(/<div[^>]*id="coach-course-panel"[^>]*>/)?.[0];
     expect(learnTab).toContain('aria-selected="false"');
     expect(learnTab).toContain('tabindex="-1"');
     expect(promoTab).toContain('aria-selected="true"');
     expect(promoTab).toContain('tabindex="0"');
     expect(learnPanel).toContain('hidden');
     expect(promoPanel).not.toContain('hidden');
+    expect(coachTab).toContain('aria-controls="coach-course-panel"');
+    expect(coachTab).toContain('hidden');
+    expect(coachPanel).toContain('aria-labelledby="coach-course-tab"');
+    expect(coachPanel).toContain('hidden');
+    expect(html).toContain('id="coach-import-container"');
   });
 
   it('教程与亮点卡片使用金色渐变，并保留暗色主题样式', () => {

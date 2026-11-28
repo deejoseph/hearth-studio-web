@@ -1565,24 +1565,8 @@ function openTactics(topicId = null) {
   els.tacticsDialog.classList.remove('lesson-mode');
   els.tacticsDialogTitle.textContent = '国际象棋练习';
   els.tacticsDialogStep.textContent = '完整题库 · 在棋盘上走出答案';
-  if (!tacticsPanel) {
-    tacticsPanel = mountTacticsPanel(els.tacticsPanelContainer, {
-      problems: BASIC_PROBLEMS,
-      canManage: canManageTactics(),
-      onProgress: () => learnPanel?.refresh(),
-      setFen: (fen) => {
-        loadBoard(fen);
-        tacticsViewColor = game.turn();
-        boardView.setOrientation(tacticsViewColor);
-        const plies = renderAll();
-        updateTacticsHighlight(plies);
-      },
-      getFen: () => game.fen(),
-    });
-  } else {
-    tacticsPanel.setCanManage(canManageTactics());
-    tacticsPanel.selectAll();
-  }
+  tacticsPanel.setCanManage(canManageTactics());
+  tacticsPanel.selectAll();
   if (!els.tacticsDialog.open) els.tacticsDialog.showModal();
   if (topicId) openPractice(topicId);
   if (account.player() && coachApp?.state() == null) void coachApp.refresh();
@@ -1595,7 +1579,10 @@ function openPractice(topicId) {
     showToast('这节课的练习暂时没找到。');
     return false;
   }
-  if (!tacticsMode) openTactics();
+  if (!tacticsMode) {
+    openTactics();
+    if (!tacticsMode) return false;
+  }
   if (!tacticsPanel?.selectLesson(topic.practiceIds)) {
     showToast('这节课的练习暂时没找到。');
     return false;
@@ -1630,10 +1617,7 @@ function clearTactics() {
   tacticsReturn = null;
   tacticsViewColor = 'w';
   paintTacticsColumn();
-  if (tacticsPanel) {
-    tacticsPanel.destroy();
-    tacticsPanel = null;
-  }
+  if (tacticsPanel) tacticsPanel.selectAll();
 }
 
 /** 更新题库面板的当前局面。 */
@@ -4748,6 +4732,7 @@ coachApp = mountCoachApp({
   onStateChange: () => {
     updateModeUi();
     tacticsPanel?.setCanManage(canManageTactics());
+    learnPanel?.syncCoachAccess(canManageTactics());
     // 刚批下来的教练当场就能看到【填我的教练资料】，不用刷新页面。
     coachProfile?.syncGate();
     // 投诉按钮与教练投诉记录都随资格变化；查询中一律不显示投诉入口。
@@ -4767,7 +4752,22 @@ function teacherBlocked() {
 }
 
 /** 国象自学教程：左边常驻的一张小卡，人人可看，不经过任何资格门。 */
-learnPanel = mountLearnPanel({ onPractice: openPractice });
+learnPanel = mountLearnPanel({ onPractice: openPractice, canAccessCoach: canManageTactics });
+tacticsPanel = mountTacticsPanel(els.tacticsPanelContainer, {
+  problems: [],
+  canManage: canManageTactics(),
+  importContainer: $('coach-import-container'),
+  onProgress: () => learnPanel?.refresh(),
+  setFen: (fen) => {
+    if (!tacticsMode) return;
+    loadBoard(fen);
+    tacticsViewColor = game.turn();
+    boardView.setOrientation(tacticsViewColor);
+    const plies = renderAll();
+    updateTacticsHighlight(plies);
+  },
+  getFen: () => game.fen(),
+});
 mountCommunityPresence();
 
 /* ------------------------------------------------------------------ */

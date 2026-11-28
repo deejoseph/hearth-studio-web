@@ -58,9 +58,9 @@ function text(node) {
   return node.text ?? node._text ?? '';
 }
 
-function mount({ stored = null, onPractice = () => {} } = {}) {
+function mount({ stored = null, onPractice = () => {}, canAccessCoach = () => false } = {}) {
   const ids = [
-    'learn-tab', 'promo-tab', 'learn-panel', 'platform-promo-panel',
+    'learn-tab', 'promo-tab', 'coach-course-tab', 'learn-panel', 'platform-promo-panel', 'coach-course-panel',
     'learn-card', 'learn-dialog', 'learn-dialog-step', 'learn-dialog-title',
     'learn-dialog-body', 'learn-prev-btn', 'learn-next-btn', 'learn-close-btn',
   ];
@@ -85,7 +85,7 @@ function mount({ stored = null, onPractice = () => {} } = {}) {
   });
   const body = elements['learn-dialog-body'];
   return {
-    panel: mountLearnPanel({ onPractice }), topics, body, elements,
+    panel: mountLearnPanel({ onPractice, canAccessCoach }), topics, body, elements,
   };
 }
 
@@ -113,6 +113,35 @@ describe('教程与平台标签', () => {
     expect(promoPanel.hidden).toBe(true);
     expect(learn.tabIndex).toBe(0);
     expect(promo.tabIndex).toBe(-1);
+  });
+
+  it('教练课件只对教练开放，撤权后立即退回平台亮点', () => {
+    const access = { allowed: false };
+    const { panel, elements } = mount({ canAccessCoach: () => access.allowed });
+    const coach = elements['coach-course-tab'];
+    const coachPanel = elements['coach-course-panel'];
+    const promo = elements['promo-tab'];
+
+    expect(coach.hidden).toBe(true);
+    expect(coachPanel.hidden).toBe(true);
+    coach.emit('click');
+    expect(promo.getAttribute('aria-selected')).toBe('true');
+    expect(coachPanel.hidden).toBe(true);
+
+    access.allowed = true;
+    panel.syncCoachAccess(true);
+    expect(coach.hidden).toBe(false);
+    promo.emit('keydown', { key: 'ArrowRight', preventDefault() {} });
+    expect(coach.focused).toBe(true);
+    expect(coach.getAttribute('aria-selected')).toBe('true');
+    expect(coachPanel.hidden).toBe(false);
+
+    access.allowed = false;
+    panel.syncCoachAccess(false);
+    expect(coach.hidden).toBe(true);
+    expect(coachPanel.hidden).toBe(true);
+    expect(promo.getAttribute('aria-selected')).toBe('true');
+    expect(promo.tabIndex).toBe(0);
   });
 
   it('左右方向键循环切换标签并移动焦点', () => {

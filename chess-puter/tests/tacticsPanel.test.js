@@ -85,8 +85,9 @@ function reviewButton(container) {
   return findAll(container, (node) => node.className === 'btn btn-primary btn-sm tactics-review-btn')[0];
 }
 
-function mount({ canManage = false, problems = BASIC_PROBLEMS, onProgress = () => {} } = {}) {
+function mount({ canManage = false, importContainer = null, problems = BASIC_PROBLEMS, onProgress = () => {} } = {}) {
   const container = fakeNode('div');
+  const importRoot = importContainer ?? fakeNode('div');
   const positions = [];
   vi.stubGlobal('document', {
     createElement: (name) => fakeNode(name),
@@ -94,12 +95,13 @@ function mount({ canManage = false, problems = BASIC_PROBLEMS, onProgress = () =
   });
   const panel = mountTacticsPanel(container, {
     canManage,
+    importContainer: importRoot,
     problems,
     onProgress,
     setFen: (fen) => positions.push(fen),
     getFen: () => START_FEN,
   });
-  return { container, panel, positions };
+  return { container, importContainer: importRoot, panel, positions };
 }
 
 beforeEach(() => {
@@ -114,8 +116,8 @@ beforeEach(() => {
 
 describe('公开解题与教练管理', () => {
   it('公众可做题，导入和题目集管理默认隐藏', () => {
-    const { container, panel } = mount();
-    const importSection = container.children[3];
+    const { container, importContainer, panel } = mount();
+    const importSection = importContainer.children[0];
     const manage = findAll(container, (node) => node.className === 'tactics-more tactics-manage')[0];
     expect(panel.getState()).toMatchObject({ canManage: false, status: 'solving' });
     expect(panel.getState().problems).toHaveLength(BASIC_PROBLEMS.length);
@@ -125,15 +127,43 @@ describe('公开解题与教练管理', () => {
     expect(panel.getState().status).toBe('correct');
   });
 
+  it('导入区可挂到教练课件页签，并随教练资格隐藏', () => {
+    const importContainer = fakeNode('div');
+    const { container, panel } = mount({ canManage: true, importContainer });
+    const importSection = importContainer.children[0];
+    expect(container.children).toHaveLength(3);
+    expect(importSection.className).toBe('tactics-more tactics-import');
+    expect(importSection.hidden).toBe(false);
+    expect(importSection.open).toBe(true);
+    panel.setCanManage(false);
+    expect(importSection.hidden).toBe(true);
+    expect(importSection.open).toBe(false);
+  });
+
+  it('教练课件里导入题目后先选中题目，不谎称已摆上棋盘', () => {
+    const fen = 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 4 4';
+    const { importContainer, panel, positions } = mount({ canManage: true, problems: [] });
+    const textarea = findAll(importContainer, (node) => node.className === 'tactics-textarea')[0];
+    const button = findAll(importContainer, (node) => node.textContent === '导入')[0];
+    textarea.value = `fen: ${fen}\nsolution: Qxf7#\ndifficulty: 900`;
+    button.emit('click');
+
+    expect(panel.getState()).toMatchObject({ canManage: true, status: 'solving' });
+    expect(panel.getState().problems).toHaveLength(1);
+    expect(positions).toEqual([fen]);
+    const result = findAll(importContainer, (node) => node.className.startsWith('tactics-import-result'))[0];
+    expect(result.textContent).toBe('成功导入 1 道题，打开练习即可开始解题。');
+  });
+
   it('资格变化只切换管理 UI，不重置当前题目', () => {
-    const { container, panel } = mount();
+    const { container, importContainer, panel } = mount();
     panel.selectProblemById('basic-tactics-fork');
     panel.setCanManage(true);
-    expect(container.children[3].hidden).toBe(false);
-    expect(container.children[3].open).toBe(true);
+    expect(importContainer.children[0].hidden).toBe(false);
+    expect(importContainer.children[0].open).toBe(true);
     expect(panel.getState()).toMatchObject({ canManage: true, currentProblemId: 'basic-tactics-fork' });
     panel.setCanManage(false);
-    expect(container.children[3].hidden).toBe(true);
+    expect(importContainer.children[0].hidden).toBe(true);
     expect(panel.getState().currentProblemId).toBe('basic-tactics-fork');
   });
 

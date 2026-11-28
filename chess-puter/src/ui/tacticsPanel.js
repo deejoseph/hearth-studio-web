@@ -55,11 +55,12 @@ const FORMAT_SAMPLE = [
  * @param {function} options.setFen - 把棋盘摆成题目局面 (fen) => void
  * @param {function} options.getFen - 读棋盘当前局面 () => fen，导入时用来取局面
  * @param {boolean} options.canManage - 是否显示教练的导入与题目集管理
+ * @param {HTMLElement} options.importContainer - 教练课件页签的导入区容器
  * @param {object[]} options.problems - 初始题目
  * @param {function} options.onProgress - 答题进度变化时通知外部
  */
 export function mountTacticsPanel(container, {
-  setFen, getFen, canManage = false, problems = [], onProgress = () => {},
+  setFen, getFen, canManage = false, importContainer = null, problems = [], onProgress = () => {},
 } = {}) {
   container.innerHTML = '';
   container.classList.add('tactics-panel');
@@ -99,7 +100,8 @@ export function mountTacticsPanel(container, {
   const storeSection = buildStoreSection(panel);
   const importSection = buildImportSection(panel);
 
-  container.append(problemSection, listSection, storeSection.root, importSection);
+  if (importContainer) importContainer.appendChild(importSection);
+  container.append(problemSection, listSection, storeSection.root);
 
   function syncManagement() {
     importSection.hidden = !panel.canManage;
@@ -140,6 +142,7 @@ export function mountTacticsPanel(container, {
       loadProblems(panel, problems);
     },
     destroy() {
+      importSection.remove();
       container.innerHTML = '';
     },
     getState() {
@@ -217,7 +220,7 @@ function buildProblemSection(panel) {
       statusBadge.textContent = '';
       statusBadge.className = 'tactics-status';
       hint.textContent = panel.canManage
-        ? '先在下面「导入题目与格式」里导入一道题。'
+        ? '先到左上方【教练课件】里导入一道题。'
         : '基础练习加载中。';
       feedback.textContent = '';
       feedback.className = 'tactics-feedback hidden';
@@ -395,7 +398,7 @@ function buildListSection(panel) {
 
     if (panel.problems.length === 0) {
       list.appendChild(emptyNote(panel.canManage
-        ? '还没有题目。点下面「导入题目与格式」试试。'
+        ? '还没有题目。到左上方【教练课件】导入试试。'
         : '基础练习加载中。'));
       return;
     }
@@ -678,7 +681,7 @@ function buildImportSection(panel) {
 
   const summary = document.createElement('summary');
   summary.className = 'tactics-more-summary';
-  summary.textContent = '教练导入与格式';
+  summary.textContent = '导入题目与格式';
   details.appendChild(summary);
 
   const body = document.createElement('div');
@@ -755,7 +758,7 @@ function buildImportSection(panel) {
     if (!panel.canManage) return;
     const problems = parseImportText(text);
     loadProblems(panel, problems);
-    showResult(`成功导入 ${problems.length} 道题，第一道已摆到棋盘上。`);
+    showResult(`成功导入 ${problems.length} 道题，打开练习即可开始解题。`);
   }
 
   fileTab.addEventListener('click', () => switchMode('file'));

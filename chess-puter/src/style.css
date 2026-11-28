@@ -433,6 +433,23 @@ svg.lucide {
   padding: 12px 14px;
 }
 
+.coach-course-lead {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.coach-course .tactics-import {
+  border: 0;
+  padding-top: 0;
+}
+
+.coach-course .tactics-more-summary {
+  color: var(--text);
+  font-size: 14px;
+}
+
 .learn-card {
   padding: 0;
 }

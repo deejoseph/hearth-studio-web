@@ -125,6 +125,8 @@
                       aria-selected="false" aria-controls="learn-panel" tabindex="-1">自学教程</button>
               <button type="button" class="learn-tab is-active" id="promo-tab" role="tab"
                       aria-selected="true" aria-controls="platform-promo-panel" tabindex="0">平台亮点</button>
+              <button type="button" class="learn-tab" id="coach-course-tab" role="tab"
+                      aria-selected="false" aria-controls="coach-course-panel" tabindex="-1" hidden>教练课件</button>
             </div>
             <div class="learn-tab-panel" id="learn-panel" role="tabpanel" aria-labelledby="learn-tab" hidden>
               <section class="learn-card" id="learn-card" aria-label="国象自学教程">
@@ -141,6 +143,16 @@
                   <button type="button" class="learn-topic" data-learn-topic="etiquette">国象礼仪</button>
                   <button type="button" class="learn-topic" data-learn-topic="ai">国际象棋与 AI</button>
                 </div>
+              </section>
+            </div>
+            <div class="learn-tab-panel" id="coach-course-panel" role="tabpanel" aria-labelledby="coach-course-tab" hidden>
+              <section class="coach-course" aria-labelledby="coach-course-title">
+                <div class="card-head">
+                  <h2 class="card-title" id="coach-course-title">教练课件</h2>
+                  <span class="learn-tag">仅教练</span>
+                </div>
+                <p class="coach-course-lead">导入 PGN 或自己编写的题目，制作本节课的练习课件。</p>
+                <div id="coach-import-container"></div>
               </section>
             </div>
             <div class="learn-tab-panel" id="platform-promo-panel" role="tabpanel" aria-labelledby="promo-tab">
