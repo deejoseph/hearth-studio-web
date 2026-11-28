@@ -55,6 +55,10 @@ describe('首页体验契约', () => {
     expect(html).toContain('id="coach-import-container"');
   });
 
+  it('平台亮点说明云课堂跨设备且无需安装', () => {
+    expect(html).toContain('<strong>云课堂</strong>，不用安装任何软件，彻底消除软件成本，走到哪里都可以上课，电脑、平板、手机都支持，有网络就能上课。');
+  });
+
   it('教程与亮点卡片使用金色渐变，并保留暗色主题样式', () => {
     const card = css.match(/^\.learn-panes \{[\s\S]*?^\}/m)?.[0];
     expect(card).toContain('border: 1px solid #e3bb57');
